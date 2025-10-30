@@ -1,0 +1,17 @@
+.DS_Store
+mattergen_results
+VASP_JOBS
+__pycache__
+test_*
+*_test
+*.vasp
+*.err
+*.out
+*.log
+*log*
+*logs*
+log/
+logs/
+*.dat
+*.out
+*.xml
