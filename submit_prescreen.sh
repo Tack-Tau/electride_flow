@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=prescreen
-#SBATCH --partition=Apus
+#SBATCH --partition=GPU
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8

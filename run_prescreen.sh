@@ -8,7 +8,7 @@ set -e
 RESULTS_DIR="./mattergen_results/ternary_csp_electrides"
 OUTPUT_DIR="./VASP_JOBS"
 MAX_COMPOSITIONS=""
-MAX_STRUCTURES=5
+MAX_STRUCTURES=0
 CONDA_ENV="mattersim"
 MP_API_KEY="${MP_API_KEY:-}"
 HULL_THRESHOLD=0.1
