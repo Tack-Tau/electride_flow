@@ -95,7 +95,26 @@ def get_mp_competing_phases_mattersim(chemsys, mp_api_key, cache_dir, device='cp
                 entry_id=item['entry_id']
             )
             entries.append(entry)
-        return entries
+        
+        # Check for missing elemental phases in cache
+        elements = chemsys.split('-')
+        present_elements = set()
+        for entry in entries:
+            comp = entry.composition
+            if len(comp.elements) == 1:
+                present_elements.add(str(comp.elements[0]))
+        
+        missing_elements = set(elements) - present_elements
+        
+        if missing_elements:
+            print(f"    WARNING: Cache missing elemental phases: {sorted(missing_elements)}")
+            print(f"    Cache will be regenerated...")
+            # Force re-query by deleting cache and returning empty (will trigger full query)
+            cache_file.unlink()
+            print(f"    Deleted incomplete cache, will re-fetch from MP...")
+            # Don't return here, let it fall through to the MP query below
+        else:
+            return entries
     
     print(f"    Querying MP for {chemsys} and all subsystems...")
     try:
@@ -166,6 +185,52 @@ def get_mp_competing_phases_mattersim(chemsys, mp_api_key, cache_dir, device='cp
             if relax_errors > 0:
                 print(f"    Relaxation errors: {relax_errors}")
             sys.stdout.flush()
+            
+            # Check for missing elemental phases and add fallback
+            present_elements = set()
+            for entry in mattersim_entries:
+                comp = entry.composition
+                if len(comp.elements) == 1:
+                    present_elements.add(str(comp.elements[0]))
+            
+            missing_elements = set(elements) - present_elements
+            
+            if missing_elements:
+                print(f"    WARNING: Missing elemental phases: {sorted(missing_elements)}")
+                print(f"    Adding fallback elemental entries using MP reference energies...")
+                
+                for elem in sorted(missing_elements):
+                    try:
+                        # Query MP for just this element
+                        elem_entries = mpr.get_entries(elem)
+                        if elem_entries:
+                            # Use the most stable elemental phase from MP
+                            elem_entry = sorted(elem_entries, key=lambda e: e.energy_per_atom)[0]
+                            
+                            # Get structure and relax with MatterSim
+                            elem_struct = mpr.get_structure_by_material_id(elem_entry.entry_id)
+                            if isinstance(elem_struct, list):
+                                elem_struct = elem_struct[0]
+                            
+                            relaxed_struct, energy_per_atom = relax_structure_mattersim(
+                                elem_struct, device=device
+                            )
+                            
+                            total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
+                            
+                            fallback_entry = ComputedEntry(
+                                composition=relaxed_struct.composition,
+                                energy=total_energy,
+                                entry_id=f"mp_mattersim_{elem_entry.entry_id}_fallback"
+                            )
+                            mattersim_entries.append(fallback_entry)
+                            print(f"      Added {elem} (fallback from {elem_entry.entry_id})")
+                        else:
+                            print(f"      ERROR: Could not find {elem} in MP!")
+                    except Exception as e:
+                        print(f"      ERROR: Failed to add {elem}: {e}")
+                
+                sys.stdout.flush()
             
             if mattersim_entries:
                 cached_data = []

@@ -50,9 +50,11 @@ mkdir -p vaspflow
 cd vaspflow
 
 # Copy files from your local machine:
-# - prescreen.py                    # Pre-screening script
+# - prescreen.py                     # Pre-screening script
 # - run_prescreen.sh                 # Submit pre-screening
 # - submit_prescreen.sh              # SLURM script for pre-screening
+# - plot_e_above_hull.py             # Visualize pre-screening results
+# - extract_stable_structs.py        # Extract stable structure CIFs
 # - workflow_manager.py              # VASP workflow orchestration
 # - run_workflow.sh                  # Submit VASP workflow
 # - submit_workflow_manager.sh       # SLURM script for workflow
@@ -81,7 +83,7 @@ cd /scratch/$USER/vaspflow
 bash run_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
-  --max-structures 5
+  --max-structures 0
 
 # Monitor pre-screening
 squeue -u $USER | grep prescreen
@@ -89,6 +91,12 @@ tail -f prescreen_*.out
 
 # When done, check results
 cat ./VASP_JOBS/prescreening_stability.json | jq '.summary'
+
+# (Optional) Visualize results and extract CIF files
+python3 plot_e_above_hull.py --input ./VASP_JOBS/prescreening_stability.json
+python3 extract_stable_structs.py \
+  --results-dir ./mattergen_results/ternary_csp_electrides \
+  --output-dir ./stable_structures
 ```
 
 ### 3. VASP Workflow (Run After Pre-screening)
@@ -101,7 +109,7 @@ bash run_workflow.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
   --max-concurrent 10 \
-  --max-structures 5
+  --max-structures 0
 
 # Check job status
 squeue -u $USER
@@ -173,9 +181,11 @@ mkdir -p vaspflow
 cd vaspflow
 
 # 4. Upload workflow scripts from your local machine
-# - prescreen.py                    # Pre-screening script
+# - prescreen.py                     # Pre-screening script
 # - run_prescreen.sh                 # Submit pre-screening
 # - submit_prescreen.sh              # SLURM script for pre-screening
+# - plot_e_above_hull.py             # Visualize pre-screening results
+# - extract_stable_structs.py        # Extract stable structure CIFs
 # - workflow_manager.py              # VASP workflow
 # - run_workflow.sh                  # Submit VASP workflow
 # - submit_workflow_manager.sh       # SLURM script for workflow
@@ -207,7 +217,7 @@ cd /scratch/$USER/vaspflow
 bash run_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
-  --max-structures 5
+  --max-structures 0
 
 # Monitor pre-screening
 squeue -u $USER | grep prescreen
@@ -217,12 +227,19 @@ tail -f prescreen_*.out
 # Check results:
 cat ./VASP_JOBS/prescreening_stability.json | jq '.summary'
 
+# 2b. (Optional) Visualize and extract stable structures
+python3 plot_e_above_hull.py --input ./VASP_JOBS/prescreening_stability.json
+python3 extract_stable_structs.py \
+  --json ./VASP_JOBS/prescreening_stability.json \
+  --results-dir ./mattergen_results/ternary_csp_electrides \
+  --output-dir ./stable_structures
+
 # 3. Submit VASP workflow manager (processes passing structures)
 bash run_workflow.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
   --max-concurrent 20 \
-  --max-structures 5
+  --max-structures 0
 
 # 4. Monitor (optional)
 squeue -u $USER                    # Check job status
@@ -670,7 +687,7 @@ python workflow_manager.py --init-only \
 python prescreen.py \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
-  --max-structures 5 \         # Max structures per composition
+  --max-structures 0 \         # Max structures per composition
   --mp-api-key YOUR_KEY \      # Materials Project API key
   --hull-threshold 0.1 \       # E_hull threshold (eV/atom)
   --device cpu                 # MatterSim device: cpu or cuda
@@ -683,7 +700,7 @@ python workflow_manager.py \
   --output-dir ./VASP_JOBS \
   --max-concurrent 10 \        # Max structures running simultaneously
   --max-compositions 20 \      # Limit number of compositions (optional)
-  --max-structures 5 \         # Max structures per composition
+  --max-structures 0 \         # Max structures per composition
   --check-interval 60          # Status check interval (seconds)
 ```
 
@@ -857,7 +874,7 @@ Pre-screening uses the MatterSim ML potential to quickly evaluate thermodynamic 
 bash run_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
-  --max-structures 5
+  --max-structures 0
 
 # Custom threshold
 bash run_prescreen.sh --hull-threshold 0.05  # Stricter (fewer pass)
@@ -873,7 +890,7 @@ bash run_workflow.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
   --max-concurrent 10 \
-  --max-structures 5
+  --max-structures 0
 
 # By default, workflow_manager.py looks for:
 #   ./VASP_JOBS/prescreening_stability.json
@@ -915,6 +932,33 @@ cat VASP_JOBS/prescreening_stability.json | jq '.results[] | {
 # Count passed vs filtered
 cat VASP_JOBS/prescreening_stability.json | jq '.results[] | select(.passed_prescreening==true)' | jq -s 'length'
 cat VASP_JOBS/prescreening_stability.json | jq '.results[] | select(.passed_prescreening==false)' | jq -s 'length'
+```
+
+### Pre-screening Utilities
+
+#### Visualizing Energy Distribution
+
+Use `plot_e_above_hull.py` to visualize the energy distribution and verify your threshold:
+
+```bash
+# Plot histogram of energy_above_hull values
+python3 plot_e_above_hull.py \
+  --input ./VASP_JOBS/prescreening_stability.json \
+  --output histogram.png \
+  --bins 100 \
+  --max-energy 2.0
+```
+
+#### Extracting Stable Structures
+
+Use `extract_stable_structs.py` to extract CIF files for structures that passed pre-screening:
+
+```bash
+# Extract CIF files for structures that passed pre-screening
+python3 extract_stable_structs.py \
+  --json ./VASP_JOBS/prescreening_stability.json \
+  --results-dir ./mattergen_results/ternary_csp_electrides \
+  --output-dir ./stable_structures
 ```
 
 ### Troubleshooting
@@ -984,6 +1028,8 @@ tail -f workflow_manager_*.out
 | `prescreen.py` | MatterSim pre-screening (separate step) |
 | `run_prescreen.sh` | Submit pre-screening wrapper (user-facing) |
 | `submit_prescreen.sh` | SLURM script for pre-screening |
+| `plot_e_above_hull.py` | Visualize pre-screening energy distribution |
+| `extract_stable_structs.py` | Extract CIF files for stable structures |
 | `workflow_manager.py` | VASP workflow orchestration + PARCHG |
 | `run_workflow.sh` | Submit workflow wrapper (user-facing) |
 | `submit_workflow_manager.sh` | SLURM script for workflow manager |
@@ -995,6 +1041,7 @@ tail -f workflow_manager_*.out
 
 **Note**: 
 - Pre-screening runs separately (`prescreen.py`) before VASP workflow (`workflow_manager.py`)
+- Utility scripts (`plot_e_above_hull.py`, `extract_stable_structs.py`) help analyze pre-screening results
 - Analysis uses `analyze.py` to orchestrate `Electride.py` for batch processing
 - User-friendly wrapper scripts provide consistent interface across all stages
 
@@ -1016,37 +1063,35 @@ tail -f workflow_manager_*.out
 
 ## Common Workflows
 
-### Test Run (Small Scale)
-
-```bash
-# Step 1: Pre-screening
-bash run_prescreen.sh \
-  --max-compositions 2 \
-  --max-structures 2
-# Total: 4 structures for testing
-
-# Wait for pre-screening to complete
-squeue -u $USER | grep prescreen
-cat ./VASP_JOBS/prescreening_stability.json | jq '.summary'
-
-# Step 2: VASP workflow
-bash run_workflow.sh \
-  --max-compositions 2 \
-  --max-structures 2 \
-  --max-concurrent 4
-```
-
 ### Production Run (Full Scale)
 
 ```bash
 # Step 1: Pre-screening (all structures)
-bash run_prescreen.sh --max-structures 5
+# Step 1: Pre-screening
+bash run_prescreen.sh \
+  --results-dir ./mattergen_results/ternary_csp_electrides \
+  --output-dir ./VASP_JOBS \
+  --device cuda \
+  --hull-threshold 0.1 \
+  --max-structures 0
 
-# Wait for completion, then start VASP
+# Wait for completion, check and visualize results
+jq '.results[] | select(.passed_prescreening == true) | {structure_id, energy_above_hull}' VASP_JOBS/prescreening_stability.json
+
+python3 plot_e_above_hull.py --bins 100
+
+# (Optional) Extract stable structures for inspection
+python3 extract_stable_structs.py \
+  --results-dir ./mattergen_results/ternary_csp_electrides \
+  --output-dir ./stable_structures
+
+# Step 2: VASP workflow
 bash run_workflow.sh \
-  --max-structures 5 \
-  --max-concurrent 20
-# Processes all compositions that passed pre-screening
+  --results-dir ./mattergen_results/ternary_csp_electrides \
+  --output-dir ./VASP_JOBS \
+  --max-concurrent 10 \
+  --max-structures 0 \
+  --check-interval 120
 ```
 
 ### Resume After Interruption
@@ -1077,11 +1122,17 @@ cd /scratch/$USER/vaspflow
 bash run_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
-  --max-structures 5
+  --max-structures 0
 
 # Wait for pre-screening to complete
 squeue -u $USER | grep prescreen
 cat ./VASP_JOBS/prescreening_stability.json | jq '.summary'
+
+# 3b. Visualize and extract stable structures (optional)
+python3 plot_e_above_hull.py --input ./VASP_JOBS/prescreening_stability.json
+python3 extract_stable_structs.py \
+  --results-dir ./mattergen_results/ternary_csp_electrides \
+  --output-dir ./stable_structures
 
 # 4. Start VASP workflow (as SLURM job)
 bash run_workflow.sh \
