@@ -201,34 +201,43 @@ def get_mp_competing_phases_mattersim(chemsys, mp_api_key, cache_dir, device='cp
                 
                 for elem in sorted(missing_elements):
                     try:
-                        # Query MP for just this element
-                        elem_entries = mpr.get_entries(elem)
-                        if elem_entries:
-                            # Use the most stable elemental phase from MP
-                            elem_entry = sorted(elem_entries, key=lambda e: e.energy_per_atom)[0]
-                            
-                            # Get structure and relax with MatterSim
-                            elem_struct = mpr.get_structure_by_material_id(elem_entry.entry_id)
-                            if isinstance(elem_struct, list):
-                                elem_struct = elem_struct[0]
-                            
-                            relaxed_struct, energy_per_atom = relax_structure_mattersim(
-                                elem_struct, device=device
-                            )
-                            
-                            total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
-                            
-                            fallback_entry = ComputedEntry(
-                                composition=relaxed_struct.composition,
-                                energy=total_energy,
-                                entry_id=f"mp_mattersim_{elem_entry.entry_id}_fallback"
-                            )
-                            mattersim_entries.append(fallback_entry)
-                            print(f"      Added {elem} (fallback from {elem_entry.entry_id})")
-                        else:
+                        # Query MP for elemental phases using summary.search
+                        elem_docs = mpr.materials.summary.search(
+                            elements=[elem],
+                            num_elements=(1, 1),
+                            fields=["material_id", "formula_pretty", "energy_per_atom", "structure"]
+                        )
+                        
+                        if not elem_docs:
                             print(f"      ERROR: Could not find {elem} in MP!")
+                            continue
+                        
+                        # Use the most stable elemental phase
+                        elem_doc = sorted(elem_docs, key=lambda d: d.energy_per_atom)[0]
+                        mp_id = elem_doc.material_id
+                        mp_struct = elem_doc.structure
+                        
+                        print(f"      Found {elem} elemental phase: {mp_id} (MP E = {elem_doc.energy_per_atom:.4f} eV/atom)")
+                        
+                        # Relax with MatterSim
+                        relaxed_struct, energy_per_atom = relax_structure_mattersim(
+                            mp_struct, device=device
+                        )
+                        
+                        total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
+                        
+                        fallback_entry = ComputedEntry(
+                            composition=relaxed_struct.composition,
+                            energy=total_energy,
+                            entry_id=f"mp_mattersim_{mp_id}_fallback"
+                        )
+                        mattersim_entries.append(fallback_entry)
+                        print(f"      Added {elem} (MatterSim E = {energy_per_atom:.4f} eV/atom, fallback from {mp_id})")
+                        
                     except Exception as e:
                         print(f"      ERROR: Failed to add {elem}: {e}")
+                        import traceback
+                        traceback.print_exc()
                 
                 sys.stdout.flush()
             
