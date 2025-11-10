@@ -668,6 +668,9 @@ fi
         print(f"  Submitting ELF: {struct_id}")
         
         try:
+            # Ensure ELF directory exists before copying PARCHG files
+            elf_dir.mkdir(parents=True, exist_ok=True)
+            
             # Copy PARCHG files from PARCHG/*/ subdirectories to ELF/ directory
             # This ensures Electride.py can find them for analysis
             parchg_labels = ['band0', 'band1', 'e0025', 'e05', 'e10']
@@ -1018,6 +1021,37 @@ fi
             if added_count > 0:
                 print(f"  Added {added_count} structures")
         
+        # Load structures from database that aren't in structures_dict yet
+        # This handles resume scenarios where structures exist in DB but weren't loaded from ZIP
+        print("\nChecking database for additional structures...")
+        loaded_from_contcar = 0
+        skipped_count = 0
+        
+        for struct_id, sdata in self.db.data['structures'].items():
+            if struct_id in structures_dict:
+                continue  # Already loaded from ZIP
+            
+            # Try to load from Relax/CONTCAR for structures that have been processed
+            if sdata['state'] not in ['PENDING', 'RELAX_RUNNING']:
+                relax_dir = Path(sdata['relax_dir'])
+                contcar_path = relax_dir / 'CONTCAR'
+                
+                if contcar_path.exists():
+                    try:
+                        structure = Structure.from_file(str(contcar_path))
+                        structures_dict[struct_id] = structure
+                        loaded_from_contcar += 1
+                    except Exception as e:
+                        print(f"  Warning: Could not load {struct_id} from CONTCAR: {e}")
+                        skipped_count += 1
+                else:
+                    skipped_count += 1
+        
+        if loaded_from_contcar > 0:
+            print(f"  Loaded {loaded_from_contcar} structures from CONTCAR files (resume)")
+        if skipped_count > 0:
+            print(f"  Skipped {skipped_count} structures (no CONTCAR available)")
+        
         self.db.data['config'] = {
             'max_concurrent': self.max_concurrent,
             'results_dir': str(results_dir),
@@ -1026,7 +1060,14 @@ fi
         }
         self.db.save()
         
-        print(f"\nTotal structures initialized: {len(structures_dict)}")
+        print(f"\nTotal structures ready for workflow: {len(structures_dict)}")
+        
+        # Report structures in database but not in structures_dict
+        missing_count = len(self.db.data['structures']) - len(structures_dict)
+        if missing_count > 0:
+            print(f"  Note: {missing_count} structures in database but not in structures_dict")
+            print(f"        (These will be skipped during monitoring)")
+        
         return structures_dict
 
 

@@ -59,6 +59,7 @@ cd vaspflow
 # - run_workflow.sh                  # Submit VASP workflow
 # - submit_workflow_manager.sh       # SLURM script for workflow
 # - workflow_status.py               # Monitor workflow progress
+# - reset_failed_jobs.py             # Reset failed jobs for retry
 # - Electride.py                     # Bader analysis
 # - bader (executable, optional)
 
@@ -190,6 +191,7 @@ cd vaspflow
 # - run_workflow.sh                  # Submit VASP workflow
 # - submit_workflow_manager.sh       # SLURM script for workflow
 # - workflow_status.py               # Status monitoring
+# - reset_failed_jobs.py             # Reset failed jobs for retry
 # - Electride.py                     # Bader analysis
 # - bader (executable, optional)
 
@@ -618,6 +620,46 @@ grep -i "error\|killed\|fail" vasp_*.out
 - Memory issues (check vasp_*.err)
 - POTCAR problems (check first few lines of vasp_*.out)
 
+### Resetting Failed Jobs for Retry
+
+Use `reset_failed_jobs.py` to reset failed structures and retry them:
+
+```bash
+# Step 1: List all failed structures to understand what went wrong
+python3 reset_failed_jobs.py --list
+
+# Output shows failures grouped by stage:
+#   RELAX_FAILED: 72 structures
+#   SC_FAILED: 4 structures
+#   PARCHG_FAILED: 4 structures
+
+# Step 2: Dry run to preview changes (recommended)
+python3 reset_failed_jobs.py --dry-run --clean
+
+# Step 3: Reset all failed jobs
+python3 reset_failed_jobs.py --clean
+
+# OR reset specific stage only
+python3 reset_failed_jobs.py --stage RELAX --clean
+python3 reset_failed_jobs.py --stage SC --clean
+python3 reset_failed_jobs.py --stage PARCHG --clean
+
+# Step 4: Resume workflow to retry
+bash run_workflow.sh \
+  --results-dir ./mattergen_results/ternary_csp_electrides \
+  --output-dir ./VASP_JOBS \
+  --max-concurrent 10
+```
+
+**What it does**:
+- `RELAX_FAILED` → `PENDING` (retry from scratch)
+- `SC_FAILED` → `RELAX_DONE` (retry SC using existing relaxed structure)
+- `PARCHG_FAILED` → `SC_DONE` (retry PARCHG using existing SC results)
+- `--clean` flag removes `VASP_FAILED` markers for clean restart
+- Creates automatic backup: `workflow.json.bak`
+
+**Important**: Investigate failure causes before blindly retrying. Some structures may have fundamental issues (bad geometry, unconverged, etc.) and will fail repeatedly.
+
 ### POTCAR Not Found
 
 ```bash
@@ -1034,6 +1076,7 @@ tail -f workflow_manager_*.out
 | `run_workflow.sh` | Submit workflow wrapper (user-facing) |
 | `submit_workflow_manager.sh` | SLURM script for workflow manager |
 | `workflow_status.py` | Status checking and reporting |
+| `reset_failed_jobs.py` | Reset failed jobs to retry (RELAX/SC/PARCHG) |
 | `analyze.py` | Orchestrates electride analysis (calls Electride.py) |
 | `analyze.sh` | SLURM script for analysis job |
 | `Electride.py` | Bader analysis on ELFCAR + PARCHG files |
@@ -1042,6 +1085,7 @@ tail -f workflow_manager_*.out
 **Note**: 
 - Pre-screening runs separately (`prescreen.py`) before VASP workflow (`workflow_manager.py`)
 - Utility scripts (`plot_e_above_hull.py`, `extract_stable_structs.py`) help analyze pre-screening results
+- `reset_failed_jobs.py` resets failed VASP jobs to retry them without data loss
 - Analysis uses `analyze.py` to orchestrate `Electride.py` for batch processing
 - User-friendly wrapper scripts provide consistent interface across all stages
 
