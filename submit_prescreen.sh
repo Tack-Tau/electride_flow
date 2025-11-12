@@ -131,7 +131,14 @@ echo "  Max structures: $MAX_STRUCTURES"
 echo "  Max compositions: ${MAX_COMPOSITIONS:-all}"
 echo "  Hull threshold: ${HULL_THRESHOLD} eV/atom"
 echo "  Device: $DEVICE"
-echo "  MP API key: ${MP_API_KEY:+[SET]}${MP_API_KEY:-[NOT SET]}"
+
+# Check MP API key
+if [ -z "$MP_API_KEY" ]; then
+    echo "ERROR: MP_API_KEY environment variable not set"
+    echo "Set it in ~/.bashrc: export MP_API_KEY=your_32_character_key"
+    exit 1
+fi
+echo "  MP API key: ${MP_API_KEY:0:8}..." # Show first 8 chars only
 echo ""
 
 echo "========================================================================"

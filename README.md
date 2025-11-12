@@ -560,6 +560,110 @@ python3 ../../../../Electride.py . --bader-exe ~/apps/Bader/bader
 
 ---
 
+## DFT Energy Above Hull Calculation
+
+After VASP relaxations complete, compute **DFT-level thermodynamic stability** using your VASP energies combined with Materials Project DFT energies for competing phases.
+
+### Why Compute DFT Hull?
+
+**Pre-screening uses MatterSim** (fast, approximate):
+- Target structures: MatterSim energies
+- Competing phases: MatterSim energies (re-relaxed from MP)
+- Purpose: Filter ~60% of structures before expensive VASP
+
+**DFT hull uses VASP + MP** (accurate, publication-quality):
+- Target structures: **VASP-PBE energies** (from your relaxations)
+- Competing phases: **MP DFT-PBE energies** (original MP data)
+- Purpose: Accurate thermodynamic stability for validation and publication
+
+**Key advantage**: VASP and MP both use GGA-PBE functional with PAW pseudopotentials → energies are directly comparable!
+
+### Usage
+
+```bash
+# Submit DFT hull calculation (after VASP relaxations complete)
+bash run_dft_e_hull.sh \
+  --vasp-jobs ./VASP_JOBS \
+  --output dft_stability_results.json \
+  --prescreen-results ./VASP_JOBS/prescreening_stability.json
+
+# Monitor job
+squeue -u $USER | grep dft_e_hull
+tail -f dft_e_hull_*.out
+
+# When complete, compare MatterSim vs DFT accuracy
+python3 compare_hulls.py \
+  --mattersim-json ./VASP_JOBS/prescreening_stability.json \
+  --dft-json ./VASP_JOBS/dft_stability_results.json \
+  --threshold 0.1 \
+  --output hull_comparison.json
+```
+
+### What It Does
+
+1. **Scans for completed VASP relaxations** (RELAX_DONE or later states)
+2. **Extracts VASP energies** from `vasprun.xml`
+3. **Queries MP for competing phases** using cached MP IDs from pre-screening
+4. **Computes DFT energy_above_hull** for each structure
+5. **Outputs** `dft_stability_results.json`
+
+### Output Format
+
+```json
+{
+  "summary": {
+    "total_structures": 100,
+    "processed_successfully": 95,
+    "failed": 5,
+    "energy_reference": "DFT (VASP-PBE + MP-PBE)"
+  },
+  "results": [
+    {
+      "structure_id": "Li10B1N4_s001",
+      "composition": "Li10B1N4",
+      "chemsys": "B-Li-N",
+      "vasp_energy_per_atom": -3.45678,
+      "dft_energy_above_hull": 0.023,
+      "num_mp_competing_phases": 45,
+      "error": null
+    }
+  ]
+}
+```
+
+### Validation with compare_hulls.py
+
+The `compare_hulls.py` script validates pre-screening accuracy by comparing MatterSim vs DFT hull values:
+
+**Statistical metrics**:
+- Pearson correlation (how well MatterSim predicts DFT)
+- Mean Absolute Error (MAE)
+- Root Mean Square Error (RMSE)
+
+**Pre-screening performance**:
+- True Positives: Correctly passed (stable in both)
+- False Positives: Incorrectly passed (unstable in DFT, wasted VASP)
+- True Negatives: Correctly filtered (unstable in both)
+- False Negatives: Incorrectly filtered (stable in DFT, missed!)
+- Precision, Recall, F1 Score
+- Computational savings (% VASP avoided)
+
+**Output**: `hull_comparison.json` with detailed analysis
+
+### When to Use
+
+- **After some VASP relaxations complete**: Validate pre-screening accuracy early
+- **Before publication**: Get accurate DFT stability data
+- **To identify outliers**: Find structures that were incorrectly filtered/passed
+
+### Performance
+
+- **Time**: ~1-2 hours for 100 structures (mostly MP API queries)
+- **Resources**: 8 CPUs, 32GB RAM (for large systems)
+- **Caching**: Uses MP IDs from pre-screening cache to minimize API calls
+
+---
+
 ## Troubleshooting
 
 ### Workflow Manager Not Running
@@ -1077,6 +1181,10 @@ tail -f workflow_manager_*.out
 | `submit_workflow_manager.sh` | SLURM script for workflow manager |
 | `workflow_status.py` | Status checking and reporting |
 | `reset_failed_jobs.py` | Reset failed jobs to retry (RELAX/SC/PARCHG) |
+| `compute_dft_e_hull.py` | Compute DFT energy_above_hull (VASP + MP) |
+| `run_dft_e_hull.sh` | Submit DFT hull wrapper (user-facing) |
+| `submit_dft_e_hull.sh` | SLURM script for DFT hull calculation |
+| `compare_hulls.py` | Compare MatterSim vs DFT hull accuracy |
 | `analyze.py` | Orchestrates electride analysis (calls Electride.py) |
 | `analyze.sh` | SLURM script for analysis job |
 | `Electride.py` | Bader analysis on ELFCAR + PARCHG files |
@@ -1086,6 +1194,8 @@ tail -f workflow_manager_*.out
 - Pre-screening runs separately (`prescreen.py`) before VASP workflow (`workflow_manager.py`)
 - Utility scripts (`plot_e_above_hull.py`, `extract_stable_structs.py`) help analyze pre-screening results
 - `reset_failed_jobs.py` resets failed VASP jobs to retry them without data loss
+- `compute_dft_e_hull.py` computes accurate DFT stability after VASP relaxations complete
+- `compare_hulls.py` validates pre-screening accuracy by comparing MatterSim vs DFT hulls
 - Analysis uses `analyze.py` to orchestrate `Electride.py` for batch processing
 - User-friendly wrapper scripts provide consistent interface across all stages
 
