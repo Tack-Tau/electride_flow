@@ -51,7 +51,7 @@ def relax_structure_mattersim(pmg_struct, sym_tol=1e-1, device='cpu', fmax=0.01,
         device: 'cpu' or 'cuda'
         fmax: Force convergence criterion (eV/Angstrom)
         max_steps: Maximum optimization steps
-        logfile: Optional path for FIRE optimizer log
+        logfile: None to suppress FIRE optimizer log, otherwise path to log file or set to '-' for stdout
     
     Returns:
         tuple: (relaxed_structure, energy_per_atom)
@@ -76,7 +76,7 @@ def relax_structure_mattersim(pmg_struct, sym_tol=1e-1, device='cpu', fmax=0.01,
     
     # Use UnitCellFilter to relax both cell and atomic positions
     ecf = UnitCellFilter(atoms)
-    dyn = FIRE(ecf, a=0.1, logfile=logfile) if logfile is not None else FIRE(ecf, a=0.1)
+    dyn = FIRE(ecf, a=0.1, logfile=logfile)
     dyn.run(fmax=fmax, steps=max_steps)
     
     energy = atoms.get_potential_energy()

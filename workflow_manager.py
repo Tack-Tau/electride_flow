@@ -251,7 +251,6 @@ class VASPWorkflowManager:
                 'LCHARG': False,
                 'LAECHG': False,
                 'LASPH': False,
-                'ISPIN': 1,
                 'LORBIT': 0,
             })
         elif job_type == 'sc':
@@ -268,7 +267,6 @@ class VASPWorkflowManager:
                 'LCHARG': True,
                 'LAECHG': False,
                 'LASPH': False,
-                'ISPIN': 1,
                 'LORBIT': 0,
             })
         elif job_type == 'elf':
@@ -288,7 +286,6 @@ class VASPWorkflowManager:
                 'LCHARG': False,
                 'LAECHG': False,
                 'LASPH': False,
-                'ISPIN': 1,
                 'LORBIT': 10,
             })
         elif job_type == 'parchg':
@@ -851,7 +848,7 @@ fi
                     break
             
             if all_done:
-                for subdir in ['band0', 'band1', 'e0025', 'e05', 'e1']:
+                for subdir in ['band0', 'band1', 'e0025', 'e05', 'e10']:
                     job_dir = parchg_dir / subdir
                     if job_dir.exists():
                         local_status = self.check_local_status(job_dir)
@@ -873,9 +870,11 @@ fi
         print(f"Max concurrent structures: {self.max_concurrent}")
         print(f"Check interval: {self.check_interval}s")
         print("="*70 + "\n")
+        sys.stdout.flush()
         
         while True:
             print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Checking job status...")
+            sys.stdout.flush()
             
             # Update status of all running jobs
             for struct_id in list(self.db.data['structures'].keys()):
@@ -919,21 +918,26 @@ fi
             print("\nStatistics:")
             for state, count in sorted(stats['states'].items()):
                 print(f"  {state}: {count}")
+            sys.stdout.flush()
             
             # Check if all done
             pending_count = len(self.db.get_by_state('PENDING'))
             if running_count == 0 and pending_count == 0:
                 completed = len(self.db.get_by_state('ELF_DONE'))
                 total = stats['total']
-                if completed + len(self.db.get_by_state('ELF_FAILED')) + \
-                   len(self.db.get_by_state('RELAX_FAILED')) + \
-                   len(self.db.get_by_state('SC_FAILED')) >= total:
+                failed_count = (len(self.db.get_by_state('ELF_FAILED')) + 
+                               len(self.db.get_by_state('PARCHG_FAILED')) + 
+                               len(self.db.get_by_state('RELAX_FAILED')) + 
+                               len(self.db.get_by_state('SC_FAILED')))
+                if completed + failed_count >= total:
                     print("\n" + "="*70)
                     print("All workflows completed!")
                     print("="*70)
+                    sys.stdout.flush()
                     break
             
             print(f"\nSleeping for {self.check_interval}s...")
+            sys.stdout.flush()
             time.sleep(self.check_interval)
     
     def initialize_structures(self, results_dir, output_dir, 
