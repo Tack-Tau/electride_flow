@@ -62,12 +62,18 @@ echo "Running DFT hull calculation..."
 echo "  VASP jobs: $VASP_JOBS"
 echo "  Output: $OUTPUT"
 echo "  Pre-screening filter: $PRESCREEN_RESULTS"
+if [ -n "$PURE_PBE" ]; then
+    echo "  Functional filtering: Pure GGA-PBE only"
+else
+    echo "  Functional filtering: Mixed PBE/PBE+U"
+fi
 echo ""
 
 python3 compute_dft_e_hull.py \
     --vasp-jobs "$VASP_JOBS" \
     --output "$OUTPUT" \
-    --prescreen-results "$PRESCREEN_RESULTS"
+    --prescreen-results "$PRESCREEN_RESULTS" \
+    $PURE_PBE
 
 EXIT_CODE=$?
 

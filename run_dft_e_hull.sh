@@ -7,6 +7,7 @@ set -e
 VASP_JOBS="./VASP_JOBS"
 OUTPUT="dft_stability_results.json"
 PRESCREEN_RESULTS="./VASP_JOBS/prescreening_stability.json"
+PURE_PBE=""
 SUBMIT_SCRIPT="submit_dft_e_hull.sh"
 
 # Parse command-line arguments
@@ -24,6 +25,10 @@ while [[ $# -gt 0 ]]; do
             PRESCREEN_RESULTS="$2"
             shift 2
             ;;
+        --pure-pbe)
+            PURE_PBE="--pure-pbe"
+            shift 1
+            ;;
         -h|--help)
             cat << EOF
 Usage: $0 [OPTIONS]
@@ -34,11 +39,15 @@ Options:
     --vasp-jobs PATH           VASP jobs directory (default: ./VASP_JOBS)
     --output FILE              Output JSON file (default: dft_stability_results.json)
     --prescreen-results FILE   Pre-screening filter (default: ./VASP_JOBS/prescreening_stability.json)
+    --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)
     -h, --help                 Show this help message
 
 Example:
-    # Basic usage (process all completed structures)
+    # Basic usage (mixed PBE/PBE+U for best accuracy)
     bash run_dft_e_hull.sh
+
+    # Pure PBE filtering (strict functional consistency)
+    bash run_dft_e_hull.sh --pure-pbe
 
     # Custom paths
     bash run_dft_e_hull.sh \\
@@ -52,6 +61,8 @@ Notes:
     - Only processes structures that completed relaxation (RELAX_DONE or later)
     - If --prescreen-results provided, only processes structures that passed pre-screening
     - Uses VASP energies from vasprun.xml + MP DFT energies for competing phases
+    - Default: Mixed PBE/PBE+U (MP recommended methodology for accuracy)
+    - Use --pure-pbe only if your VASP uses pure PBE without +U corrections
 
 EOF
             exit 0
@@ -74,6 +85,7 @@ fi
 export VASP_JOBS
 export OUTPUT
 export PRESCREEN_RESULTS
+export PURE_PBE
 
 echo "======================================================================"
 echo "Submitting DFT Energy Above Hull Calculation"
@@ -81,6 +93,11 @@ echo "======================================================================"
 echo "VASP jobs: $VASP_JOBS"
 echo "Output: $OUTPUT"
 echo "Pre-screening filter: $PRESCREEN_RESULTS"
+if [ -n "$PURE_PBE" ]; then
+    echo "Functional filtering: Pure GGA-PBE only (PBE+U excluded)"
+else
+    echo "Functional filtering: Mixed PBE/PBE+U (recommended)"
+fi
 echo "======================================================================"
 
 # Submit job
