@@ -25,6 +25,9 @@ from pymatgen.ext.matproj import MPRester
 from pymatgen.io.ase import AseAtomsAdaptor
 
 from ase.optimize import FIRE
+from ase.filters import UnitCellFilter
+from pyxtal import pyxtal
+from pyxtal.db import database_topology
 
 try:
     from mattersim.forcefield import MatterSimCalculator
@@ -38,15 +41,31 @@ warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data w
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
 
 
-def relax_structure_mattersim(structure, device='cpu', fmax=0.05, max_steps=100):
+def relax_structure_mattersim(pmg_struct, sym_tol=1e-1, device='cpu', fmax=0.01, max_steps=500, logfile=None):
     """
-    Relax structure using MatterSim + FIRE optimizer.
+    Relax structure using MatterSim + FIRE optimizer with symmetrization and cell relaxation.
     
-    Note: Creates a NEW calculator for each structure to avoid memory accumulation.
-    This follows the pattern from relax_structures_manual.py which was proven fast.
+    Args:
+        pmg_struct: Pymatgen Structure object
+        sym_tol: Symmetry tolerance for PyXtal symmetrization (default 1e-1)
+        device: 'cpu' or 'cuda'
+        fmax: Force convergence criterion (eV/Angstrom)
+        max_steps: Maximum optimization steps
+        logfile: Optional path for FIRE optimizer log
+    
+    Returns:
+        tuple: (relaxed_structure, energy_per_atom)
+    
+    Note:
+        - Symmetrizes structure using PyXtal (important for mattergen structures)
+        - Uses UnitCellFilter to relax both cell and atomic positions
+        - Creates a NEW calculator for each structure to avoid memory accumulation
     """
-    adaptor = AseAtomsAdaptor()
-    atoms = adaptor.get_atoms(structure)
+    
+    # Symmetrize structure using PyXtal
+    xtal = pyxtal()
+    xtal.from_seed(pmg_struct, tol=sym_tol)
+    atoms = xtal.to_ase()
     
     # Create fresh calculator for this structure (prevents memory issues)
     calc = MatterSimCalculator(
@@ -55,11 +74,16 @@ def relax_structure_mattersim(structure, device='cpu', fmax=0.05, max_steps=100)
     )
     atoms.calc = calc
     
-    optimizer = FIRE(atoms, logfile=None)
-    optimizer.run(fmax=fmax, steps=max_steps)
+    # Use UnitCellFilter to relax both cell and atomic positions
+    ecf = UnitCellFilter(atoms)
+    dyn = FIRE(ecf, a=0.1, logfile=logfile) if logfile is not None else FIRE(ecf, a=0.1)
+    dyn.run(fmax=fmax, steps=max_steps)
     
     energy = atoms.get_potential_energy()
     energy_per_atom = energy / len(atoms)
+    
+    # Convert back to pymatgen structure
+    adaptor = AseAtomsAdaptor()
     relaxed_structure = adaptor.get_structure(atoms)
     
     # Clean up
@@ -503,6 +527,8 @@ def main():
             
             results.append({
                 'structure_id': struct_id,
+                'pmg': relaxed_struct,
+                'energy_per_atom': energy_per_atom,
                 'composition': item['composition'],
                 'chemsys': chemsys,
                 'mattersim_energy_per_atom': float(energy_per_atom),
@@ -516,6 +542,8 @@ def main():
             failed += 1
             results.append({
                 'structure_id': struct_id,
+                'pmg': None,
+                'energy_per_atom': None,
                 'composition': item['composition'],
                 'chemsys': chemsys,
                 'mattersim_energy_per_atom': None,
@@ -527,8 +555,10 @@ def main():
         
         # Save checkpoint every 50 structures
         if len(results) % 50 == 0:
+            # Create JSON-safe version (exclude pmg Structure objects)
+            results_json = [{k: v for k, v in r.items() if k != 'pmg'} for r in results]
             checkpoint_data = {
-                'results': results,
+                'results': results_json,
                 'passed': passed,
                 'failed': failed,
                 'timestamp': datetime.now().isoformat()
@@ -536,7 +566,8 @@ def main():
             with open(checkpoint_file, 'w') as f:
                 json.dump(checkpoint_data, f, indent=2)
     
-    # Save results
+    # Save results to JSON (exclude pmg Structure objects)
+    results_json = [{k: v for k, v in r.items() if k != 'pmg'} for r in results]
     output_data = {
         'summary': {
             'total_structures': len(all_structures),
@@ -545,12 +576,43 @@ def main():
             'hull_threshold': args.hull_threshold,
             'energy_reference': 'MatterSim-v1.0.0-5M'
         },
-        'results': results
+        'results': results_json
     }
     
     output_file = output_dir / 'prescreening_stability.json'
     with open(output_file, 'w') as f:
         json.dump(output_data, f, indent=2)
+    
+    print(f"\nJSON results saved to: {output_file}")
+    
+    # Save PyXtal database with relaxed structures
+    print("\nSaving PyXtal database...")
+    db_file = output_dir / 'prescreening_structures.db'
+    db = database_topology(str(db_file))
+    
+    successful_count = 0
+    for res in results:
+        if res['pmg'] is not None:
+            try:
+                xtal = pyxtal()
+                xtal.from_seed(res['pmg'])
+                db.add_xtal(
+                    xtal, 
+                    kvp={
+                        'structure_id': res['structure_id'],
+                        'e_above_hull': res['energy_above_hull'],
+                        'e_mattersim': res['energy_per_atom'],
+                        'composition': res['composition'],
+                        'chemsys': res['chemsys'],
+                        'passed_prescreening': res['passed_prescreening']
+                    }
+                )
+                successful_count += 1
+            except Exception as e:
+                print(f"  Warning: Could not add {res['structure_id']} to database: {e}")
+    
+    print(f"PyXtal database saved to: {db_file}")
+    print(f"  Structures in database: {successful_count}")
     
     # Remove checkpoint file (no longer needed)
     if checkpoint_file.exists():
@@ -562,7 +624,8 @@ def main():
     print(f"Total structures: {len(all_structures)}")
     print(f"Passed: {passed}")
     print(f"Failed: {failed}")
-    print(f"Results saved to: {output_file}")
+    print(f"JSON: {output_file}")
+    print(f"Database: {db_file} ({successful_count} structures)")
     print("="*70)
     
     return 0
