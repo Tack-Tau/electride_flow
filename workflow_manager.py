@@ -20,16 +20,22 @@ import zipfile
 import warnings
 import subprocess
 import shutil
-import numpy as np
 from pathlib import Path
 from io import StringIO
 from datetime import datetime
-from collections import defaultdict
 
-from pymatgen.core import Structure, Composition
+from pymatgen.core import Structure
 from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.sets import MPRelaxSet, MPStaticSet
 from pymatgen.io.vasp.outputs import Vasprun
+from pymatgen.io.ase import AseAtomsAdaptor
+
+try:
+    from pyxtal import pyxtal
+    PYXTAL_AVAILABLE = True
+except ImportError:
+    PYXTAL_AVAILABLE = False
+    print("WARNING: PyXtal not available. Structures will not be symmetrized.")
 
 warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data with symbol.*')
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
@@ -227,13 +233,27 @@ class VASPWorkflowManager:
         """
         Create VASP input files using pymatgen.
         
-        Note: For SC, ELF, and PARCHG jobs, POSCAR is deleted after generation.
-        The relaxed structure (CONTCAR from Relax) will be copied by the SLURM script.
+        Note: 
+        - For relax jobs, structure is symmetrized using PyXtal before VASP input generation
+        - For SC, ELF, and PARCHG jobs, POSCAR is deleted after generation
+        - The relaxed structure (CONTCAR from Relax) will be copied by the SLURM script
         """
         job_dir = Path(job_dir)
         job_dir.mkdir(parents=True, exist_ok=True)
         
         if job_type == 'relax':
+            # Symmetrize structure using PyXtal (same as in prescreen.py)
+            if PYXTAL_AVAILABLE:
+                try:
+                    adaptor = AseAtomsAdaptor()
+                    xtal = pyxtal()
+                    xtal.from_seed(structure, tol=1e-1)  # Default tolerance
+                    atoms = xtal.to_ase()
+                    structure = adaptor.get_structure(atoms)
+                except Exception as e:
+                    print(f"    Warning: Could not symmetrize structure: {e}")
+                    print(f"    Proceeding with original structure...")
+            
             vis = MPRelaxSet(structure, user_incar_settings={
                 'PREC': 'Accurate',
                 'ALGO': 'Fast',
@@ -808,8 +828,26 @@ fi
             if job_status == 'NOTFOUND':
                 local_status = self.check_local_status(sdata['relax_dir'])
                 if local_status == 'DONE':
-                    self.db.update_state(struct_id, 'RELAX_DONE')
-                    print(f"  {struct_id}: Relax completed")
+                    # Check convergence before marking as done
+                    vasprun_path = Path(sdata['relax_dir']) / 'vasprun.xml'
+                    if vasprun_path.exists():
+                        try:
+                            vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
+                            if not vr.converged:
+                                self.db.update_state(struct_id, 'RELAX_FAILED', 
+                                                   error='VASP calculation not converged')
+                                print(f"  {struct_id}: Relax FAILED (not converged)")
+                            else:
+                                self.db.update_state(struct_id, 'RELAX_DONE')
+                                print(f"  {struct_id}: Relax completed")
+                        except Exception as e:
+                            self.db.update_state(struct_id, 'RELAX_FAILED', 
+                                               error=f'Could not check convergence: {e}')
+                            print(f"  {struct_id}: Relax FAILED (convergence check error)")
+                    else:
+                        self.db.update_state(struct_id, 'RELAX_FAILED', 
+                                           error='vasprun.xml not found')
+                        print(f"  {struct_id}: Relax FAILED (vasprun.xml missing)")
                 elif local_status == 'FAILED':
                     self.db.update_state(struct_id, 'RELAX_FAILED')
                     print(f"  {struct_id}: Relax failed")
@@ -819,8 +857,26 @@ fi
             if job_status == 'NOTFOUND':
                 local_status = self.check_local_status(sdata['sc_dir'])
                 if local_status == 'DONE':
-                    self.db.update_state(struct_id, 'SC_DONE')
-                    print(f"  {struct_id}: SC completed")
+                    # Check convergence before marking as done
+                    vasprun_path = Path(sdata['sc_dir']) / 'vasprun.xml'
+                    if vasprun_path.exists():
+                        try:
+                            vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
+                            if not vr.converged:
+                                self.db.update_state(struct_id, 'SC_FAILED', 
+                                                   error='VASP calculation not converged')
+                                print(f"  {struct_id}: SC FAILED (not converged)")
+                            else:
+                                self.db.update_state(struct_id, 'SC_DONE')
+                                print(f"  {struct_id}: SC completed")
+                        except Exception as e:
+                            self.db.update_state(struct_id, 'SC_FAILED', 
+                                               error=f'Could not check convergence: {e}')
+                            print(f"  {struct_id}: SC FAILED (convergence check error)")
+                    else:
+                        self.db.update_state(struct_id, 'SC_FAILED', 
+                                           error='vasprun.xml not found')
+                        print(f"  {struct_id}: SC FAILED (vasprun.xml missing)")
                 elif local_status == 'FAILED':
                     self.db.update_state(struct_id, 'SC_FAILED')
                     print(f"  {struct_id}: SC failed")
@@ -830,8 +886,26 @@ fi
             if job_status == 'NOTFOUND':
                 local_status = self.check_local_status(sdata['elf_dir'])
                 if local_status == 'DONE':
-                    self.db.update_state(struct_id, 'ELF_DONE')
-                    print(f"  {struct_id}: ELF completed")
+                    # Check convergence before marking as done
+                    vasprun_path = Path(sdata['elf_dir']) / 'vasprun.xml'
+                    if vasprun_path.exists():
+                        try:
+                            vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
+                            if not vr.converged:
+                                self.db.update_state(struct_id, 'ELF_FAILED', 
+                                                   error='VASP calculation not converged')
+                                print(f"  {struct_id}: ELF FAILED (not converged)")
+                            else:
+                                self.db.update_state(struct_id, 'ELF_DONE')
+                                print(f"  {struct_id}: ELF completed")
+                        except Exception as e:
+                            self.db.update_state(struct_id, 'ELF_FAILED', 
+                                               error=f'Could not check convergence: {e}')
+                            print(f"  {struct_id}: ELF FAILED (convergence check error)")
+                    else:
+                        self.db.update_state(struct_id, 'ELF_FAILED', 
+                                           error='vasprun.xml not found')
+                        print(f"  {struct_id}: ELF FAILED (vasprun.xml missing)")
                 elif local_status == 'FAILED':
                     self.db.update_state(struct_id, 'ELF_FAILED')
                     print(f"  {struct_id}: ELF failed")
@@ -848,6 +922,7 @@ fi
                     break
             
             if all_done:
+                # Check both local status and convergence for each PARCHG job
                 for subdir in ['band0', 'band1', 'e0025', 'e05', 'e10']:
                     job_dir = parchg_dir / subdir
                     if job_dir.exists():
@@ -855,10 +930,29 @@ fi
                         if local_status == 'FAILED':
                             any_failed = True
                             break
+                        elif local_status == 'DONE':
+                            # Check convergence
+                            vasprun_path = job_dir / 'vasprun.xml'
+                            if vasprun_path.exists():
+                                try:
+                                    vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
+                                    if not vr.converged:
+                                        self.db.update_state(struct_id, 'PARCHG_FAILED', 
+                                                           error=f'PARCHG {subdir} not converged')
+                                        print(f"  {struct_id}: PARCHG FAILED ({subdir} not converged)")
+                                        any_failed = True
+                                        break
+                                except Exception as e:
+                                    self.db.update_state(struct_id, 'PARCHG_FAILED', 
+                                                       error=f'PARCHG {subdir} convergence check error: {e}')
+                                    print(f"  {struct_id}: PARCHG FAILED ({subdir} convergence check error)")
+                                    any_failed = True
+                                    break
                 
                 if any_failed:
-                    self.db.update_state(struct_id, 'PARCHG_FAILED')
-                    print(f"  {struct_id}: PARCHG failed")
+                    if sdata['state'] != 'PARCHG_FAILED':  # Only update if not already marked failed
+                        self.db.update_state(struct_id, 'PARCHG_FAILED')
+                        print(f"  {struct_id}: PARCHG failed")
                 else:
                     self.db.update_state(struct_id, 'PARCHG_DONE')
                     print(f"  {struct_id}: PARCHG completed")
