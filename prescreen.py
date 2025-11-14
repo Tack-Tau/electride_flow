@@ -12,15 +12,16 @@ import json
 import argparse
 import zipfile
 import warnings
+import time
+import random
+import fcntl
 from pathlib import Path
 from io import StringIO
-from collections import defaultdict
 from datetime import datetime
 
-from pymatgen.core import Structure, Composition
+from pymatgen.core import Composition
 from pymatgen.io.cif import CifParser
-from pymatgen.entries.computed_entries import ComputedEntry
-from pymatgen.analysis.phase_diagram import PhaseDiagram
+from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
 from pymatgen.ext.matproj import MPRester
 from pymatgen.io.ase import AseAtomsAdaptor
 
@@ -41,14 +42,14 @@ warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data w
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
 
 
-def relax_structure_mattersim(pmg_struct, sym_tol=1e-1, device='cpu', fmax=0.01, max_steps=500, logfile=None):
+def relax_structure_mattersim(pmg_struct, calculator, sym_tol=1e-1, fmax=0.01, max_steps=500, logfile=None):
     """
     Relax structure using MatterSim + FIRE optimizer with symmetrization and cell relaxation.
     
     Args:
         pmg_struct: Pymatgen Structure object
+        calculator: MatterSimCalculator instance (reused across batch)
         sym_tol: Symmetry tolerance for PyXtal symmetrization (default 1e-1)
-        device: 'cpu' or 'cuda'
         fmax: Force convergence criterion (eV/Angstrom)
         max_steps: Maximum optimization steps
         logfile: None to suppress FIRE optimizer log, otherwise path to log file or set to '-' for stdout
@@ -59,7 +60,7 @@ def relax_structure_mattersim(pmg_struct, sym_tol=1e-1, device='cpu', fmax=0.01,
     Note:
         - Symmetrizes structure using PyXtal (important for mattergen structures)
         - Uses UnitCellFilter to relax both cell and atomic positions
-        - Creates a NEW calculator for each structure to avoid memory accumulation
+        - Calculator is reused for efficiency (batch processing)
     """
     
     # Symmetrize structure using PyXtal
@@ -67,12 +68,8 @@ def relax_structure_mattersim(pmg_struct, sym_tol=1e-1, device='cpu', fmax=0.01,
     xtal.from_seed(pmg_struct, tol=sym_tol)
     atoms = xtal.to_ase()
     
-    # Create fresh calculator for this structure (prevents memory issues)
-    calc = MatterSimCalculator(
-        load_path="MatterSim-v1.0.0-5M.pth",
-        device=device
-    )
-    atoms.calc = calc
+    # Attach calculator (reused from batch)
+    atoms.calc = calculator
     
     # Use UnitCellFilter to relax both cell and atomic positions
     ecf = UnitCellFilter(atoms)
@@ -86,218 +83,271 @@ def relax_structure_mattersim(pmg_struct, sym_tol=1e-1, device='cpu', fmax=0.01,
     adaptor = AseAtomsAdaptor()
     relaxed_structure = adaptor.get_structure(atoms)
     
-    # Clean up
+    # Clean up atoms object (but keep calculator for reuse)
     del atoms
-    del calc
-    if device == 'cuda':
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+    del ecf
+    del dyn
     
     return relaxed_structure, energy_per_atom
 
 
-def get_mp_competing_phases_mattersim(chemsys, mp_api_key, cache_dir, device='cpu'):
+def load_mp_cache_locked(cache_file):
     """
-    Get MP competing phases and re-relax with MatterSim for consistent energy reference.
-    Results are cached per chemical system.
+    Load MP cache with file locking for safe concurrent access.
+    
+    Returns:
+        dict: Cache data keyed by (chemsys, entry_id)
     """
-    cache_dir = Path(cache_dir)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / f"mp_{chemsys}_mattersim.json"
+    cache_file = Path(cache_file)
+    cached_data = {}
     
     if cache_file.exists():
-        print(f"    Using cached MP data for {chemsys}")
         with open(cache_file, 'r') as f:
-            cached_data = json.load(f)
-        
-        entries = []
-        for item in cached_data:
-            entry = ComputedEntry(
-                composition=item['composition'],
-                energy=item['energy'],
-                entry_id=item['entry_id']
-            )
-            entries.append(entry)
-        
-        # Check for missing elemental phases in cache
-        elements = chemsys.split('-')
-        present_elements = set()
-        for entry in entries:
-            comp = entry.composition
-            if len(comp.elements) == 1:
-                present_elements.add(str(comp.elements[0]))
-        
-        missing_elements = set(elements) - present_elements
-        
-        if missing_elements:
-            print(f"    WARNING: Cache missing elemental phases: {sorted(missing_elements)}")
-            print(f"    Cache will be regenerated...")
-            # Force re-query by deleting cache and returning empty (will trigger full query)
-            cache_file.unlink()
-            print(f"    Deleted incomplete cache, will re-fetch from MP...")
-            # Don't return here, let it fall through to the MP query below
-        else:
-            return entries
+            # Acquire shared lock for reading
+            fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+            try:
+                cache_list = json.load(f)
+                # Convert list to dict keyed by (chemsys, mp_id) for fast lookup
+                for item in cache_list:
+                    key = (item.get('chemsys', ''), item['entry_id'])
+                    cached_data[key] = item
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
     
-    print(f"    Querying MP for {chemsys} and all subsystems...")
-    try:
-        with MPRester(mp_api_key) as mpr:
+    return cached_data
+
+
+def save_mp_cache_locked(cache_file, new_entries_data):
+    """
+    Save MP cache entries with file locking for safe concurrent writes.
+    
+    Args:
+        cache_file: Path to cache file
+        new_entries_data: List of new cache entries to add
+    """
+    cache_file = Path(cache_file)
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Use a lock file to coordinate access
+    lock_file = cache_file.with_suffix('.lock')
+    
+    with open(lock_file, 'w') as lock_f:
+        # Acquire exclusive lock
+        fcntl.flock(lock_f.fileno(), fcntl.LOCK_EX)
+        try:
+            # Load existing cache
+            existing_cache = {}
+            if cache_file.exists():
+                with open(cache_file, 'r') as f:
+                    cache_list = json.load(f)
+                    for item in cache_list:
+                        key = (item.get('chemsys', ''), item['entry_id'])
+                        existing_cache[key] = item
+            
+            # Add new entries (avoid duplicates)
+            for new_item in new_entries_data:
+                key = (new_item['chemsys'], new_item['entry_id'])
+                if key not in existing_cache:
+                    existing_cache[key] = new_item
+            
+            # Write back to file
+            all_cache_data = list(existing_cache.values())
+            with open(cache_file, 'w') as f:
+                json.dump(all_cache_data, f, indent=2)
+            
+            print(f"    Updated cache: {cache_file} ({len(all_cache_data)} total entries)")
+        finally:
+            fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
+
+
+def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, batch_size=32):
+    """
+    Get MP stable (on-hull) phases and relax with MatterSim for consistent energy reference.
+    
+    Key optimizations:
+    - Queries ONLY stable phases (is_stable=True) from MP
+    - Uses single SHARED global cache file (mp_mattersim.json) across all parallel batches
+    - Per-chemsys locking prevents duplicate MP queries across batches
+    - Reuses calculator across batch for efficiency
+    - Returns PDEntry objects for phase diagram analysis
+    
+    Args:
+        chemsys: Chemical system string (e.g., 'B-Li-N')
+        mp_api_key: Materials Project API key
+        cache_file: Path to SHARED global cache file (mp_mattersim.json)
+        calculator: MatterSimCalculator instance (reused for batch)
+        batch_size: Batch size for processing (not used in this function but passed for consistency)
+    
+    Returns:
+        List of PDEntry objects for stable phases in this chemical system
+    """
+    cache_file = Path(cache_file)
+    
+    # Use per-chemical-system lock to prevent duplicate queries
+    # This ensures only ONE batch queries MP for this chemsys at a time
+    chemsys_lock_file = cache_file.parent / f"mp_cache_{chemsys.replace('-', '')}.lock"
+    
+    with open(chemsys_lock_file, 'w') as chemsys_lock:
+        # Acquire exclusive lock for this chemical system
+        fcntl.flock(chemsys_lock.fileno(), fcntl.LOCK_EX)
+        
+        try:
+            # Double-check pattern: read cache AFTER acquiring lock
+            # Another batch may have populated it while we waited for lock
+            cached_data = load_mp_cache_locked(cache_file)
+    
+            # Extract entries for this chemsys from cache
             elements = chemsys.split('-')
+            entries = []
+            cached_count = 0
             
-            mp_entries = mpr.get_entries_in_chemsys(elements)
-            
-            if not mp_entries:
-                print(f"    Warning: No MP entries found for {chemsys} and subsystems")
-                return []
-            
-            phase_count = {}
-            for entry in mp_entries:
-                comp_els = tuple(sorted([str(el) for el in entry.composition.elements]))
-                phase_count[comp_els] = phase_count.get(comp_els, 0) + 1
-            
-            for comp_els, count in sorted(phase_count.items()):
-                sub_chemsys = '-'.join(comp_els)
-                print(f"      {sub_chemsys}: {count} phases")
-            
-            print(f"    Total: {len(mp_entries)} MP phases, fetching structures and relaxing with MatterSim...")
-            
-            mattersim_entries = []
-            fetch_errors = 0
-            relax_errors = 0
-            
-            for mp_entry in mp_entries:
-                try:
-                    if hasattr(mp_entry, 'structure') and mp_entry.structure is not None:
-                        mp_struct = mp_entry.structure
-                    else:
-                        mp_struct = mpr.get_structure_by_material_id(mp_entry.entry_id)
-                        
-                        if isinstance(mp_struct, list):
-                            if len(mp_struct) == 0:
-                                fetch_errors += 1
-                                continue
-                            mp_struct = mp_struct[0]
-                    
-                    if not hasattr(mp_struct, 'composition'):
-                        fetch_errors += 1
-                        continue
-                    
-                except Exception:
-                    fetch_errors += 1
-                    continue
-                
-                try:
-                    relaxed_struct, energy_per_atom = relax_structure_mattersim(
-                        mp_struct, device=device
+            for key, item in cached_data.items():
+                item_chemsys = key[0]
+                # Include if chemsys matches OR if it's a subset (e.g., 'B', 'Li' for 'B-Li-N')
+                item_elements = sorted(item_chemsys.split('-'))
+                if set(item_elements).issubset(set(elements)):
+                    entry = PDEntry(
+                        composition=Composition(item['composition']),
+                        energy=item['energy'],
+                        name=item['entry_id']
                     )
+                    entries.append(entry)
+                    cached_count += 1
+            
+            # Check if we have all required subsystems cached
+            required_chemsys = set()
+            for n in range(1, len(elements) + 1):
+                from itertools import combinations
+                for combo in combinations(elements, n):
+                    required_chemsys.add('-'.join(sorted(combo)))
+            
+            cached_chemsys = set(item[0] for item in cached_data.keys())
+            missing_chemsys = required_chemsys - cached_chemsys
+            
+            if cached_count > 0 and not missing_chemsys:
+                print(f"    Using cached data: {cached_count} stable phases for {chemsys}")
+                return entries
+    
+            # Need to query MP for missing data
+            print(f"    Querying MP for stable phases in {chemsys} and subsystems...")
+            if missing_chemsys:
+                print(f"      Missing: {sorted(missing_chemsys)}")
+    
+            try:
+                with MPRester(mp_api_key) as mpr:
+                    # Query ALL missing subsystems (including elementals and binaries)
+                    # This ensures we have terminal entries for phase diagram construction
+                    all_stable_docs = []
+                    systems_to_query = missing_chemsys if missing_chemsys else [chemsys]
                     
-                    total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
-                    
-                    entry = ComputedEntry(
-                        composition=relaxed_struct.composition,
-                        energy=total_energy,
-                        entry_id=f"mp_mattersim_{mp_entry.entry_id}"
-                    )
-                    mattersim_entries.append(entry)
-                except Exception:
-                    relax_errors += 1
-            
-            print(f"    Successfully relaxed: {len(mattersim_entries)}/{len(mp_entries)} phases")
-            if fetch_errors > 0:
-                print(f"    Structure fetch errors: {fetch_errors}")
-            if relax_errors > 0:
-                print(f"    Relaxation errors: {relax_errors}")
-            sys.stdout.flush()
-            
-            # Check for missing elemental phases and add fallback
-            present_elements = set()
-            for entry in mattersim_entries:
-                comp = entry.composition
-                if len(comp.elements) == 1:
-                    present_elements.add(str(comp.elements[0]))
-            
-            missing_elements = set(elements) - present_elements
-            
-            if missing_elements:
-                print(f"    WARNING: Missing elemental phases: {sorted(missing_elements)}")
-                print(f"    Adding fallback elemental entries using MP reference energies...")
-                
-                for elem in sorted(missing_elements):
-                    try:
-                        # Query MP for elemental phases using summary.search
-                        elem_docs = mpr.materials.summary.search(
-                            elements=[elem],
-                            num_elements=(1, 1),
-                            fields=["material_id", "formula_pretty", "energy_per_atom", "structure"]
+                    for sys in sorted(systems_to_query):
+                        # Query only STABLE phases (is_stable=True)
+                        # This is MP's authoritative determination of thermodynamic stability
+                        stable_docs = mpr.materials.summary.search(
+                            chemsys=sys,
+                            is_stable=True,  # Only on-hull phases
+                            fields=["material_id", "formula_pretty", "energy_per_atom", "structure", "energy_above_hull"]
                         )
                         
-                        if not elem_docs:
-                            print(f"      ERROR: Could not find {elem} in MP!")
+                        if stable_docs:
+                            all_stable_docs.extend(stable_docs)
+                        
+                        # Random sleep to avoid API rate limiting (0-500 ms)
+                        time.sleep(random.uniform(0, 0.5))
+                    
+                    if not all_stable_docs:
+                        print(f"    Warning: No stable MP phases found for {chemsys} and subsystems")
+                        return entries
+                    
+                    print(f"    Found {len(all_stable_docs)} stable phases across all subsystems, relaxing with MatterSim...")
+                    
+                    new_entries_data = []
+                    success_count = 0
+                    
+                    for doc in all_stable_docs:
+                        mp_id = doc.material_id
+                        
+                        # Determine chemsys for this phase
+                        doc_elements = sorted([str(el) for el in doc.structure.composition.elements])
+                        doc_chemsys = '-'.join(doc_elements)
+                        
+                        # Skip if already cached
+                        cache_key = (doc_chemsys, mp_id)
+                        if cache_key in cached_data:
                             continue
                         
-                        # Use the most stable elemental phase
-                        elem_doc = sorted(elem_docs, key=lambda d: d.energy_per_atom)[0]
-                        mp_id = elem_doc.material_id
-                        mp_struct = elem_doc.structure
-                        
-                        print(f"      Found {elem} elemental phase: {mp_id} (MP E = {elem_doc.energy_per_atom:.4f} eV/atom)")
-                        
-                        # Relax with MatterSim
-                        relaxed_struct, energy_per_atom = relax_structure_mattersim(
-                            mp_struct, device=device
-                        )
-                        
-                        total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
-                        
-                        fallback_entry = ComputedEntry(
-                            composition=relaxed_struct.composition,
-                            energy=total_energy,
-                            entry_id=f"mp_mattersim_{mp_id}_fallback"
-                        )
-                        mattersim_entries.append(fallback_entry)
-                        print(f"      Added {elem} (MatterSim E = {energy_per_atom:.4f} eV/atom, fallback from {mp_id})")
-                        
-                    except Exception as e:
-                        print(f"      ERROR: Failed to add {elem}: {e}")
-                        import traceback
-                        traceback.print_exc()
-                
-                sys.stdout.flush()
-            
-            if mattersim_entries:
-                cached_data = []
-                for entry in mattersim_entries:
-                    cached_data.append({
-                        'composition': entry.composition.as_dict(),
-                        'energy': entry.energy,
-                        'entry_id': entry.entry_id
-                    })
-                with open(cache_file, 'w') as f:
-                    json.dump(cached_data, f, indent=2)
-                print(f"    Cached {len(mattersim_entries)} MP phases for {chemsys}")
-            
-            return mattersim_entries
-            
-    except Exception as e:
-        print(f"    Error querying MP for {chemsys}: {e}")
-        return []
+                        try:
+                            # Relax with MatterSim using reused calculator
+                            relaxed_struct, energy_per_atom = relax_structure_mattersim(
+                                doc.structure, calculator
+                            )
+                            
+                            total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
+                            
+                            # Create PDEntry
+                            entry = PDEntry(
+                                composition=relaxed_struct.composition,
+                                energy=total_energy,
+                                name=f"mp_mattersim_{mp_id}"
+                            )
+                            entries.append(entry)
+                            
+                            # Store for caching
+                            new_entries_data.append({
+                                'chemsys': doc_chemsys,
+                                'composition': {str(el): float(amt) for el, amt in relaxed_struct.composition.items()},
+                                'energy': total_energy,
+                                'entry_id': f"mp_mattersim_{mp_id}",
+                                'mp_id': mp_id
+                            })
+                            success_count += 1
+                            
+                        except Exception as e:
+                            print(f"      Warning: Failed to relax {mp_id}: {e}")
+                    
+                    print(f"    Successfully relaxed {success_count} new phases")
+                    
+                    # Update cache with new entries (with file locking)
+                    if new_entries_data:
+                        save_mp_cache_locked(cache_file, new_entries_data)
+                    
+                    return entries
+                    
+            except Exception as e:
+                print(f"    Error querying MP for {chemsys}: {e}")
+                import traceback
+                traceback.print_exc()
+                return entries
+        
+        finally:
+            # Release the per-chemsys lock
+            fcntl.flock(chemsys_lock.fileno(), fcntl.LOCK_UN)
 
 
 def compute_energy_above_hull(structure, energy_per_atom, mp_entries):
-    """Compute energy above hull for a structure."""
+    """
+    Compute energy above hull for a structure using PDEntry.
+    
+    Args:
+        structure: Pymatgen Structure
+        energy_per_atom: Energy per atom (eV/atom)
+        mp_entries: List of PDEntry objects for reference phases
+    
+    Returns:
+        float: Energy above hull (eV/atom)
+    """
     composition = structure.composition
     total_energy = energy_per_atom * composition.num_atoms
     
-    entry = ComputedEntry(
+    entry = PDEntry(
         composition=composition,
         energy=total_energy,
-        entry_id='generated'
+        name='generated'
     )
     
     all_entries = list(mp_entries) + [entry]
     pd = PhaseDiagram(all_entries)
-    e_above_hull = pd.get_e_above_hull(entry)
+    decomp, e_above_hull = pd.get_decomp_and_e_above_hull(entry, allow_negative=True)
     
     return float(e_above_hull)
 
@@ -358,22 +408,40 @@ def main():
         help="Device for MatterSim"
     )
     parser.add_argument(
+        '--start-composition',
+        type=int,
+        default=0,
+        help="Starting composition index for parallel batch processing (default: 0)"
+    )
+    parser.add_argument(
         '--max-compositions',
         type=int,
         default=None,
-        help="Max compositions to process"
+        help="Max compositions to process (count from start-composition)"
     )
     parser.add_argument(
         '--max-structures',
         type=int,
-        default=5,
+        default=0,
         help="Max structures per composition"
+    )
+    parser.add_argument(
+        '--batch-size',
+        type=int,
+        default=32,
+        help="Batch size for structure processing (reuses MatterSimCalculator)"
     )
     parser.add_argument(
         '--mp-cache-dir',
         type=str,
         default=None,
-        help="Directory to cache MP data"
+        help="Directory to save MP cache file (default: same as output-dir)"
+    )
+    parser.add_argument(
+        '--batch-id',
+        type=str,
+        default=None,
+        help="Batch ID for parallel runs (creates unique checkpoint/output files)"
     )
     
     args = parser.parse_args()
@@ -388,11 +456,10 @@ def main():
         print("  Use: --mp-api-key YOUR_KEY or export MP_API_KEY=YOUR_KEY")
         return 1
     
-    mp_cache_dir = args.mp_cache_dir
-    if mp_cache_dir is None:
-        mp_cache_dir = output_dir / "mp_mattersim_cache"
-    else:
-        mp_cache_dir = Path(mp_cache_dir).expanduser()
+    # Use SHARED global cache file (with file locking for parallel safety)
+    # All parallel batches share the same cache to avoid duplicate MP API calls
+    mp_cache_dir = Path(args.mp_cache_dir).expanduser() if args.mp_cache_dir else output_dir
+    mp_cache_file = mp_cache_dir / "mp_mattersim.json"
     
     print("="*70)
     print("MatterSim Pre-screening for VASPflow")
@@ -401,14 +468,22 @@ def main():
     print(f"Output directory: {output_dir}")
     print(f"Hull threshold: {args.hull_threshold} eV/atom")
     print(f"Device: {args.device}")
+    print(f"Batch size: {args.batch_size}")
+    print(f"Start composition index: {args.start_composition}")
     print(f"Max compositions: {args.max_compositions or 'all'}")
     print(f"Max structures per composition: {args.max_structures}")
-    print(f"MP cache directory: {mp_cache_dir}")
+    print(f"MP cache file: {mp_cache_file}")
     print("="*70 + "\n")
     
     
     # Scan structures
     comp_dirs = sorted(results_dir.glob("*_structures"))
+    
+    # Apply start index for parallel batch processing
+    if args.start_composition > 0:
+        comp_dirs = comp_dirs[args.start_composition:]
+    
+    # Apply max compositions limit
     if args.max_compositions:
         comp_dirs = comp_dirs[:args.max_compositions]
     
@@ -440,44 +515,65 @@ def main():
     
     print(f"\nTotal structures loaded: {len(all_structures)}\n")
     
-    # Pre-fetch MP data for all chemical systems
+    # Pre-fetch MP stable phases for all chemical systems
     unique_chemsys = sorted(set(s['chemsys'] for s in all_structures))
     
     print("="*70)
-    print("Pre-fetching MP Competing Phases")
+    print("Pre-fetching MP Stable Phases (on-hull only)")
     print("="*70)
     print(f"Unique chemical systems: {len(unique_chemsys)}")
     print("="*70 + "\n")
     
+    # Create MatterSim calculator for MP phases (one-time)
+    print(f"Creating MatterSimCalculator (device={args.device})...")
+    try:
+        import torch
+        import gc
+        calc_mp = MatterSimCalculator(
+            load_path="MatterSim-v1.0.0-5M.pth",
+            device=args.device
+        )
+        print("  Calculator created successfully\n")
+    except Exception as e:
+        print(f"ERROR: Failed to create MatterSimCalculator: {e}")
+        return 1
+    
     mp_entries_cache = {}
     for chemsys in unique_chemsys:
-        print(f"Fetching MP data for {chemsys}...")
-        sys.stdout.flush()  # Ensure output is visible immediately
+        print(f"Fetching MP stable phases for {chemsys}...")
+        sys.stdout.flush()
         try:
-            mp_entries = get_mp_competing_phases_mattersim(
-                chemsys, mp_api_key, mp_cache_dir, device=args.device
+            mp_entries = get_mp_stable_phases_mattersim(
+                chemsys, mp_api_key, mp_cache_file, calc_mp, batch_size=args.batch_size
             )
             mp_entries_cache[chemsys] = mp_entries
-            print(f"  → Cached {len(mp_entries)} competing phases\n")
+            print(f"  → {len(mp_entries)} stable phases ready\n")
             sys.stdout.flush()
         except Exception as e:
             print(f"  → Error: {e}\n")
             sys.stdout.flush()
             mp_entries_cache[chemsys] = []
     
+    # Clean up MP calculator
+    del calc_mp
+    if args.device == 'cuda':
+        torch.cuda.empty_cache()
+        gc.collect()
+    
     print("="*70)
-    print("MP data pre-fetch complete")
+    print("MP stable phases pre-fetch complete")
     print("="*70 + "\n")
     
-    # Run pre-screening
+    # Run pre-screening with batch processing
     print("="*70)
-    print("Running MatterSim Pre-screening")
+    print("Running MatterSim Pre-screening (Batch Processing)")
     print("="*70)
-    print(f"Processing {len(all_structures)} structures with progress tracking...\n")
+    print(f"Processing {len(all_structures)} structures in batches of {args.batch_size}...\n")
     sys.stdout.flush()
     
     # Check for existing checkpoint
-    checkpoint_file = output_dir / 'prescreening_checkpoint.json'
+    batch_suffix = f"_batch{args.batch_id}" if args.batch_id else ""
+    checkpoint_file = output_dir / f'prescreening_checkpoint{batch_suffix}.json'
     if checkpoint_file.exists():
         print(f"Found checkpoint file, resuming from previous run...")
         with open(checkpoint_file, 'r') as f:
@@ -494,68 +590,97 @@ def main():
         failed = 0
         processed_ids = set()
     
-    # Process structures with progress bar
-    from tqdm import tqdm
-    for item in tqdm(all_structures, desc="Pre-screening", unit="struct"):
-        struct_id = item['id']
+    # Filter unprocessed structures
+    structures_to_process = [s for s in all_structures if s['id'] not in processed_ids]
+    
+    if not structures_to_process:
+        print("All structures already processed!\n")
+    else:
+        print(f"Processing {len(structures_to_process)} remaining structures...\n")
         
-        # Skip if already processed
-        if struct_id in processed_ids:
-            continue
+        # Process in batches
+        import torch
+        import gc
+        from tqdm import tqdm
         
-        structure = item['structure']
-        chemsys = item['chemsys']
+        n_batches = (len(structures_to_process) + args.batch_size - 1) // args.batch_size
         
-        try:
-            relaxed_struct, energy_per_atom = relax_structure_mattersim(
-                structure, device=args.device
+        for batch_idx in range(n_batches):
+            batch_start = batch_idx * args.batch_size
+            batch_end = min((batch_idx + 1) * args.batch_size, len(structures_to_process))
+            batch = structures_to_process[batch_start:batch_end]
+            
+            print(f"\n{'='*70}")
+            print(f"Batch {batch_idx + 1}/{n_batches}: Processing {len(batch)} structures")
+            print(f"{'='*70}\n")
+            
+            # Create calculator for this batch
+            calc = MatterSimCalculator(
+                load_path="MatterSim-v1.0.0-5M.pth",
+                device=args.device
             )
             
-            mp_entries = mp_entries_cache.get(chemsys, [])
-            
-            if not mp_entries:
-                e_hull = None
-                passed_prescreening = True
-            else:
-                e_hull = compute_energy_above_hull(relaxed_struct, energy_per_atom, mp_entries)
-                passed_prescreening = e_hull < args.hull_threshold
+            # Process structures in batch
+            for item in tqdm(batch, desc=f"Batch {batch_idx + 1}", unit="struct"):
+                struct_id = item['id']
+                structure = item['structure']
+                chemsys = item['chemsys']
                 
-                if passed_prescreening:
-                    passed += 1
-                else:
+                try:
+                    # Relax using batch calculator
+                    relaxed_struct, energy_per_atom = relax_structure_mattersim(
+                        structure, calc
+                    )
+                    
+                    mp_entries = mp_entries_cache.get(chemsys, [])
+                    
+                    if not mp_entries:
+                        e_hull = None
+                        passed_prescreening = True
+                    else:
+                        e_hull = compute_energy_above_hull(relaxed_struct, energy_per_atom, mp_entries)
+                        passed_prescreening = e_hull < args.hull_threshold
+                        
+                        if passed_prescreening:
+                            passed += 1
+                        else:
+                            failed += 1
+                    
+                    results.append({
+                        'structure_id': struct_id,
+                        'pmg': relaxed_struct,
+                        'energy_per_atom': energy_per_atom,
+                        'composition': item['composition'],
+                        'chemsys': chemsys,
+                        'mattersim_energy_per_atom': float(energy_per_atom),
+                        'energy_above_hull': float(e_hull) if e_hull is not None else None,
+                        'is_stable': e_hull < 0.01 if e_hull is not None else None,
+                        'passed_prescreening': passed_prescreening
+                    })
+                    
+                except Exception as e:
+                    tqdm.write(f"  ERROR on {struct_id}: {e}")
                     failed += 1
+                    results.append({
+                        'structure_id': struct_id,
+                        'pmg': None,
+                        'energy_per_atom': None,
+                        'composition': item['composition'],
+                        'chemsys': chemsys,
+                        'mattersim_energy_per_atom': None,
+                        'energy_above_hull': None,
+                        'is_stable': None,
+                        'passed_prescreening': False,
+                        'error': str(e)
+                    })
             
-            results.append({
-                'structure_id': struct_id,
-                'pmg': relaxed_struct,
-                'energy_per_atom': energy_per_atom,
-                'composition': item['composition'],
-                'chemsys': chemsys,
-                'mattersim_energy_per_atom': float(energy_per_atom),
-                'energy_above_hull': float(e_hull) if e_hull is not None else None,
-                'is_stable': e_hull < 0.01 if e_hull is not None else None,
-                'passed_prescreening': passed_prescreening
-            })
+            # Clean up calculator after batch
+            del calc
+            if args.device == 'cuda':
+                torch.cuda.empty_cache()
+                gc.collect()
             
-        except Exception as e:
-            tqdm.write(f"  ERROR on {struct_id}: {e}")
-            failed += 1
-            results.append({
-                'structure_id': struct_id,
-                'pmg': None,
-                'energy_per_atom': None,
-                'composition': item['composition'],
-                'chemsys': chemsys,
-                'mattersim_energy_per_atom': None,
-                'energy_above_hull': None,
-                'is_stable': None,
-                'passed_prescreening': False,
-                'error': str(e)
-            })
-        
-        # Save checkpoint every 50 structures
-        if len(results) % 50 == 0:
-            # Create JSON-safe version (exclude pmg Structure objects)
+            # Save checkpoint after each batch
             results_json = [{k: v for k, v in r.items() if k != 'pmg'} for r in results]
             checkpoint_data = {
                 'results': results_json,
@@ -565,6 +690,9 @@ def main():
             }
             with open(checkpoint_file, 'w') as f:
                 json.dump(checkpoint_data, f, indent=2)
+            
+            print(f"\nBatch {batch_idx + 1} complete. Checkpoint saved.")
+            print(f"Progress: {len(results)}/{len(all_structures)} structures\n")
     
     # Save results to JSON (exclude pmg Structure objects)
     results_json = [{k: v for k, v in r.items() if k != 'pmg'} for r in results]
@@ -579,7 +707,7 @@ def main():
         'results': results_json
     }
     
-    output_file = output_dir / 'prescreening_stability.json'
+    output_file = output_dir / f'prescreening_stability{batch_suffix}.json'
     with open(output_file, 'w') as f:
         json.dump(output_data, f, indent=2)
     
@@ -587,15 +715,17 @@ def main():
     
     # Save PyXtal database with relaxed structures
     print("\nSaving PyXtal database...")
-    db_file = output_dir / 'prescreening_structures.db'
+    db_file = output_dir / f'prescreening_structures{batch_suffix}.db'
     db = database_topology(str(db_file))
     
     successful_count = 0
+    fallback_count = 0
     for res in results:
         if res['pmg'] is not None:
             try:
+                # Try with default tolerance first
                 xtal = pyxtal()
-                xtal.from_seed(res['pmg'])
+                xtal.from_seed(res['pmg'], tol=1e-1)
                 db.add_xtal(
                     xtal, 
                     kvp={
@@ -609,10 +739,31 @@ def main():
                 )
                 successful_count += 1
             except Exception as e:
-                print(f"  Warning: Could not add {res['structure_id']} to database: {e}")
+                # Try again with more permissive tolerance
+                try:
+                    xtal = pyxtal()
+                    xtal.from_seed(res['pmg'], tol=0.5)
+                    db.add_xtal(
+                        xtal, 
+                        kvp={
+                            'structure_id': res['structure_id'],
+                            'e_above_hull': res['energy_above_hull'],
+                            'e_mattersim': res['energy_per_atom'],
+                            'composition': res['composition'],
+                            'chemsys': res['chemsys'],
+                            'passed_prescreening': res['passed_prescreening']
+                        }
+                    )
+                    successful_count += 1
+                    fallback_count += 1
+                    print(f"  Note: {res['structure_id']} added with relaxed tolerance (tol=0.5)")
+                except Exception as e2:
+                    print(f"  Warning: Could not add {res['structure_id']} to database: {e2}")
     
     print(f"PyXtal database saved to: {db_file}")
     print(f"  Structures in database: {successful_count}")
+    if fallback_count > 0:
+        print(f"  Structures using relaxed tolerance: {fallback_count}")
     
     # Remove checkpoint file (no longer needed)
     if checkpoint_file.exists():

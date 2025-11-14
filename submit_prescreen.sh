@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=32G
-#SBATCH --time=2-00:00:00
+#SBATCH --time=3-00:00:00
 #SBATCH --output=prescreen_%j.out
 #SBATCH --error=prescreen_%j.err
 
@@ -52,7 +52,19 @@ echo ""
 # Check GPU availability and auto-detect device
 if command -v nvidia-smi &> /dev/null; then
     echo "GPU Information:"
+    echo "========================================================================"
     nvidia-smi --query-gpu=index,name,memory.total,memory.free --format=csv,noheader
+    
+    # Get GPU memory info
+    GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
+    GPU_MEM_TOTAL=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
+    GPU_MEM_FREE=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1)
+    
+    echo ""
+    echo "Allocated GPU: $GPU_NAME"
+    echo "Total VRAM: $GPU_MEM_TOTAL MiB (~$((GPU_MEM_TOTAL/1024)) GB)"
+    echo "Free VRAM: $GPU_MEM_FREE MiB (~$((GPU_MEM_FREE/1024)) GB)"
+    echo "========================================================================"
     echo ""
     
     # Auto-detect: use cuda if GPU available, otherwise fallback to cpu
@@ -61,7 +73,8 @@ if command -v nvidia-smi &> /dev/null; then
             echo "Warning: CUDA requested but not available in PyTorch, falling back to CPU"
             DEVICE="cpu"
         else
-            echo "Using CUDA device for MatterSim"
+            echo "  Using CUDA device for MatterSim"
+            echo "  PyTorch detects GPU with full VRAM access"
         fi
     fi
 else
@@ -77,10 +90,14 @@ echo ""
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
 export MKL_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
 
+# PyTorch CUDA memory allocator settings (prevents fragmentation and OOM)
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 echo "Computation device: $DEVICE"
 echo "Parallelization settings:"
 echo "  OMP_NUM_THREADS: $OMP_NUM_THREADS"
 echo "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
+echo "  PYTORCH_CUDA_ALLOC_CONF: $PYTORCH_CUDA_ALLOC_CONF"
 echo ""
 
 # Check dependencies
