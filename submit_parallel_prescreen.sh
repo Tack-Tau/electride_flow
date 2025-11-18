@@ -119,7 +119,7 @@ for i in $(seq 0 $((NUM_JOBS - 1))); do
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --time=3-00:00:00
 #SBATCH --output=prescreen_batch${i}_%j.out
 #SBATCH --error=prescreen_batch${i}_%j.err

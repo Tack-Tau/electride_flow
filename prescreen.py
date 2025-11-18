@@ -15,6 +15,7 @@ import warnings
 import time
 import random
 import fcntl
+import numpy as np
 from pathlib import Path
 from io import StringIO
 from datetime import datetime
@@ -40,55 +41,148 @@ except ImportError:
 
 warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data with symbol.*')
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
+warnings.filterwarnings('ignore', category=RuntimeWarning, message='invalid value encountered in det')
 
 
-def relax_structure_mattersim(pmg_struct, calculator, sym_tol=1e-1, fmax=0.01, max_steps=500, logfile=None):
+def validate_structure(pmg_struct):
+    """
+    Pre-validate structure to catch obviously malformed structures before MatterSim.
+    Returns (is_valid, error_message).
+    """
+    try:
+        # Check 1: Reasonable lattice parameters (not too small/large)
+        lattice = pmg_struct.lattice
+        abc = lattice.abc
+        if any(a < 1.0 or a > 50.0 for a in abc):
+            return False, f"Unrealistic lattice parameters: {abc}"
+        
+        # Check 2: Reasonable angles
+        angles = lattice.angles
+        if any(angle < 10.0 or angle > 170.0 for angle in angles):
+            return False, f"Unrealistic angles: {angles}"
+        
+        # Check 3: Atoms too close (min distance check)
+        dist_matrix = pmg_struct.distance_matrix
+        min_dist = dist_matrix[dist_matrix > 0].min() if len(dist_matrix) > 1 else 1.0
+        if min_dist < 0.5:  # Too close (< 0.5 Angstrom)
+            return False, f"Atoms too close: min_dist={min_dist:.3f} Å"
+        
+        # Check 4: Try spglib symmetry analysis (catches spglib failures early)
+        from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+        try:
+            sga = SpacegroupAnalyzer(pmg_struct, symprec=0.1)
+            _ = sga.get_space_group_symbol()
+        except Exception as e:
+            # If spglib fails here, it will definitely fail later
+            return False, f"Spglib symmetry detection failed: {str(e)[:100]}"
+        
+        return True, None
+        
+    except Exception as e:
+        return False, f"Validation error: {str(e)[:100]}"
+
+
+def relax_structure_mattersim(pmg_struct, calculator, structure_id=None, fmax=0.01, max_steps=500, logfile=None):
     """
     Relax structure using MatterSim + FIRE optimizer with symmetrization and cell relaxation.
     
     Args:
         pmg_struct: Pymatgen Structure object
         calculator: MatterSimCalculator instance (reused across batch)
-        sym_tol: Symmetry tolerance for PyXtal symmetrization (default 1e-1)
+        structure_id: Structure ID for error reporting (optional)
         fmax: Force convergence criterion (eV/Angstrom)
         max_steps: Maximum optimization steps
         logfile: None to suppress FIRE optimizer log, otherwise path to log file or set to '-' for stdout
     
     Returns:
-        tuple: (relaxed_structure, energy_per_atom)
+        tuple: (relaxed_structure, energy_per_atom, error_message)
+               Returns (None, None, error_msg) if relaxation fails
     
     Note:
-        - Symmetrizes structure using PyXtal (important for mattergen structures)
+        - Symmetrizes structure using PyXtal with progressive tolerance (1e-5 to 0.5)
+        - Falls back to direct conversion if all tolerances fail
         - Uses UnitCellFilter to relax both cell and atomic positions
         - Calculator is reused for efficiency (batch processing)
+        - Has extensive error handling for ASE calculator failures (NaN, inf, spglib crashes)
+        - Never raises exceptions - returns None values on failure
     """
     
-    # Symmetrize structure using PyXtal
-    xtal = pyxtal()
-    xtal.from_seed(pmg_struct, tol=sym_tol)
-    atoms = xtal.to_ase()
+    sid_prefix = f"[{structure_id}] " if structure_id else ""
+    
+    # Symmetrize structure using PyXtal with progressive tolerance relaxation
+    tolerances = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.3, 0.5]
+    atoms = None
+    
+    for tol in tolerances:
+        try:
+            xtal = pyxtal()
+            xtal.from_seed(pmg_struct, tol=tol)
+            atoms = xtal.to_ase()
+            break
+        except Exception:
+            continue
+    
+    # If all tolerances failed, try direct conversion without symmetrization
+    if atoms is None:
+        try:
+            adaptor = AseAtomsAdaptor()
+            atoms = adaptor.get_atoms(pmg_struct)
+        except Exception as e:
+            return None, None, f"{sid_prefix}Structure conversion failed (PyXtal failed at all tolerances {tolerances}, direct conversion also failed): {e}"
     
     # Attach calculator (reused from batch)
     atoms.calc = calculator
     
-    # Use UnitCellFilter to relax both cell and atomic positions
-    ecf = UnitCellFilter(atoms)
-    dyn = FIRE(ecf, a=0.1, logfile=logfile)
-    dyn.run(fmax=fmax, steps=max_steps)
+    # Check initial energy calculation (catches NaN/inf early)
+    try:
+        initial_energy = atoms.get_potential_energy()
+        if not np.isfinite(initial_energy):
+            return None, None, f"{sid_prefix}Initial energy is not finite: {initial_energy}"
+    except Exception as e:
+        return None, None, f"{sid_prefix}Initial energy calculation failed: {e}"
     
-    energy = atoms.get_potential_energy()
-    energy_per_atom = energy / len(atoms)
-    
-    # Convert back to pymatgen structure
-    adaptor = AseAtomsAdaptor()
-    relaxed_structure = adaptor.get_structure(atoms)
+    # Relax with error handling for ASE calculator failures
+    try:
+        ecf = UnitCellFilter(atoms)
+        dyn = FIRE(ecf, a=0.1, logfile=logfile)
+        dyn.run(fmax=fmax, steps=max_steps)
+        
+        # Get final energy
+        energy = atoms.get_potential_energy()
+        
+        # Check for NaN/inf values
+        if not np.isfinite(energy):
+            # Clean up before returning
+            try:
+                del atoms, ecf, dyn
+            except:
+                pass
+            return None, None, f"{sid_prefix}Final energy is not finite: {energy}"
+        
+        energy_per_atom = energy / len(atoms)
+        
+        # Convert back to pymatgen structure
+        adaptor = AseAtomsAdaptor()
+        relaxed_structure = adaptor.get_structure(atoms)
+        
+    except Exception as e:
+        # Clean up before returning
+        try:
+            del atoms
+            if 'ecf' in locals():
+                del ecf
+            if 'dyn' in locals():
+                del dyn
+        except:
+            pass
+        return None, None, f"{sid_prefix}Relaxation failed: {e}"
     
     # Clean up atoms object (but keep calculator for reuse)
     del atoms
     del ecf
     del dyn
     
-    return relaxed_structure, energy_per_atom
+    return relaxed_structure, energy_per_atom, None
 
 
 def load_mp_cache_locked(cache_file):
@@ -276,34 +370,34 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
                         if cache_key in cached_data:
                             continue
                         
-                        try:
-                            # Relax with MatterSim using reused calculator
-                            relaxed_struct, energy_per_atom = relax_structure_mattersim(
-                                doc.structure, calculator
-                            )
-                            
-                            total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
-                            
-                            # Create PDEntry
-                            entry = PDEntry(
-                                composition=relaxed_struct.composition,
-                                energy=total_energy,
-                                name=f"mp_mattersim_{mp_id}"
-                            )
-                            entries.append(entry)
-                            
-                            # Store for caching
-                            new_entries_data.append({
-                                'chemsys': doc_chemsys,
-                                'composition': {str(el): float(amt) for el, amt in relaxed_struct.composition.items()},
-                                'energy': total_energy,
-                                'entry_id': f"mp_mattersim_{mp_id}",
-                                'mp_id': mp_id
-                            })
-                            success_count += 1
-                            
-                        except Exception as e:
-                            print(f"      Warning: Failed to relax {mp_id}: {e}")
+                        # Relax with MatterSim using reused calculator
+                        relaxed_struct, energy_per_atom, error_msg = relax_structure_mattersim(
+                            doc.structure, calculator, structure_id=mp_id
+                        )
+                        
+                        if relaxed_struct is None or energy_per_atom is None:
+                            print(f"      Warning: Failed to relax {mp_id}: {error_msg}")
+                            continue
+                        
+                        total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
+                        
+                        # Create PDEntry
+                        entry = PDEntry(
+                            composition=relaxed_struct.composition,
+                            energy=total_energy,
+                            name=f"mp_mattersim_{mp_id}"
+                        )
+                        entries.append(entry)
+                        
+                        # Store for caching
+                        new_entries_data.append({
+                            'chemsys': doc_chemsys,
+                            'composition': {str(el): float(amt) for el, amt in relaxed_struct.composition.items()},
+                            'energy': total_energy,
+                            'entry_id': f"mp_mattersim_{mp_id}",
+                            'mp_id': mp_id
+                        })
+                        success_count += 1
                     
                     print(f"    Successfully relaxed {success_count} new phases")
                     
@@ -574,6 +668,8 @@ def main():
     # Check for existing checkpoint
     batch_suffix = f"_batch{args.batch_id}" if args.batch_id else ""
     checkpoint_file = output_dir / f'prescreening_checkpoint{batch_suffix}.json'
+    db_file = output_dir / f'prescreening_structures{batch_suffix}.db'
+    
     if checkpoint_file.exists():
         print(f"Found checkpoint file, resuming from previous run...")
         with open(checkpoint_file, 'r') as f:
@@ -582,13 +678,56 @@ def main():
             passed = checkpoint_data.get('passed', 0)
             failed = checkpoint_data.get('failed', 0)
             processed_ids = {r['structure_id'] for r in results}
-        print(f"Resuming: {len(results)}/{len(all_structures)} already processed\n")
+            currently_processing = checkpoint_data.get('currently_processing', None)
+        
+        print(f"Resuming: {len(results)}/{len(all_structures)} already processed")
+        
+        # Detect if we crashed during a structure (segfault detection)
+        if currently_processing:
+            print(f"\n   SEGFAULT DETECTED: Crashed while processing '{currently_processing}'")
+            
+            # Find the problematic structure
+            problem_struct = None
+            for s in all_structures:
+                if s['id'] == currently_processing:
+                    problem_struct = s
+                    break
+            
+            if problem_struct:
+                results.append({
+                    'structure_id': currently_processing,
+                    'energy_per_atom': None,
+                    'composition': problem_struct['composition'],
+                    'chemsys': problem_struct['chemsys'],
+                    'mattersim_energy_per_atom': None,
+                    'energy_above_hull': None,
+                    'is_stable': False,
+                    'passed_prescreening': False,
+                    'error': 'Auto-skipped due to segfault (spglib crash)'
+                })
+                processed_ids.add(currently_processing)
+                failed += 1
+                print(f"     Added '{currently_processing}' to failed list\n")
+            else:
+                print(f"      Could not find structure in loaded data\n")
+        
+        # Open existing database for incremental updates
+        if db_file.exists():
+            print(f"Found existing database: {db_file}")
+            db = database_topology(str(db_file))
+        else:
+            print(f"Creating new database: {db_file}")
+            db = database_topology(str(db_file))
+        print()
         sys.stdout.flush()
     else:
         results = []
         passed = 0
         failed = 0
         processed_ids = set()
+        # Create new database for incremental updates
+        db = database_topology(str(db_file))
+        print(f"Created new database: {db_file}\n")
     
     # Filter unprocessed structures
     structures_to_process = [s for s in all_structures if s['id'] not in processed_ids]
@@ -614,11 +753,60 @@ def main():
             print(f"Batch {batch_idx + 1}/{n_batches}: Processing {len(batch)} structures")
             print(f"{'='*70}\n")
             
-            # Create calculator for this batch
-            calc = MatterSimCalculator(
-                load_path="MatterSim-v1.0.0-5M.pth",
-                device=args.device
-            )
+            # Mark the first structure in this batch as currently processing
+            # This helps detect segfaults during calculator creation
+            if batch:
+                first_struct_id = batch[0]['id']
+                checkpoint_data_temp = {
+                    'results': [{k: v for k, v in r.items() if k != 'pmg'} for r in results],
+                    'passed': passed,
+                    'failed': failed,
+                    'currently_processing': first_struct_id,
+                    'timestamp': datetime.now().isoformat()
+                }
+                with open(checkpoint_file, 'w') as f:
+                    json.dump(checkpoint_data_temp, f, indent=2)
+            
+            # Create calculator for this batch (with error handling)
+            try:
+                calc = MatterSimCalculator(
+                    load_path="MatterSim-v1.0.0-5M.pth",
+                    device=args.device
+                )
+            except Exception as e:
+                print(f"ERROR creating calculator for batch {batch_idx + 1}: {e}")
+                print(f"Skipping entire batch of {len(batch)} structures\n")
+                sys.stdout.flush()
+                
+                # Mark all structures in this batch as failed
+                for item in batch:
+                    failed += 1
+                    results.append({
+                        'structure_id': item['id'],
+                        'pmg': None,
+                        'energy_per_atom': None,
+                        'composition': item['composition'],
+                        'chemsys': item['chemsys'],
+                        'mattersim_energy_per_atom': None,
+                        'energy_above_hull': None,
+                        'is_stable': None,
+                        'passed_prescreening': False,
+                        'error': f'Calculator creation failed: {str(e)}'
+                    })
+                
+                # Save checkpoint and continue to next batch
+                results_json = [{k: v for k, v in r.items() if k != 'pmg'} for r in results]
+                checkpoint_data = {
+                    'results': results_json,
+                    'passed': passed,
+                    'failed': failed,
+                    'currently_processing': None,
+                    'timestamp': datetime.now().isoformat()
+                }
+                with open(checkpoint_file, 'w') as f:
+                    json.dump(checkpoint_data, f, indent=2)
+                
+                continue
             
             # Process structures in batch
             for item in tqdm(batch, desc=f"Batch {batch_idx + 1}", unit="struct"):
@@ -626,40 +814,23 @@ def main():
                 structure = item['structure']
                 chemsys = item['chemsys']
                 
-                try:
-                    # Relax using batch calculator
-                    relaxed_struct, energy_per_atom = relax_structure_mattersim(
-                        structure, calc
-                    )
-                    
-                    mp_entries = mp_entries_cache.get(chemsys, [])
-                    
-                    if not mp_entries:
-                        e_hull = None
-                        passed_prescreening = True
-                    else:
-                        e_hull = compute_energy_above_hull(relaxed_struct, energy_per_atom, mp_entries)
-                        passed_prescreening = e_hull < args.hull_threshold
-                        
-                        if passed_prescreening:
-                            passed += 1
-                        else:
-                            failed += 1
-                    
-                    results.append({
-                        'structure_id': struct_id,
-                        'pmg': relaxed_struct,
-                        'energy_per_atom': energy_per_atom,
-                        'composition': item['composition'],
-                        'chemsys': chemsys,
-                        'mattersim_energy_per_atom': float(energy_per_atom),
-                        'energy_above_hull': float(e_hull) if e_hull is not None else None,
-                        'is_stable': e_hull < 0.01 if e_hull is not None else None,
-                        'passed_prescreening': passed_prescreening
-                    })
-                    
-                except Exception as e:
-                    tqdm.write(f"  ERROR on {struct_id}: {e}")
+                # Mark this structure as currently processing (for segfault detection)
+                # Save immediately to detect crashes
+                checkpoint_data_temp = {
+                    'results': [{k: v for k, v in r.items() if k != 'pmg'} for r in results],
+                    'passed': passed,
+                    'failed': failed,
+                    'currently_processing': struct_id,  # Mark what we're processing
+                    'timestamp': datetime.now().isoformat()
+                }
+                with open(checkpoint_file, 'w') as f:
+                    json.dump(checkpoint_data_temp, f, indent=2)
+                
+                # Pre-validate structure to catch malformed structures early
+                is_valid, validation_error = validate_structure(structure)
+                if not is_valid:
+                    # Skip MatterSim relaxation for invalid structures
+                    tqdm.write(f"  SKIPPING {struct_id}: {validation_error}")
                     failed += 1
                     results.append({
                         'structure_id': struct_id,
@@ -671,8 +842,59 @@ def main():
                         'energy_above_hull': None,
                         'is_stable': None,
                         'passed_prescreening': False,
-                        'error': str(e)
+                        'error': f"Invalid structure: {validation_error}"
                     })
+                    continue
+                
+                # Relax using batch calculator (handles errors internally)
+                relaxed_struct, energy_per_atom, relax_error = relax_structure_mattersim(
+                    structure, calc, structure_id=struct_id
+                )
+                
+                # Check if relaxation failed
+                if relaxed_struct is None or energy_per_atom is None:
+                    tqdm.write(f"  ERROR on {struct_id}: {relax_error}")
+                    failed += 1
+                    results.append({
+                        'structure_id': struct_id,
+                        'pmg': None,
+                        'energy_per_atom': None,
+                        'composition': item['composition'],
+                        'chemsys': chemsys,
+                        'mattersim_energy_per_atom': None,
+                        'energy_above_hull': None,
+                        'is_stable': None,
+                        'passed_prescreening': False,
+                        'error': relax_error
+                    })
+                    continue
+                
+                # Relaxation succeeded - compute hull distance
+                mp_entries = mp_entries_cache.get(chemsys, [])
+                
+                if not mp_entries:
+                    e_hull = None
+                    passed_prescreening = True
+                else:
+                    e_hull = compute_energy_above_hull(relaxed_struct, energy_per_atom, mp_entries)
+                    passed_prescreening = e_hull < args.hull_threshold
+                    
+                    if passed_prescreening:
+                        passed += 1
+                    else:
+                        failed += 1
+                
+                results.append({
+                    'structure_id': struct_id,
+                    'pmg': relaxed_struct,
+                    'energy_per_atom': energy_per_atom,
+                    'composition': item['composition'],
+                    'chemsys': chemsys,
+                    'mattersim_energy_per_atom': float(energy_per_atom),
+                    'energy_above_hull': float(e_hull) if e_hull is not None else None,
+                    'is_stable': e_hull < 0.001 if e_hull is not None else None,
+                    'passed_prescreening': passed_prescreening
+                })
             
             # Clean up calculator after batch
             del calc
@@ -680,19 +902,68 @@ def main():
                 torch.cuda.empty_cache()
                 gc.collect()
             
-            # Save checkpoint after each batch
+            # Save checkpoint after each batch (clear currently_processing marker)
             results_json = [{k: v for k, v in r.items() if k != 'pmg'} for r in results]
             checkpoint_data = {
                 'results': results_json,
                 'passed': passed,
                 'failed': failed,
+                'currently_processing': None,  # Clear marker after batch completes
                 'timestamp': datetime.now().isoformat()
             }
             with open(checkpoint_file, 'w') as f:
                 json.dump(checkpoint_data, f, indent=2)
             
-            print(f"\nBatch {batch_idx + 1} complete. Checkpoint saved.")
-            print(f"Progress: {len(results)}/{len(all_structures)} structures\n")
+            # Save structures to database incrementally after each batch
+            batch_db_count = 0
+            batch_failed_count = 0
+            batch_start_idx = max(0, len(results) - len(batch))
+            tolerances_db = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.3, 0.5]
+            
+            for i in range(batch_start_idx, len(results)):
+                res = results[i]
+                if res['pmg'] is not None:
+                    # Valid structure - try progressive tolerances
+                    added = False
+                    for tol in tolerances_db:
+                        try:
+                            xtal = pyxtal()
+                            xtal.from_seed(res['pmg'], tol=tol)
+                            db.add_xtal(
+                                xtal,
+                                kvp={
+                                    'structure_id': res['structure_id'],
+                                    'e_above_hull': res['energy_above_hull'],
+                                    'e_mattersim': res['energy_per_atom'],
+                                    'composition': res['composition'],
+                                    'chemsys': res['chemsys'],
+                                    'passed_prescreening': res['passed_prescreening'],
+                                    'status': 'valid'
+                                }
+                            )
+                            batch_db_count += 1
+                            added = True
+                            break
+                        except Exception:
+                            continue
+                    
+                    if not added:
+                        tqdm.write(f"  Warning: Could not add {res['structure_id']} to database after trying all tolerances {tolerances_db}")
+                else:
+                    # Invalid/failed structure - record metadata only (no structure object)
+                    # Note: These are tracked in checkpoint JSON with full error details
+                    batch_failed_count += 1
+            
+            # Explicit commit after each batch
+            if hasattr(db, 'db') and hasattr(db.db, 'commit'):
+                db.db.commit()
+            
+            print(f"\nBatch {batch_idx + 1} complete.")
+            print(f"  Checkpoint saved: {checkpoint_file.name}")
+            print(f"  Database updated: {batch_db_count} valid structures added")
+            if batch_failed_count > 0:
+                print(f"  Skipped {batch_failed_count} invalid structures (tracked in checkpoint JSON)")
+            print(f"  Progress: {len(results)}/{len(all_structures)} structures\n")
     
     # Save results to JSON (exclude pmg Structure objects)
     results_json = [{k: v for k, v in r.items() if k != 'pmg'} for r in results]
@@ -713,61 +984,32 @@ def main():
     
     print(f"\nJSON results saved to: {output_file}")
     
-    # Save PyXtal database with relaxed structures
-    print("\nSaving PyXtal database...")
-    db_file = output_dir / f'prescreening_structures{batch_suffix}.db'
-    db = database_topology(str(db_file))
-    
-    successful_count = 0
-    fallback_count = 0
-    for res in results:
-        if res['pmg'] is not None:
-            try:
-                # Try with default tolerance first
-                xtal = pyxtal()
-                xtal.from_seed(res['pmg'], tol=1e-1)
-                db.add_xtal(
-                    xtal, 
-                    kvp={
-                        'structure_id': res['structure_id'],
-                        'e_above_hull': res['energy_above_hull'],
-                        'e_mattersim': res['energy_per_atom'],
-                        'composition': res['composition'],
-                        'chemsys': res['chemsys'],
-                        'passed_prescreening': res['passed_prescreening']
-                    }
-                )
-                successful_count += 1
-            except Exception as e:
-                # Try again with more permissive tolerance
-                try:
-                    xtal = pyxtal()
-                    xtal.from_seed(res['pmg'], tol=0.5)
-                    db.add_xtal(
-                        xtal, 
-                        kvp={
-                            'structure_id': res['structure_id'],
-                            'e_above_hull': res['energy_above_hull'],
-                            'e_mattersim': res['energy_per_atom'],
-                            'composition': res['composition'],
-                            'chemsys': res['chemsys'],
-                            'passed_prescreening': res['passed_prescreening']
-                        }
-                    )
-                    successful_count += 1
-                    fallback_count += 1
-                    print(f"  Note: {res['structure_id']} added with relaxed tolerance (tol=0.5)")
-                except Exception as e2:
-                    print(f"  Warning: Could not add {res['structure_id']} to database: {e2}")
-    
-    print(f"PyXtal database saved to: {db_file}")
-    print(f"  Structures in database: {successful_count}")
-    if fallback_count > 0:
-        print(f"  Structures using relaxed tolerance: {fallback_count}")
+    # Database was already saved incrementally during batch processing (see lines 770-808)
+    # Get final database statistics
+    print("\nDatabase Statistics:")
+    if db_file.exists():
+        try:
+            # Count structures in database
+            db_check = database_topology(str(db_file))
+            if hasattr(db_check, 'db') and hasattr(db_check.db, 'execute'):
+                cursor = db_check.db.execute("SELECT COUNT(*) FROM systems")
+                db_count = cursor.fetchone()[0]
+                print(f"  PyXtal database: {db_file}")
+                print(f"  Structures in database: {db_count}")
+            else:
+                print(f"  PyXtal database: {db_file} (count unavailable)")
+        except Exception as e:
+            print(f"  PyXtal database: {db_file} (statistics unavailable: {e})")
+    else:
+        print(f"  No database file found (all structures may have failed)")
     
     # Remove checkpoint file (no longer needed)
-    if checkpoint_file.exists():
-        checkpoint_file.unlink()
+    try:
+        if checkpoint_file.exists():
+            checkpoint_file.unlink()
+            print(f"  Checkpoint file removed")
+    except Exception as e:
+        print(f"  Warning: Could not remove checkpoint file: {e}")
     
     print("\n" + "="*70)
     print("Pre-screening Complete")
@@ -776,7 +1018,7 @@ def main():
     print(f"Passed: {passed}")
     print(f"Failed: {failed}")
     print(f"JSON: {output_file}")
-    print(f"Database: {db_file} ({successful_count} structures)")
+    print(f"Database: {db_file}")
     print("="*70)
     
     return 0

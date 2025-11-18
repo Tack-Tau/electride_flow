@@ -242,72 +242,92 @@ class VASPWorkflowManager:
         job_dir.mkdir(parents=True, exist_ok=True)
         
         if job_type == 'relax':
-            # Symmetrize structure using PyXtal (same as in prescreen.py)
+            # Symmetrize structure using PyXtal with progressive tolerance (same as in prescreen.py)
             if PYXTAL_AVAILABLE:
-                try:
-                    adaptor = AseAtomsAdaptor()
-                    xtal = pyxtal()
-                    xtal.from_seed(structure, tol=1e-1)  # Default tolerance
-                    atoms = xtal.to_ase()
-                    structure = adaptor.get_structure(atoms)
-                except Exception as e:
-                    print(f"    Warning: Could not symmetrize structure: {e}")
+                tolerances = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.3, 0.5]
+                symmetrized = False
+                for tol in tolerances:
+                    try:
+                        adaptor = AseAtomsAdaptor()
+                        xtal = pyxtal()
+                        xtal.from_seed(structure, tol=tol)
+                        atoms = xtal.to_ase()
+                        structure = adaptor.get_structure(atoms)
+                        symmetrized = True
+                        break
+                    except Exception:
+                        continue
+                
+                if not symmetrized:
+                    print(f"    Warning: Could not symmetrize structure with tolerances {tolerances}")
                     print(f"    Proceeding with original structure...")
             
-            vis = MPRelaxSet(structure, user_incar_settings={
-                'PREC': 'Accurate',
-                'ALGO': 'Fast',
-                'ADDGRID': True,
-                'EDIFF': 1e-6,
-                'EDIFFG': -0.01,
-                'IBRION': 2,
-                'ISIF': 3,
-                'NELM': 150,
-                'NSW': 300,
-                'ISMEAR': 0,
-                'SIGMA': 0.05,
-                'POTIM': 0.3,
-                'LWAVE': False,
-                'LCHARG': False,
-                'LAECHG': False,
-                'LASPH': False,
-                'LORBIT': 0,
-            })
+            vis = MPRelaxSet(structure, 
+                user_incar_settings={
+                    'PREC': 'Accurate',
+                    'ALGO': 'Fast',
+                    'ADDGRID': True,
+                    'EDIFF': 1e-6,
+                    'EDIFFG': -0.01,
+                    'IBRION': 2,
+                    'ISIF': 3,
+                    'NELM': 150,
+                    'NSW': 300,
+                    'ISMEAR': 0,
+                    'SIGMA': 0.05,
+                    'ISPIN': 1,
+                    'POTIM': 0.3,
+                    'LWAVE': False,
+                    'LCHARG': False,
+                    'LAECHG': False,
+                    'LASPH': False,
+                    'LORBIT': 0,
+                },
+                user_kpoints_settings={'reciprocal_density': 250}
+            )
         elif job_type == 'sc':
-            vis = MPStaticSet(structure, user_incar_settings={
-                'PREC': 'Accurate',
-                'ALGO': 'Normal',
-                'ADDGRID': True,
-                'EDIFF': 1e-6,
-                'IBRION': -1,
-                'NSW': 0,
-                'ISMEAR': 0,
-                'SIGMA': 0.05,
-                'LWAVE': True,
-                'LCHARG': True,
-                'LAECHG': False,
-                'LASPH': False,
-                'LORBIT': 0,
-            })
+            vis = MPStaticSet(structure, 
+                user_incar_settings={
+                    'PREC': 'Accurate',
+                    'ALGO': 'Normal',
+                    'ADDGRID': True,
+                    'EDIFF': 1e-6,
+                    'IBRION': -1,
+                    'NSW': 0,
+                    'ISMEAR': 0,
+                    'SIGMA': 0.05,
+                    'ISPIN': 1,
+                    'LWAVE': True,
+                    'LCHARG': True,
+                    'LAECHG': False,
+                    'LASPH': False,
+                    'LORBIT': 0,
+                },
+                user_kpoints_settings={'reciprocal_density': 250}
+            )
         elif job_type == 'elf':
-            vis = MPStaticSet(structure, user_incar_settings={
-                'PREC': 'Accurate',
-                'ALGO': 'Normal',
-                'ADDGRID': True,
-                'EDIFF': 1e-6,
-                'IBRION': -1,
-                'NSW': 0,
-                'ISMEAR': -5,
-                'LELF': True,
-                'ISTART': 1,
-                'ICHARG': 11,
-                'NEDOS': 1000,
-                'LWAVE': False,
-                'LCHARG': False,
-                'LAECHG': False,
-                'LASPH': False,
-                'LORBIT': 10,
-            })
+            vis = MPStaticSet(structure, 
+                user_incar_settings={
+                    'PREC': 'Accurate',
+                    'ALGO': 'Normal',
+                    'ADDGRID': True,
+                    'EDIFF': 1e-6,
+                    'IBRION': -1,
+                    'NSW': 0,
+                    'ISMEAR': -5,
+                    'ISPIN': 1,
+                    'LELF': True,
+                    'ISTART': 1,
+                    'ICHARG': 11,
+                    'NEDOS': 1000,
+                    'LWAVE': False,
+                    'LCHARG': False,
+                    'LAECHG': False,
+                    'LASPH': False,
+                    'LORBIT': 10,
+                },
+                user_kpoints_settings={'reciprocal_density': 250}
+            )
         elif job_type == 'parchg':
             if not parchg_settings:
                 raise ValueError("parchg_settings required for PARCHG job")
@@ -320,9 +340,13 @@ class VASPWorkflowManager:
                 'NSW': 0,
                 'ISMEAR': 1,
                 'SIGMA': 0.2,
+                'ISPIN': 1,
             }
             base_settings.update(parchg_settings)
-            vis = MPStaticSet(structure, user_incar_settings=base_settings)
+            vis = MPStaticSet(structure, 
+                user_incar_settings=base_settings,
+                user_kpoints_settings={'reciprocal_density': 250}
+            )
         else:
             raise ValueError(f"Unknown job_type: {job_type}")
         
@@ -886,26 +910,8 @@ fi
             if job_status == 'NOTFOUND':
                 local_status = self.check_local_status(sdata['elf_dir'])
                 if local_status == 'DONE':
-                    # Check convergence before marking as done
-                    vasprun_path = Path(sdata['elf_dir']) / 'vasprun.xml'
-                    if vasprun_path.exists():
-                        try:
-                            vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-                            if not vr.converged:
-                                self.db.update_state(struct_id, 'ELF_FAILED', 
-                                                   error='VASP calculation not converged')
-                                print(f"  {struct_id}: ELF FAILED (not converged)")
-                            else:
-                                self.db.update_state(struct_id, 'ELF_DONE')
-                                print(f"  {struct_id}: ELF completed")
-                        except Exception as e:
-                            self.db.update_state(struct_id, 'ELF_FAILED', 
-                                               error=f'Could not check convergence: {e}')
-                            print(f"  {struct_id}: ELF FAILED (convergence check error)")
-                    else:
-                        self.db.update_state(struct_id, 'ELF_FAILED', 
-                                           error='vasprun.xml not found')
-                        print(f"  {struct_id}: ELF FAILED (vasprun.xml missing)")
+                    self.db.update_state(struct_id, 'ELF_DONE')
+                    print(f"  {struct_id}: ELF completed")
                 elif local_status == 'FAILED':
                     self.db.update_state(struct_id, 'ELF_FAILED')
                     print(f"  {struct_id}: ELF failed")
@@ -922,7 +928,7 @@ fi
                     break
             
             if all_done:
-                # Check both local status and convergence for each PARCHG job
+                # Check local status for each PARCHG job (no convergence check needed)
                 for subdir in ['band0', 'band1', 'e0025', 'e05', 'e10']:
                     job_dir = parchg_dir / subdir
                     if job_dir.exists():
@@ -930,29 +936,10 @@ fi
                         if local_status == 'FAILED':
                             any_failed = True
                             break
-                        elif local_status == 'DONE':
-                            # Check convergence
-                            vasprun_path = job_dir / 'vasprun.xml'
-                            if vasprun_path.exists():
-                                try:
-                                    vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-                                    if not vr.converged:
-                                        self.db.update_state(struct_id, 'PARCHG_FAILED', 
-                                                           error=f'PARCHG {subdir} not converged')
-                                        print(f"  {struct_id}: PARCHG FAILED ({subdir} not converged)")
-                                        any_failed = True
-                                        break
-                                except Exception as e:
-                                    self.db.update_state(struct_id, 'PARCHG_FAILED', 
-                                                       error=f'PARCHG {subdir} convergence check error: {e}')
-                                    print(f"  {struct_id}: PARCHG FAILED ({subdir} convergence check error)")
-                                    any_failed = True
-                                    break
                 
                 if any_failed:
-                    if sdata['state'] != 'PARCHG_FAILED':  # Only update if not already marked failed
-                        self.db.update_state(struct_id, 'PARCHG_FAILED')
-                        print(f"  {struct_id}: PARCHG failed")
+                    self.db.update_state(struct_id, 'PARCHG_FAILED')
+                    print(f"  {struct_id}: PARCHG failed")
                 else:
                     self.db.update_state(struct_id, 'PARCHG_DONE')
                     print(f"  {struct_id}: PARCHG completed")

@@ -12,7 +12,7 @@ MAX_COMPOSITIONS=""
 MAX_STRUCTURES=0
 CHECK_INTERVAL=60
 DB_NAME="workflow.json"
-CONDA_ENV="mattersim"
+CONDA_ENV="vaspflow"
 PRESCREEN_RESULTS=""
 
 # Colors
@@ -74,7 +74,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --max-compositions N         Max compositions to process (default: all)"
             echo "  --max-structures N           Max structures per composition (default: 5, use 0 for all)"
             echo "  --check-interval SECONDS     Status check interval (default: 60)"
-            echo "  --conda-env NAME             Conda environment name (default: mattersim)"
+            echo "  --conda-env NAME             Conda environment name (default: vaspflow)"
             echo "  --prescreen-results FILE     Pre-screening results file (default: auto-detect)"
             echo ""
             echo "Example:"

@@ -8,8 +8,8 @@ Usage:
 
 import argparse
 import json
-import sqlite3
 import shutil
+import sqlite3
 from pathlib import Path
 from typing import Dict, List, Any
 import sys
@@ -66,7 +66,7 @@ def merge_batch_results(batch_results: List[Dict[str, Any]]) -> Dict[str, Any]:
     
     # Use first batch as template
     merged = {
-        'metadata': batch_results[0]['metadata'].copy(),
+        'summary': batch_results[0]['summary'].copy(),
         'results': []
     }
     
@@ -90,19 +90,23 @@ def merge_batch_results(batch_results: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Sort by composition, then structure_id
     merged['results'].sort(key=lambda x: (x['composition'], x['structure_id']))
     
-    # Update metadata
-    merged['metadata']['total_batches'] = len(batch_results)
-    merged['metadata']['total_structures'] = len(merged['results'])
+    # Update summary
+    merged['summary']['total_batches'] = len(batch_results)
+    merged['summary']['total_structures'] = len(merged['results'])
     
     print(f"Merged {len(batch_results)} batches:")
     print(f"  Total unique structures: {len(merged['results'])}")
     print(f"  Duplicates skipped: {duplicate_count}")
     
-    # Count stable structures
-    stable_count = sum(1 for r in merged['results'] 
-                      if r.get('thermodynamic_stability', {}).get('e_above_hull_eV_atom', float('inf')) <= 
-                      merged['metadata'].get('hull_threshold_eV_atom', 0.1))
-    print(f"  Stable structures (below threshold): {stable_count}")
+    # Count structures that passed prescreening
+    passed_count = sum(1 for r in merged['results'] if r.get('passed_prescreening', False))
+    failed_count = len(merged['results']) - passed_count
+    
+    merged['summary']['passed_prescreening'] = passed_count
+    merged['summary']['failed_prescreening'] = failed_count
+    
+    print(f"  Passed prescreening: {passed_count}")
+    print(f"  Failed prescreening: {failed_count}")
     
     return merged
 
@@ -155,7 +159,10 @@ def check_mp_cache(output_dir: Path) -> bool:
 
 def merge_pyxtal_databases(output_dir: Path) -> bool:
     """
-    Merge PyXtal database files from parallel batches.
+    Merge PyXtal database files from parallel batches using direct SQL.
+    
+    PyXtal wraps ASE database, which is SQLite underneath. For bulk operations,
+    we use SQL directly for speed, avoiding expensive per-structure operations.
     
     Args:
         output_dir: Directory containing batch database files
@@ -184,58 +191,81 @@ def merge_pyxtal_databases(output_dir: Path) -> bool:
         merged_db_path.unlink()
         print(f"Removed existing merged database\n")
     
-    # Create merged database by copying first batch
-    if batch_dbs:
+    try:
+        # Copy first batch as base (fast file copy)
         shutil.copy2(batch_dbs[0], merged_db_path)
         print(f"Initialized merged database from {batch_dbs[0].name}")
-    
-    # Attach and copy data from remaining databases
-    if len(batch_dbs) > 1:
-        try:
-            conn = sqlite3.connect(str(merged_db_path))
-            cursor = conn.cursor()
-            
-            total_structures = 0
-            
+        
+        # Get count from first batch
+        conn = sqlite3.connect(str(merged_db_path))
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM systems")
+        initial_count = cursor.fetchone()[0]
+        print(f"  Initial structures: {initial_count}\n")
+        
+        # Merge remaining databases using SQL (fast bulk operations)
+        if len(batch_dbs) > 1:
             for i, batch_db in enumerate(batch_dbs[1:], 1):
                 print(f"Merging {batch_db.name}...")
                 
-                # Attach the batch database
-                cursor.execute(f"ATTACH DATABASE '{batch_db}' AS batch{i}")
-                
-                # Get table names from batch database
-                cursor.execute(f"SELECT name FROM batch{i}.sqlite_master WHERE type='table'")
-                tables = cursor.fetchall()
-                
-                for (table_name,) in tables:
-                    # Copy data from batch table to merged table
+                try:
+                    # Use unique alias for each batch to avoid conflicts
+                    batch_alias = f"batch_{i}_{batch_db.stem}"
+                    
+                    # Attach the batch database (use string formatting, ATTACH doesn't support parameterized queries)
+                    cursor.execute(f"ATTACH DATABASE '{batch_db}' AS {batch_alias}")
+                    
+                    # Get table names from batch database
+                    cursor.execute(f"SELECT name FROM {batch_alias}.sqlite_master WHERE type='table'")
+                    tables = cursor.fetchall()
+                    
+                    batch_structures = 0
+                    for (table_name,) in tables:
+                        # Copy data using INSERT OR IGNORE (skips duplicates automatically)
+                        try:
+                            cursor.execute(f"INSERT OR IGNORE INTO {table_name} SELECT * FROM {batch_alias}.{table_name}")
+                            added = cursor.rowcount
+                            if table_name == 'systems':
+                                batch_structures = added
+                            print(f"  Added {added} entries to table '{table_name}'")
+                        except sqlite3.Error as e:
+                            print(f"  Warning: Could not merge table '{table_name}': {e}")
+                    
+                    # Commit before detaching (critical to release locks)
+                    conn.commit()
+                    
+                    # Now detach the batch database
+                    cursor.execute(f"DETACH DATABASE {batch_alias}")
+                    
+                    print(f"  → {batch_structures} new structures from {batch_db.name}\n")
+                    
+                except sqlite3.Error as e:
+                    print(f"  ERROR: {e}")
+                    print(f"  This database may be corrupted (check for batch job crash)\n")
+                    # Try to commit and detach if attached
                     try:
-                        cursor.execute(f"INSERT OR IGNORE INTO {table_name} SELECT * FROM batch{i}.{table_name}")
-                        added = cursor.rowcount
-                        total_structures += added
-                        print(f"  Added {added} entries from table '{table_name}'")
-                    except sqlite3.Error as e:
-                        print(f"  Warning: Could not merge table '{table_name}': {e}")
-                
-                # Detach the batch database
-                cursor.execute(f"DETACH DATABASE batch{i}")
-            
-            conn.commit()
-            conn.close()
-            
-            print(f"\nDatabase merge complete!")
-            print(f"  Total structures added: {total_structures}")
-            print(f"  Merged database: {merged_db_path}")
-            return True
-            
-        except Exception as e:
-            print(f"\nERROR merging databases: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-    else:
-        print("Only one database file found, no merging needed")
+                        conn.commit()
+                        if 'batch_alias' in locals():
+                            cursor.execute(f"DETACH DATABASE {batch_alias}")
+                    except:
+                        pass
+                    continue
+        
+        # Get final count
+        cursor.execute("SELECT COUNT(*) FROM systems")
+        final_count = cursor.fetchone()[0]
+        conn.close()
+        
+        print(f"Database merge complete!")
+        print(f"  Total structures in merged database: {final_count}")
+        print(f"  Merged database: {merged_db_path}")
         return True
+        
+    except Exception as e:
+        print(f"\nERROR merging databases: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 def main():
@@ -298,15 +328,18 @@ def main():
     check_mp_cache(output_dir)
     
     # Merge PyXtal databases unless skipped
+    db_success = False
     if not args.skip_database:
         db_success = merge_pyxtal_databases(output_dir)
         if not db_success:
             print("\nWARNING: Database merge failed or was skipped")
+            print("  Batch database files will be kept for manual inspection")
     else:
         print("\nSkipping database merge (--skip-database)")
+        db_success = True  # Consider it successful if skipped
     
-    # Cleanup batch files if requested
-    if not args.keep_batches:
+    # Cleanup batch files ONLY if merge was successful
+    if not args.keep_batches and db_success:
         print("\nCleaning up batch files...")
         batch_files = list(output_dir.glob('prescreening_stability_batch*.json'))
         checkpoint_files = list(output_dir.glob('prescreening_checkpoint_batch*.json'))
@@ -323,8 +356,11 @@ def main():
                 print(f"  WARNING: Failed to delete {bf.name}: {e}")
         
         print(f"Deleted {len(all_files)} batch and checkpoint files")
+    elif not args.keep_batches and not db_success:
+        print("\nBatch files KEPT due to merge failure")
+        print("  Fix the database issues, then re-run merge with --keep-batches")
     else:
-        print("\nBatch files kept (use --keep-batches=False to delete)")
+        print("\nBatch files kept (--keep-batches flag set)")
     
     print()
     print("="*70)
