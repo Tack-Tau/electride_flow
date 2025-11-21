@@ -377,7 +377,7 @@ class VASPWorkflowManager:
 #SBATCH --partition=Apus,Orion
 #SBATCH --nodes=1
 #SBATCH --ntasks=32
-#SBATCH --exclusive
+#SBATCH --mem=64G
 #SBATCH --time=1-00:00:00
 #SBATCH --output={job_dir}/vasp_%j.out
 #SBATCH --error={job_dir}/vasp_%j.err
@@ -394,11 +394,6 @@ export PMG_VASP_PSP_DIR=$HOME/apps/PBE64
 # Intel MPI settings for SLURM
 export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
 export I_MPI_FABRICS=shm:ofi
-
-# Unset conflicting SLURM memory variables (for --exclusive jobs)
-unset SLURM_MEM_PER_CPU
-unset SLURM_MEM_PER_GPU  
-unset SLURM_MEM_PER_NODE
 
 # VASP executable (use srun for SLURM-native MPI launching)
 VASP_CMD="srun $HOME/apps/vasp.6.2.1/bin/vasp_std"
@@ -483,7 +478,7 @@ echo "Successfully verified CHGCAR and WAVECAR are present"
 
 """
         
-        # For PARCHG: copy POSCAR, CHGCAR, and WAVECAR from SC
+        # For PARCHG: copy CONTCAR, CHGCAR, and WAVECAR from SC
         if job_type == 'parchg':
             script += f"""
 # Copy CONTCAR from relaxation as POSCAR
@@ -542,6 +537,11 @@ if [ $EXIT_CODE -eq 0 ]; then
     if [ -f "CHGCAR" ] && [ -s "CHGCAR" ] && [ -f "WAVECAR" ] && [ -s "WAVECAR" ]; then
         echo "VASP calculation completed successfully"
         echo "Verified CHGCAR and WAVECAR exist"
+        
+        # Keep CHGCAR and WAVECAR for downstream ELF/PARCHG jobs
+        # They will be cleaned up after ELF calculation finishes
+        rm -f CHG WFULL AECCAR* TMPCAR 2>/dev/null
+        
         touch VASP_DONE
     else
         echo "VASP calculation failed: CHGCAR or WAVECAR missing/empty"
@@ -553,11 +553,37 @@ if [ $EXIT_CODE -eq 0 ]; then
     fi
 """
         elif job_type == 'elf':
-            script += """
+            # Generate relative paths to SC and PARCHG directories for cleanup
+            elf_to_sc = os.path.relpath(prev_dir, job_dir) if prev_dir else None
+            elf_to_parchg = "../PARCHG"
+            
+            script += f"""
     # Verify critical files for ELF calculation
     if [ -f "ELFCAR" ] && [ -s "ELFCAR" ]; then
         echo "VASP calculation completed successfully"
         echo "Verified ELFCAR exists"
+        
+        # ELF is typically the last job - clean up CHGCAR/WAVECAR from all directories
+        # Clean up in current ELF directory
+        rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR 2>/dev/null
+"""
+            
+            if elf_to_sc:
+                script += f"""        
+        # Clean up in SC directory
+        if [ -d "{elf_to_sc}" ]; then
+            echo "  Cleaning {elf_to_sc}/"
+            rm -f "{elf_to_sc}/CHGCAR" "{elf_to_sc}/WAVECAR" "{elf_to_sc}/CHG" "{elf_to_sc}/WFULL" 2>/dev/null
+        fi
+"""
+            
+            script += f"""        
+        # Clean up in all PARCHG subdirectories
+        if [ -d "{elf_to_parchg}" ]; then
+            echo "  Cleaning {elf_to_parchg}/*/"
+            find "{elf_to_parchg}" -maxdepth 2 -type f \\( -name "CHGCAR" -o -name "WAVECAR" -o -name "CHG" -o -name "WFULL" \\) -delete 2>/dev/null
+        fi
+        
         touch VASP_DONE
     else
         echo "VASP calculation failed: ELFCAR missing/empty"
@@ -570,6 +596,10 @@ if [ $EXIT_CODE -eq 0 ]; then
     if [ -f "CONTCAR" ] && [ -s "CONTCAR" ]; then
         echo "VASP calculation completed successfully"
         echo "Verified CONTCAR exists"
+        
+        # Clean up large unnecessary files to save disk space
+        rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR 2>/dev/null
+        
         touch VASP_DONE
     else
         echo "VASP calculation failed: CONTCAR missing/empty"
@@ -585,6 +615,10 @@ if [ $EXIT_CODE -eq 0 ]; then
         echo "Verified PARCHG exists"
         mv PARCHG "{parchg_file}"
         echo "Renamed PARCHG to {parchg_file}"
+        
+        # Clean up large unnecessary files to save disk space
+        rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR 2>/dev/null
+        
         touch VASP_DONE
     else
         echo "VASP calculation failed: PARCHG missing/empty"

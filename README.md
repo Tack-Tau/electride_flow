@@ -956,7 +956,7 @@ script = f"""#!/bin/bash
 #SBATCH --partition=Apus      # Change partition
 #SBATCH --ntasks=32            # Change cores
 #SBATCH --time=1-00:00:00      # Change walltime (1 day)
-#SBATCH --exclusive            # Exclusive node access
+#SBATCH --mem=64G              # Change memoery
 #SBATCH --output={job_dir}/vasp_%j.out
 #SBATCH --error={job_dir}/vasp_%j.err
 ```
