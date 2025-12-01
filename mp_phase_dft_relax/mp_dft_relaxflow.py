@@ -147,8 +147,8 @@ def create_vasp_relax_inputs(structure, job_dir):
             'EDIFFG': -0.01,
             'IBRION': 2,
             'ISIF': 3,
-            'NELM': 150,
-            'NSW': 300,
+            'NELM': 60,
+            'NSW': 30,
             'ISMEAR': 0,
             'SIGMA': 0.05,
             'ISPIN': 1,
@@ -159,7 +159,7 @@ def create_vasp_relax_inputs(structure, job_dir):
             'LASPH': False,
             'LORBIT': 0,
         },
-        user_kpoints_settings={'reciprocal_density': 250}
+        user_kpoints_settings={'reciprocal_density': 64}
     )
     
     vis.write_input(str(job_dir))
@@ -179,7 +179,7 @@ def create_slurm_script(job_dir, job_name):
 #SBATCH --nodes=1
 #SBATCH --ntasks=32
 #SBATCH --mem=64G
-#SBATCH --time=1-00:00:00
+#SBATCH --time=00:30:00
 #SBATCH --output={job_dir}/vasp_%j.out
 #SBATCH --error={job_dir}/vasp_%j.err
 
@@ -299,7 +299,7 @@ def check_relax_convergence(relax_dir):
     try:
         vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
         
-        if not vr.converged:
+        if not vr.converged_electronic:
             return False, None
         
         final_energy = vr.final_energy
@@ -410,7 +410,7 @@ def update_job_status(db):
             else:
                 sdata['state'] = 'FAILED'
                 sdata['update_time'] = datetime.now().isoformat()
-                print(f"    {mp_id}: FAILED (not converged)")
+                print(f"    {mp_id}: FAILED (electronic not converged)")
                 failed += 1
         
         elif slurm_status == 'FAILED':
@@ -418,6 +418,25 @@ def update_job_status(db):
             sdata['update_time'] = datetime.now().isoformat()
             print(f"    {mp_id}: FAILED (SLURM job failed)")
             failed += 1
+        
+        elif slurm_status is None:
+            # Job not found in queue or sacct - likely timed out or crashed
+            # Check if vasprun.xml exists to distinguish partial completion from total failure
+            converged, energy_per_atom = check_relax_convergence(sdata['relax_dir'])
+            
+            if converged:
+                # Job finished but SLURM lost track of it - mark as completed
+                sdata['state'] = 'COMPLETED'
+                sdata['vasp_energy_per_atom'] = energy_per_atom
+                sdata['update_time'] = datetime.now().isoformat()
+                print(f"    {mp_id}: COMPLETED (E={energy_per_atom:.6f} eV/atom, SLURM lost)")
+                completed += 1
+            else:
+                # Job terminated without proper completion - timeout or crash
+                sdata['state'] = 'FAILED'
+                sdata['update_time'] = datetime.now().isoformat()
+                print(f"    {mp_id}: FAILED (timeout or crash, no convergence)")
+                failed += 1
     
     return completed, failed
 

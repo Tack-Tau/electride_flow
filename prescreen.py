@@ -4,6 +4,13 @@ MatterSim Pre-screening for VASPflow
 
 Performs fast thermodynamic stability screening using MatterSim before expensive VASP calculations.
 Outputs: prescreening_stability.json with structures passing energy_above_hull threshold.
+
+IMPORTANT UPDATE (Modern MPRester):
+- Uses mp_api.client.MPRester (modern API, not legacy pymatgen.ext.matproj)
+- Queries ALL GGA/GGA+U entries via get_entries_in_chemsys() (not filtered by r2SCAN is_stable)
+- Uses GGA-optimized structures (compatible with MatterSim relaxation)
+- Matches methodology in compute_dft_e_hull.py and redo_mp_phase_relax.py
+- Fixes false negative issue where r2SCAN geometries gave artificially high MatterSim energies
 """
 
 import os
@@ -23,7 +30,13 @@ from datetime import datetime
 from pymatgen.core import Composition
 from pymatgen.io.cif import CifParser
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
-from pymatgen.ext.matproj import MPRester
+# Use modern MP API for correct GGA phase queries
+try:
+    from mp_api.client import MPRester
+except ImportError:
+    print("ERROR: mp-api package is required")
+    print("Install with: pip install mp-api")
+    sys.exit(1)
 from pymatgen.io.ase import AseAtomsAdaptor
 
 from ase.optimize import FIRE
@@ -256,10 +269,19 @@ def save_mp_cache_locked(cache_file, new_entries_data):
 
 def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, batch_size=32):
     """
-    Get MP stable (on-hull) phases and relax with MatterSim for consistent energy reference.
+    Get MP GGA phases and relax with MatterSim for consistent energy reference.
+    
+    CRITICAL UPDATES (matches compute_dft_e_hull.py and redo_mp_phase_relax.py):
+    - Uses modern mp_api.client.MPRester (not legacy pymatgen.ext.matproj)
+    - Queries ALL GGA/GGA+U entries via get_entries_in_chemsys() (not filtered by r2SCAN is_stable)
+    - Filters functionals: GGA/GGA+U accepted, r2SCAN/SCAN excluded
+    - Deduplication: Prefers pure GGA over GGA+U for same formula
+    - Uses GGA-optimized structures (compatible with MatterSim relaxation)
+    
+    This fixes the false negative issue where r2SCAN-stable + r2SCAN-geometry phases
+    gave artificially high MatterSim energies due to geometry incompatibility.
     
     Key optimizations:
-    - Queries ONLY stable phases (is_stable=True) from MP
     - Uses single SHARED global cache file (mp_mattersim.json) across all parallel batches
     - Per-chemsys locking prevents duplicate MP queries across batches
     - Reuses calculator across batch for efficiency
@@ -273,7 +295,7 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
         batch_size: Batch size for processing (not used in this function but passed for consistency)
     
     Returns:
-        List of PDEntry objects for stable phases in this chemical system
+        List of PDEntry objects for GGA phases in this chemical system
     """
     cache_file = Path(cache_file)
     
@@ -319,64 +341,149 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
             missing_chemsys = required_chemsys - cached_chemsys
             
             if cached_count > 0 and not missing_chemsys:
-                print(f"    Using cached data: {cached_count} stable phases for {chemsys}")
+                print(f"    Using cached data: {cached_count} GGA phases for {chemsys}")
                 return entries
     
             # Need to query MP for missing data
-            print(f"    Querying MP for stable phases in {chemsys} and subsystems...")
+            print(f"    Querying MP for GGA phases in {chemsys}...")
             if missing_chemsys:
-                print(f"      Missing: {sorted(missing_chemsys)}")
+                print(f"      Missing subsystems: {sorted(missing_chemsys)}")
     
             try:
                 with MPRester(mp_api_key) as mpr:
-                    # Query ALL missing subsystems (including elementals and binaries)
-                    # This ensures we have terminal entries for phase diagram construction
-                    all_stable_docs = []
-                    systems_to_query = missing_chemsys if missing_chemsys else [chemsys]
+                    # Get ALL GGA entries in this chemical system (not filtered by r2SCAN stability)
+                    # This ensures we get GGA data even for phases where r2SCAN is now preferred
+                    computed_entries = mpr.get_entries_in_chemsys(
+                        elements,
+                        property_data=None,
+                        conventional_unit_cell=False,
+                        additional_criteria={}  # No is_stable filter - get all GGA/GGA+U entries
+                    )
                     
-                    for sys in sorted(systems_to_query):
-                        # Query only STABLE phases (is_stable=True)
-                        # This is MP's authoritative determination of thermodynamic stability
-                        stable_docs = mpr.materials.summary.search(
-                            chemsys=sys,
-                            is_stable=True,  # Only on-hull phases
-                            fields=["material_id", "formula_pretty", "energy_per_atom", "structure", "energy_above_hull"]
-                        )
+                    print(f"    Retrieved {len(computed_entries)} entries from MP")
+                    
+                    # Filter for GGA/GGA+U, exclude r2SCAN/SCAN, and get structures
+                    mp_phases = []
+                    seen_formulas = {}
+                    skipped_structure_retrieval = []
+                    
+                    for comp_entry in computed_entries:
+                        entry_id = comp_entry.entry_id
                         
-                        if stable_docs:
-                            all_stable_docs.extend(stable_docs)
+                        # Filter by functional based on entry_id suffix
+                        has_U = False
+                        has_SCAN = False
+                        is_gga = False
                         
-                        # Random sleep to avoid API rate limiting (0-500 ms)
-                        time.sleep(random.uniform(0, 0.5))
+                        if '-GGA' in entry_id:
+                            is_gga = True
+                        elif '-GGA+U' in entry_id or '_GGA+U' in entry_id:
+                            has_U = True
+                            is_gga = True
+                        elif '-r2SCAN' in entry_id or '_r2SCAN' in entry_id:
+                            has_SCAN = True
+                        elif '-SCAN' in entry_id or '_SCAN' in entry_id:
+                            has_SCAN = True
+                        else:
+                            # No explicit suffix - likely legacy GGA
+                            is_gga = True
+                        
+                        # Skip r2SCAN/SCAN
+                        if has_SCAN or not is_gga:
+                            continue
+                        
+                        # Get MP ID (base without functional suffix)
+                        mp_id_parts = entry_id.split('-')
+                        if len(mp_id_parts) >= 2:
+                            mp_id = mp_id_parts[0] + '-' + mp_id_parts[1]
+                        else:
+                            mp_id = entry_id
+                        
+                        # Extract structure - try multiple methods
+                        structure = None
+                        
+                        # Method 1: Try get_structure_by_material_id
+                        try:
+                            structure = mpr.get_structure_by_material_id(mp_id)
+                        except Exception:
+                            # Method 2: Try materials.summary.search
+                            try:
+                                summary_docs = mpr.materials.summary.search(
+                                    material_ids=[mp_id],
+                                    fields=["material_id", "structure"]
+                                )
+                                if summary_docs and len(summary_docs) > 0:
+                                    structure = summary_docs[0].structure
+                            except Exception:
+                                skipped_structure_retrieval.append(f"{mp_id} ({comp_entry.composition.reduced_formula})")
+                                continue
+                        
+                        if structure is None:
+                            continue
+                        
+                        formula = structure.composition.reduced_formula
+                        
+                        # Handle duplicates: prefer pure GGA over GGA+U
+                        if formula in seen_formulas:
+                            existing_has_U = seen_formulas[formula]['has_U']
+                            if not has_U and existing_has_U:
+                                # Replace with pure GGA
+                                mp_phases = [(mid, s, has_u) for mid, s, has_u in mp_phases 
+                                            if s.composition.reduced_formula != formula]
+                            else:
+                                continue
+                        
+                        mp_phases.append((mp_id, structure, has_U))
+                        seen_formulas[formula] = {'mp_id': mp_id, 'has_U': has_U}
                     
-                    if not all_stable_docs:
-                        print(f"    Warning: No stable MP phases found for {chemsys} and subsystems")
-                        return entries
+                    if skipped_structure_retrieval:
+                        print(f"    WARNING: Could not retrieve structures for {len(skipped_structure_retrieval)} phases:")
+                        for phase_info in skipped_structure_retrieval[:5]:
+                            print(f"      {phase_info}")
+                        if len(skipped_structure_retrieval) > 5:
+                            print(f"      ... and {len(skipped_structure_retrieval) - 5} more")
                     
-                    print(f"    Found {len(all_stable_docs)} stable phases across all subsystems, relaxing with MatterSim...")
+                    print(f"    Filtered to {len(mp_phases)} GGA/GGA+U phases with structures")
+                    
+                    # Verify we have terminal (elemental) phases
+                    elements_found = set()
+                    for mp_id, structure, has_U in mp_phases:
+                        if len(structure.composition.elements) == 1:
+                            elements_found.add(str(structure.composition.elements[0]))
+                    
+                    expected_elements = set(elements)
+                    if elements_found != expected_elements:
+                        missing = expected_elements - elements_found
+                        print(f"    WARNING: Missing terminal phases for elements: {sorted(missing)}")
+                        print(f"    This will cause 'Missing terminal entries' errors in phase diagram!")
+                    else:
+                        print(f"      All terminal phases present: {sorted(elements_found)}")
+                    
+                    print(f"    Relaxing {len(mp_phases)} GGA phases with MatterSim...")
                     
                     new_entries_data = []
                     success_count = 0
+                    failed_count = 0
                     
-                    for doc in all_stable_docs:
-                        mp_id = doc.material_id
-                        
+                    for mp_id, structure, has_U in mp_phases:
                         # Determine chemsys for this phase
-                        doc_elements = sorted([str(el) for el in doc.structure.composition.elements])
+                        doc_elements = sorted([str(el) for el in structure.composition.elements])
                         doc_chemsys = '-'.join(doc_elements)
                         
                         # Skip if already cached
-                        cache_key = (doc_chemsys, mp_id)
+                        entry_id_cached = f"mp_mattersim_{mp_id}"
+                        cache_key = (doc_chemsys, entry_id_cached)
                         if cache_key in cached_data:
                             continue
                         
-                        # Relax with MatterSim using reused calculator
+                        # Relax GGA-optimized structure with MatterSim (using reused calculator)
                         relaxed_struct, energy_per_atom, error_msg = relax_structure_mattersim(
-                            doc.structure, calculator, structure_id=mp_id
+                            structure, calculator, structure_id=mp_id
                         )
                         
                         if relaxed_struct is None or energy_per_atom is None:
                             print(f"      Warning: Failed to relax {mp_id}: {error_msg}")
+                            failed_count += 1
                             continue
                         
                         total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
@@ -399,7 +506,9 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
                         })
                         success_count += 1
                     
-                    print(f"    Successfully relaxed {success_count} new phases")
+                    print(f"    Successfully relaxed {success_count} GGA phases")
+                    if failed_count > 0:
+                        print(f"    Failed to relax {failed_count} phases")
                     
                     # Update cache with new entries (with file locking)
                     if new_entries_data:
@@ -613,9 +722,11 @@ def main():
     unique_chemsys = sorted(set(s['chemsys'] for s in all_structures))
     
     print("="*70)
-    print("Pre-fetching MP Stable Phases (on-hull only)")
+    print("Pre-fetching MP GGA Phases (Modern MPRester)")
     print("="*70)
     print(f"Unique chemical systems: {len(unique_chemsys)}")
+    print("Strategy: Query ALL GGA/GGA+U entries (not filtered by r2SCAN stability)")
+    print("  This ensures GGA-optimized structures compatible with MatterSim")
     print("="*70 + "\n")
     
     # Create MatterSim calculator for MP phases (one-time)
@@ -696,7 +807,6 @@ def main():
             if problem_struct:
                 results.append({
                     'structure_id': currently_processing,
-                    'energy_per_atom': None,
                     'composition': problem_struct['composition'],
                     'chemsys': problem_struct['chemsys'],
                     'mattersim_energy_per_atom': None,
@@ -784,7 +894,6 @@ def main():
                     results.append({
                         'structure_id': item['id'],
                         'pmg': None,
-                        'energy_per_atom': None,
                         'composition': item['composition'],
                         'chemsys': item['chemsys'],
                         'mattersim_energy_per_atom': None,
@@ -835,7 +944,6 @@ def main():
                     results.append({
                         'structure_id': struct_id,
                         'pmg': None,
-                        'energy_per_atom': None,
                         'composition': item['composition'],
                         'chemsys': chemsys,
                         'mattersim_energy_per_atom': None,
@@ -858,7 +966,6 @@ def main():
                     results.append({
                         'structure_id': struct_id,
                         'pmg': None,
-                        'energy_per_atom': None,
                         'composition': item['composition'],
                         'chemsys': chemsys,
                         'mattersim_energy_per_atom': None,
@@ -887,7 +994,6 @@ def main():
                 results.append({
                     'structure_id': struct_id,
                     'pmg': relaxed_struct,
-                    'energy_per_atom': energy_per_atom,
                     'composition': item['composition'],
                     'chemsys': chemsys,
                     'mattersim_energy_per_atom': float(energy_per_atom),
@@ -922,8 +1028,16 @@ def main():
             
             for i in range(batch_start_idx, len(results)):
                 res = results[i]
+                
+                # Find original structure for this result
+                orig_struct = None
+                for s in batch:
+                    if s['id'] == res['structure_id']:
+                        orig_struct = s['structure']
+                        break
+                
                 if res['pmg'] is not None:
-                    # Valid structure - try progressive tolerances
+                    # Valid structure with successful relaxation - try progressive tolerances
                     added = False
                     for tol in tolerances_db:
                         try:
@@ -934,11 +1048,12 @@ def main():
                                 kvp={
                                     'structure_id': res['structure_id'],
                                     'e_above_hull': res['energy_above_hull'],
-                                    'e_mattersim': res['energy_per_atom'],
+                                    'e_mattersim': res['mattersim_energy_per_atom'],
                                     'composition': res['composition'],
                                     'chemsys': res['chemsys'],
                                     'passed_prescreening': res['passed_prescreening'],
-                                    'status': 'valid'
+                                    'status': 'valid',
+                                    'symmetrized': True
                                 }
                             )
                             batch_db_count += 1
@@ -948,11 +1063,73 @@ def main():
                             continue
                     
                     if not added:
-                        tqdm.write(f"  Warning: Could not add {res['structure_id']} to database after trying all tolerances {tolerances_db}")
+                        # PyXtal failed on relaxed structure - try original structure with progressive tolerances
+                        tqdm.write(f"  Warning: PyXtal failed on relaxed structure {res['structure_id']}, trying original structure")
+                        if orig_struct is not None:
+                            orig_added = False
+                            for tol in tolerances_db:
+                                try:
+                                    xtal_orig = pyxtal()
+                                    xtal_orig.from_seed(orig_struct, tol=tol)
+                                    db.add_xtal(
+                                        xtal_orig,
+                                        kvp={
+                                            'structure_id': res['structure_id'],
+                                            'e_above_hull': res['energy_above_hull'],
+                                            'e_mattersim': res['mattersim_energy_per_atom'],
+                                            'composition': res['composition'],
+                                            'chemsys': res['chemsys'],
+                                            'passed_prescreening': False,  # Never proceed to DFT (use relaxed structure failed)
+                                            'status': 'failed_symmetrization_after_relax',
+                                            'symmetrized': True,
+                                            'note': 'original_structure_saved_due_to_relaxed_pyxtal_failure'
+                                        }
+                                    )
+                                    batch_db_count += 1
+                                    orig_added = True
+                                    break
+                                except Exception:
+                                    continue
+                            
+                            if not orig_added:
+                                tqdm.write(f"  Error: Could not save even original structure for {res['structure_id']} (PyXtal failed at all tolerances)")
+                                batch_failed_count += 1
+                        else:
+                            batch_failed_count += 1
                 else:
-                    # Invalid/failed structure - record metadata only (no structure object)
-                    # Note: These are tracked in checkpoint JSON with full error details
-                    batch_failed_count += 1
+                    # Invalid/failed structure - try to save original structure for book-keeping
+                    if orig_struct is not None:
+                        orig_added = False
+                        for tol in tolerances_db:
+                            try:
+                                xtal_failed = pyxtal()
+                                xtal_failed.from_seed(orig_struct, tol=tol)
+                                db.add_xtal(
+                                    xtal_failed,
+                                    kvp={
+                                        'structure_id': res['structure_id'],
+                                        'e_above_hull': None,
+                                        'e_mattersim': None,
+                                        'composition': res['composition'],
+                                        'chemsys': res['chemsys'],
+                                        'passed_prescreening': False,  # Never proceed to DFT
+                                        'status': res.get('error', 'failed_prescreening')[:200],  # Truncate long errors
+                                        'symmetrized': True,
+                                        'note': 'original_structure_saved_for_bookkeeping'
+                                    }
+                                )
+                                batch_db_count += 1
+                                orig_added = True
+                                break
+                            except Exception:
+                                continue
+                        
+                        if not orig_added:
+                            # Even original structure failed PyXtal at all tolerances - skip database entry
+                            # These are still tracked in checkpoint JSON with full error details
+                            batch_failed_count += 1
+                    else:
+                        batch_failed_count += 1
             
             # Explicit commit after each batch
             if hasattr(db, 'db') and hasattr(db.db, 'commit'):
@@ -960,9 +1137,9 @@ def main():
             
             print(f"\nBatch {batch_idx + 1} complete.")
             print(f"  Checkpoint saved: {checkpoint_file.name}")
-            print(f"  Database updated: {batch_db_count} valid structures added")
+            print(f"  Database updated: {batch_db_count} structures added")
             if batch_failed_count > 0:
-                print(f"  Skipped {batch_failed_count} invalid structures (tracked in checkpoint JSON)")
+                print(f"  Could not save {batch_failed_count} structures to database (tracked in checkpoint JSON)")
             print(f"  Progress: {len(results)}/{len(all_structures)} structures\n")
     
     # Save results to JSON (exclude pmg Structure objects)
