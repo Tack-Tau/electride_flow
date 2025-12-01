@@ -51,8 +51,8 @@ def parse_band_gap_from_vasprun(vasprun_path):
     try:
         vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=True)
         
-        if not vr.converged:
-            print(f"    Warning: VASP calculation not converged")
+        if not vr.converged_electronic:
+            print(f"    Warning: Electronic SCF not converged")
             return None, False
         
         if vr.efermi is None:
@@ -271,8 +271,8 @@ class VASPWorkflowManager:
                     'EDIFFG': -0.01,
                     'IBRION': 2,
                     'ISIF': 3,
-                    'NELM': 150,
-                    'NSW': 300,
+                    'NELM': 60,
+                    'NSW': 30,
                     'ISMEAR': 0,
                     'SIGMA': 0.05,
                     'ISPIN': 1,
@@ -283,7 +283,7 @@ class VASPWorkflowManager:
                     'LASPH': False,
                     'LORBIT': 0,
                 },
-                user_kpoints_settings={'reciprocal_density': 250}
+                user_kpoints_settings={'reciprocal_density': 64}
             )
         elif job_type == 'sc':
             vis = MPStaticSet(structure, 
@@ -303,7 +303,7 @@ class VASPWorkflowManager:
                     'LASPH': False,
                     'LORBIT': 0,
                 },
-                user_kpoints_settings={'reciprocal_density': 250}
+                user_kpoints_settings={'reciprocal_density': 64}
             )
         elif job_type == 'elf':
             vis = MPStaticSet(structure, 
@@ -326,7 +326,7 @@ class VASPWorkflowManager:
                     'LASPH': False,
                     'LORBIT': 10,
                 },
-                user_kpoints_settings={'reciprocal_density': 250}
+                user_kpoints_settings={'reciprocal_density': 64}
             )
         elif job_type == 'parchg':
             if not parchg_settings:
@@ -345,7 +345,7 @@ class VASPWorkflowManager:
             base_settings.update(parchg_settings)
             vis = MPStaticSet(structure, 
                 user_incar_settings=base_settings,
-                user_kpoints_settings={'reciprocal_density': 250}
+                user_kpoints_settings={'reciprocal_density': 64}
             )
         else:
             raise ValueError(f"Unknown job_type: {job_type}")
@@ -378,7 +378,7 @@ class VASPWorkflowManager:
 #SBATCH --nodes=1
 #SBATCH --ntasks=32
 #SBATCH --mem=64G
-#SBATCH --time=1-00:00:00
+#SBATCH --time=00:30:00
 #SBATCH --output={job_dir}/vasp_%j.out
 #SBATCH --error={job_dir}/vasp_%j.err
 
@@ -582,6 +582,49 @@ if [ $EXIT_CODE -eq 0 ]; then
         if [ -d "{elf_to_parchg}" ]; then
             echo "  Cleaning {elf_to_parchg}/*/"
             find "{elf_to_parchg}" -maxdepth 2 -type f \\( -name "CHGCAR" -o -name "WAVECAR" -o -name "CHG" -o -name "WFULL" \\) -delete 2>/dev/null
+        fi
+        
+        # Compress PARCHG files in ELF directory into a single tar.gz archive
+        # Only compress if we have all 5 PARCHG files (band0, band1, e0025, e05, e10)
+        echo "  Validating and compressing PARCHG files..."
+        
+        # Check if all 5 expected PARCHG files exist and are non-empty
+        PARCHG_FILES="PARCHG-band0 PARCHG-band1 PARCHG-e0025 PARCHG-e05 PARCHG-e10"
+        ALL_VALID=true
+        
+        for pf in $PARCHG_FILES; do
+            if [ ! -f "$pf" ] || [ ! -s "$pf" ]; then
+                echo "    Warning: $pf is missing or empty"
+                ALL_VALID=false
+            fi
+        done
+        
+        if [ "$ALL_VALID" = true ]; then
+            if [ ! -f "PARCHG.tar.gz" ]; then
+                echo "    All 5 PARCHG files validated (non-empty)"
+                if tar czf PARCHG.tar.gz $PARCHG_FILES 2>/dev/null; then
+                    echo "    Created PARCHG.tar.gz in ELF directory"
+                    
+                    # Remove PARCHG-* files from ELF directory
+                    rm -f PARCHG-*
+                    echo "    Removed PARCHG-* files from ELF directory"
+                    
+                    # Remove PARCHG-* files from all PARCHG subdirectories
+                    if [ -d "{elf_to_parchg}" ]; then
+                        find "{elf_to_parchg}" -maxdepth 2 -type f -name "PARCHG-*" -delete 2>/dev/null
+                        echo "    Removed PARCHG-* files from {elf_to_parchg}/*/ subdirectories"
+                    fi
+                    
+                    echo "    Disk space saved: PARCHG files compressed into single archive"
+                else
+                    echo "    ERROR: Failed to create PARCHG.tar.gz"
+                fi
+            else
+                echo "    PARCHG.tar.gz already exists"
+            fi
+        else
+            echo "    ERROR: Not all PARCHG files are valid - skipping compression"
+            echo "    This indicates PARCHG jobs may have failed"
         fi
         
         touch VASP_DONE
@@ -891,13 +934,13 @@ fi
                     if vasprun_path.exists():
                         try:
                             vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-                            if not vr.converged:
+                            if not vr.converged_electronic:
                                 self.db.update_state(struct_id, 'RELAX_FAILED', 
-                                                   error='VASP calculation not converged')
-                                print(f"  {struct_id}: Relax FAILED (not converged)")
+                                                   error='Electronic SCF not converged')
+                                print(f"  {struct_id}: Relax FAILED (electronic not converged)")
                             else:
                                 self.db.update_state(struct_id, 'RELAX_DONE')
-                                print(f"  {struct_id}: Relax completed")
+                                print(f"  {struct_id}: Relax completed (electronic converged)")
                         except Exception as e:
                             self.db.update_state(struct_id, 'RELAX_FAILED', 
                                                error=f'Could not check convergence: {e}')
@@ -909,6 +952,11 @@ fi
                 elif local_status == 'FAILED':
                     self.db.update_state(struct_id, 'RELAX_FAILED')
                     print(f"  {struct_id}: Relax failed")
+                else:
+                    # Job not in queue and no completion marker - likely timed out or crashed
+                    self.db.update_state(struct_id, 'RELAX_FAILED', 
+                                       error='Job terminated without completion marker (timeout or crash)')
+                    print(f"  {struct_id}: Relax FAILED (timeout or crash)")
         
         elif state == 'SC_RUNNING':
             job_status = self.check_job_status(sdata['sc_job_id'])
@@ -920,13 +968,13 @@ fi
                     if vasprun_path.exists():
                         try:
                             vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-                            if not vr.converged:
+                            if not vr.converged_electronic:
                                 self.db.update_state(struct_id, 'SC_FAILED', 
-                                                   error='VASP calculation not converged')
-                                print(f"  {struct_id}: SC FAILED (not converged)")
+                                                   error='Electronic SCF not converged')
+                                print(f"  {struct_id}: SC FAILED (electronic not converged)")
                             else:
                                 self.db.update_state(struct_id, 'SC_DONE')
-                                print(f"  {struct_id}: SC completed")
+                                print(f"  {struct_id}: SC completed (electronic converged)")
                         except Exception as e:
                             self.db.update_state(struct_id, 'SC_FAILED', 
                                                error=f'Could not check convergence: {e}')
@@ -938,6 +986,11 @@ fi
                 elif local_status == 'FAILED':
                     self.db.update_state(struct_id, 'SC_FAILED')
                     print(f"  {struct_id}: SC failed")
+                else:
+                    # Job not in queue and no completion marker - likely timed out or crashed
+                    self.db.update_state(struct_id, 'SC_FAILED', 
+                                       error='Job terminated without completion marker (timeout or crash)')
+                    print(f"  {struct_id}: SC FAILED (timeout or crash)")
         
         elif state == 'ELF_RUNNING':
             job_status = self.check_job_status(sdata['elf_job_id'])
@@ -949,6 +1002,11 @@ fi
                 elif local_status == 'FAILED':
                     self.db.update_state(struct_id, 'ELF_FAILED')
                     print(f"  {struct_id}: ELF failed")
+                else:
+                    # Job not in queue and no completion marker - likely timed out or crashed
+                    self.db.update_state(struct_id, 'ELF_FAILED', 
+                                       error='Job terminated without completion marker (timeout or crash)')
+                    print(f"  {struct_id}: ELF FAILED (timeout or crash)")
         
         elif state == 'PARCHG_RUNNING':
             all_done = True
@@ -970,9 +1028,15 @@ fi
                         if local_status == 'FAILED':
                             any_failed = True
                             break
+                        elif local_status == 'UNKNOWN':
+                            # Job terminated without completion marker (timeout or crash)
+                            any_failed = True
+                            print(f"    {subdir}: no completion marker (timeout or crash)")
+                            break
                 
                 if any_failed:
-                    self.db.update_state(struct_id, 'PARCHG_FAILED')
+                    self.db.update_state(struct_id, 'PARCHG_FAILED',
+                                       error='One or more PARCHG jobs terminated without completion marker')
                     print(f"  {struct_id}: PARCHG failed")
                 else:
                     self.db.update_state(struct_id, 'PARCHG_DONE')
@@ -1106,7 +1170,7 @@ fi
             zip_path = comp_dir / "generated_crystals_cif.zip"
             
             if not zip_path.exists():
-                print(f"⊘ Skipping {comp_name} (no ZIP file)")
+                print(f"  Skipping {comp_name} (no ZIP file)")
                 continue
             
             print(f"Scanning {comp_name}...")

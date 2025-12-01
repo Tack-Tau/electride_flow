@@ -506,6 +506,8 @@ tail OSZICAR
 
 After ELF calculations complete, analyze structures for electride characteristics using Bader topological analysis on both ELFCAR and PARCHG files.
 
+**New in v2.0**: Incremental analysis with DFT energy_above_hull integration and PyXtal database storage.
+
 ### Submit Analysis Job
 
 **Recommended**: Run analysis as a SLURM job (not on login node):
@@ -519,14 +521,14 @@ bash submit_analysis.sh \
   --vasp-jobs ./VASP_JOBS \
   --bader-exe ~/apps/Bader/bader \
   --threshold 0.6 \
-  --output electride_candidates.csv
+  --output electride_analysis.csv
 
 # Monitor analysis job
 squeue -u $USER | grep analyze
 tail -f electride_analysis_*.out
 
 # View results when complete
-cat electride_candidates.csv
+cat electride_analysis.csv
 ```
 
 ### What the Analysis Does
@@ -542,39 +544,98 @@ For each completed ELF calculation, the workflow:
 3. **Runs Bader analysis** on each file to identify electron localization maxima
 4. **Filters interstitial electrons** - sites far from atoms with high localization
 5. **Reports volumes** of interstitial electron density for each type
+6. **Adds DFT stability** - reads `e_above_hull` from `dft_stability_results.json`
+7. **Extracts spacegroup** - from VASP relaxed structure (CONTCAR) using PyXtal
+8. **Saves to database** - stores structures in PyXtal database for further analysis
+
+### Key Features (v2.0)
+
+**Incremental Analysis**:
+- Automatically skips already-analyzed structures from CSV and database
+- Run repeatedly as new ELF calculations complete without re-processing
+- Perfect for monitoring ongoing workflows
+
+**Enhanced Electride Criteria**:
+- **Old criteria**: ANY of (e0025 > 0 OR e05 > 0 OR e10 > 0 OR band0 > 0)
+- **New criteria**: ALL of (e0025 > 0 AND e05 > 0 AND e10 > 0 AND band0 > 0)
+- More stringent to reduce false positives
+
+**DFT Integration**:
+- Reads DFT energy_above_hull from `compute_dft_e_hull.py` output
+- Results sorted by stability (lowest e_above_hull first)
+- Most stable electride candidates rise to the top
+
+**PyXtal Database**:
+- Saves all analyzed structures to `electride_data.db`
+- Adaptive symmetrization (tolerances: 1e-5 to 0.5)
+- P1 fallback ensures 100% save success
+- Query-able for advanced analysis
 
 ### Detection Parameters
 
 - `--threshold`: Minimum ELF value for electride detection (default: 0.6)
 - `--bader-exe`: Path to Bader executable (default: `bader` in PATH)
-- `--output`: Output CSV file name (default: `electride_results.csv`)
+- `--output`: Output CSV file name (default: `electride_analysis.csv`)
+- `--pyxtal-db`: PyXtal database file (default: `electride_data.db`)
+- `--dft-stability`: DFT stability JSON (default: `./VASP_JOBS/dft_stability_results.json`)
 
 ### Understanding Results
 
 The analysis generates a **CSV file** with columns:
 ```
-formula,e0025,e05,e10,band0,band1
-Li10B1N4_s001,32.62,31.82,31.31,35.11,0.00
-Li10B1N4_s004,0.00,0.00,0.00,33.28,0.00
+formula,composition,e0025,e05,e10,band0,band1,spacegroup,e_above_hull
+Li10B1N4_s001,Li10B1N4,32.62,31.82,31.31,35.11,0.00,166,0.023
+Li10B1N4_s004,Li10B1N4,0.00,0.00,0.00,33.28,0.00,139,0.045
 ```
+
+**New columns** (v2.0):
+- `composition`: Chemical formula
+- `spacegroup`: Space group number from PyXtal (1 = P1 fallback)
+- `e_above_hull`: DFT energy above hull (eV/atom) from VASP calculations
 
 **Interpreting volumes** (in Å³):
 - **> 0**: Interstitial electrons detected (potential electride)
+- **All of e0025, e05, e10, band0 > 0**: Valid electride (new criteria)
 - **High values across multiple columns**: Strong electride character
-- **Only band0 or band1 non-zero**: Band-selective electride
-- **All zeros**: Not an electride
+- **Only some non-zero**: Does not meet electride criteria
 
 **Example cases**:
-- `Li10B1N4_s001`: Strong electride (all energy windows + VBM show interstitial character)
-- `Li10B1N4_s004`: Band-selective electride (only VBM shows interstitial electrons)
+- `Li10B1N4_s001`: **Valid electride** (all required volumes > 0, stable at 0.023 eV/atom)
+- `Li10B1N4_s004`: Not electride (e0025, e05, e10 = 0, fails criteria)
+
+**Sorting**:
+- Results sorted by `e_above_hull` (low → high)
+- Most thermodynamically stable electrides appear first
 
 Console output during analysis:
 ```
 Analyzing: Li10B1N4_s001 (VASP_JOBS/Li10B1N4/Li10B1N4_s001/ELF)
+  Spacegroup: 166
   *** ELECTRIDE CANDIDATE *** (e0025=32.62, e05=31.82, e10=31.31, band0=35.11, band1=0.00)
+  Saved to database: Li10B1N4_s001
 
 Analyzing: Li10B1N4_s003 (VASP_JOBS/Li10B1N4/Li10B1N4_s003/ELF)
-  Not electride (no interstitial electrons)
+  Spacegroup: 139
+  Not electride (criteria: e0025 AND e05 AND e10 AND band0 > 0)
+```
+
+### Incremental Analysis Workflow
+
+```bash
+# Day 1: 50 ELF calculations done
+bash submit_analysis.sh
+# Output: 50 structures analyzed → electride_analysis.csv, electride_data.db
+
+# Day 2: 30 more ELF calculations done (total 80)
+bash submit_analysis.sh
+# Output: Only 30 new analyzed (skips existing 50)
+#         → electride_analysis.csv updated (80 total, re-sorted)
+#         → electride_data.db updated (80 total)
+
+# Day 3: 20 more ELF calculations done (total 100)
+bash submit_analysis.sh
+# Output: Only 20 new analyzed
+#         → Final results with 100 structures, sorted by stability
 ```
 
 ### Direct Analysis (Advanced)
@@ -585,12 +646,34 @@ The analysis uses `Electride.py` internally via `analyze.py`. For manual testing
 # Test on single structure
 cd VASP_JOBS/Li10B1N4/Li10B1N4_s001/ELF
 python3 ../../../../Electride.py . --bader-exe ~/apps/Bader/bader
+
+# Run with all options
+python3 analyze.py \
+  --db VASP_JOBS/workflow.json \
+  --bader-exe ~/apps/Bader/bader \
+  --threshold 0.6 \
+  --output electride_analysis.csv \
+  --pyxtal-db electride_data.db \
+  --dft-stability VASP_JOBS/dft_stability_results.json
 ```
 
 **Note**: The analysis requires:
 - ELFCAR file (generated by VASP with `LELF=True`)
 - PARCHG files (5 types, automatically copied to ELF directory by workflow)
 - Bader executable (download from: https://theory.cm.utexas.edu/henkelman/code/bader/)
+- (Optional) `dft_stability_results.json` for e_above_hull values
+
+### Output Files
+
+1. **`electride_analysis.csv`**: Main results table sorted by stability
+2. **`electride_data.db`**: PyXtal database with symmetrized structures
+3. **`electride_analysis_detailed.log`**: Full console output from analysis run
+
+### Performance
+
+- **Incremental mode**: Only analyzes new structures (minutes for 30 new structures)
+- **Full analysis**: ~5-10 minutes per structure (PARCHG extraction + Bader analysis)
+- **Database saves**: ~1 second per structure (with adaptive tolerance)
 
 ---
 
@@ -625,12 +708,10 @@ bash run_dft_e_hull.sh \
 squeue -u $USER | grep dft_e_hull
 tail -f dft_e_hull_*.out
 
-# When complete, compare MatterSim vs DFT accuracy
-python3 compare_hulls.py \
-  --mattersim-json ./VASP_JOBS/prescreening_stability.json \
-  --dft-json ./VASP_JOBS/dft_stability_results.json \
-  --threshold 0.1 \
-  --output hull_comparison.json
+# Hull comparison (MatterSim vs DFT) is automatically generated
+# if --prescreen-results is provided to compute_dft_e_hull.py
+# Results will be in: VASP_JOBS/hull_comparison.json
+# Plots: hull_comparison_scatter.png, hull_comparison_residuals.png
 ```
 
 ### What It Does
@@ -669,9 +750,9 @@ python3 compare_hulls.py \
 }
 ```
 
-### Validation with compare_hulls.py
+### Validation: MatterSim vs DFT Hull Comparison
 
-The `compare_hulls.py` script validates pre-screening accuracy by comparing MatterSim vs DFT hull values:
+The `compute_dft_e_hull.py` script automatically validates pre-screening accuracy by comparing MatterSim vs DFT hull values when `--prescreen-results` is provided:
 
 **Statistical metrics**:
 - Pearson correlation (how well MatterSim predicts DFT)
@@ -1340,10 +1421,9 @@ tail -f workflow_manager_*.out
 | `submit_workflow_manager.sh` | SLURM script for workflow manager |
 | `workflow_status.py` | Status checking and reporting |
 | `reset_failed_jobs.py` | Reset failed jobs to retry (RELAX/SC/PARCHG) |
-| `compute_dft_e_hull.py` | Compute DFT energy_above_hull (stable phases only) |
+| `compute_dft_e_hull.py` | Compute DFT energy_above_hull + MatterSim comparison |
 | `run_dft_e_hull.sh` | Submit DFT hull wrapper (user-facing) |
 | `submit_dft_e_hull.sh` | SLURM script for DFT hull calculation |
-| `compare_hulls.py` | Compare MatterSim vs DFT hull accuracy |
 | `analyze.py` | Orchestrates electride analysis (calls Electride.py) |
 | `analyze.sh` | SLURM script for analysis job |
 | `Electride.py` | Bader analysis on ELFCAR + PARCHG files |
@@ -1357,7 +1437,7 @@ tail -f workflow_manager_*.out
 - **PyXtal symmetrization**: Automatic structure symmetrization in both prescreening and VASP workflow
 - **PDEntry for hulls**: Uses `PDEntry` instead of `ComputedEntry` for accurate phase diagram analysis
 - `reset_failed_jobs.py` resets failed VASP jobs to retry them without data loss
-- `compare_hulls.py` validates pre-screening accuracy by comparing MatterSim vs DFT hulls
+- **Integrated hull validation**: `compute_dft_e_hull.py` automatically validates pre-screening accuracy with plots and statistics
 - User-friendly wrapper scripts provide consistent interface across all stages
 
 ---
