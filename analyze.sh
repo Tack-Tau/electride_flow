@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=analyze_electrides
-#SBATCH --partition=Apus
+#SBATCH --partition=Apus,Orion
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=64G
 #SBATCH --time=3-00:00:00
 #SBATCH --output=electride_analysis_%j.out
 #SBATCH --error=electride_analysis_%j.err
@@ -16,7 +16,7 @@ VASP_JOBS_DIR=${VASP_JOBS_DIR:-"VASP_JOBS"}
 BADER_EXE=${BADER_EXE:-"$HOME/apps/Bader/bader"}
 OUTPUT_CSV=${OUTPUT_CSV:-"electride_analysis.csv"}
 PYXTAL_DB=${PYXTAL_DB:-"electride_data.db"}
-DFT_STABILITY=${DFT_STABILITY:-"${VASP_JOBS_DIR}/dft_stability_results.json"}
+PRESCREENING=${PRESCREENING:-"${VASP_JOBS_DIR}/prescreening_stability.json"}
 ELF_THRESHOLD=${ELF_THRESHOLD:-0.6}
 CONDA_ENV=${CONDA_ENV:-"vaspflow"}
 
@@ -32,16 +32,17 @@ echo "  VASP jobs directory: $VASP_JOBS_DIR"
 echo "  Bader executable: $BADER_EXE"
 echo "  Output CSV: $OUTPUT_CSV"
 echo "  PyXtal database: $PYXTAL_DB"
-echo "  DFT stability: $DFT_STABILITY"
+echo "  Prescreening results: $PRESCREENING"
 echo "  ELF threshold: $ELF_THRESHOLD"
 echo "  Conda environment: $CONDA_ENV"
 echo ""
 echo "Features:"
 echo "  - Incremental analysis (skips already-analyzed structures)"
-echo "  - Electride criteria: e0025 > 0 AND e05 > 0 AND e10 > 0 AND band0 > 0"
-echo "  - Adds e_above_hull from DFT calculations"
+echo "  - Electride criteria: (e0025 > 0 OR e05 > 0) AND (e10 > 0 OR band0 > 0)"
+echo "  - Uses MatterSim e_above_hull from prescreening"
 echo "  - Adds spacegroup from CONTCAR"
 echo "  - Saves to PyXtal database"
+echo "  - Parallel processing with ${SLURM_CPUS_PER_TASK} workers"
 echo "========================================================================"
 echo ""
 
@@ -58,8 +59,8 @@ echo "Conda environment activated: $(which python3)"
 echo ""
 
 # Set number of threads for CPU parallelization
-export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
-export MKL_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-32}
+export MKL_NUM_THREADS=${SLURM_CPUS_PER_TASK:-32}
 
 echo "Parallelization settings:"
 echo "  OMP_NUM_THREADS: $OMP_NUM_THREADS"
@@ -99,7 +100,8 @@ python3 analyze.py \
     --threshold "$ELF_THRESHOLD" \
     --output "electride_analysis.csv" \
     --pyxtal-db "$PYXTAL_DB" \
-    --dft-stability "$DFT_STABILITY" \
+    --prescreening "$PRESCREENING" \
+    --workers "${SLURM_CPUS_PER_TASK:-32}" \
     2>&1 | tee electride_analysis_detailed.log
 
 EXIT_CODE=$?
