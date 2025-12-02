@@ -376,9 +376,9 @@ class VASPWorkflowManager:
 #SBATCH --job-name={job_name}_{job_type}
 #SBATCH --partition=Apus,Orion
 #SBATCH --nodes=1
-#SBATCH --ntasks=32
-#SBATCH --mem=64G
-#SBATCH --time=00:30:00
+#SBATCH --ntasks=16
+#SBATCH --mem=32G
+#SBATCH --time=00:20:00
 #SBATCH --output={job_dir}/vasp_%j.out
 #SBATCH --error={job_dir}/vasp_%j.err
 
@@ -392,7 +392,11 @@ export OMP_NUM_THREADS=1
 export PMG_VASP_PSP_DIR=$HOME/apps/PBE64
 
 # Intel MPI settings for SLURM
-export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
+if [ -e /opt/slurm/lib/libpmi.so ]; then
+  export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
+else
+  export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi.so.0
+fi
 export I_MPI_FABRICS=shm:ofi
 
 # VASP executable (use srun for SLURM-native MPI launching)
