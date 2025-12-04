@@ -102,7 +102,7 @@ def get_spacegroup_from_contcar(relax_dir):
         struct = poscar.structure
         
         # Try PyXtal symmetrization with progressive tolerances
-        tolerances = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.3, 0.5]
+        tolerances = [0.5, 0.3, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
         for tol in tolerances:
             try:
                 xtal = pyxtal()
@@ -601,7 +601,7 @@ def main():
         'e_above_hull': []
     }
     
-    tolerances = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.3, 0.5]
+    tolerances = [0.5, 0.3, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
     db_saved_count = 0
     db_failed_count = 0
     electride_count = 0

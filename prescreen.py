@@ -123,7 +123,7 @@ def relax_structure_mattersim(pmg_struct, calculator, structure_id=None, fmax=0.
     sid_prefix = f"[{structure_id}] " if structure_id else ""
     
     # Symmetrize structure using PyXtal with progressive tolerance relaxation
-    tolerances = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.3, 0.5]
+    tolerances = [0.5, 0.3, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
     atoms = None
     
     for tol in tolerances:
