@@ -41,6 +41,28 @@ warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data w
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
 
 
+def check_electronic_convergence_outcar(outcar_path):
+    """
+    Check electronic convergence from OUTCAR file.
+    
+    For timed-out jobs, vasprun.xml is incomplete/corrupted. This function checks
+    OUTCAR for "aborting loop because EDIFF is reached" marker, which indicates
+    electronic SCF converged in at least one ionic step.
+    
+    Returns:
+        bool: True if electronic convergence was achieved
+    """
+    if not outcar_path.exists():
+        return False
+    
+    try:
+        with open(outcar_path, 'r') as f:
+            content = f.read()
+        return 'aborting loop because EDIFF is reached' in content
+    except Exception:
+        return False
+
+
 def parse_band_gap_from_vasprun(vasprun_path):
     """
     Parse band gap from vasprun.xml using pymatgen's vasprun parser.
@@ -242,9 +264,9 @@ class VASPWorkflowManager:
         job_dir.mkdir(parents=True, exist_ok=True)
         
         if job_type == 'relax':
-            # Symmetrize structure using PyXtal with progressive tolerance (same as in prescreen.py)
+            # Symmetrize structure using PyXtal with progressive tolerance
             if PYXTAL_AVAILABLE:
-                tolerances = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.3, 0.5]
+                tolerances = [0.5, 0.3, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
                 symmetrized = False
                 for tol in tolerances:
                     try:
@@ -957,10 +979,45 @@ fi
                     self.db.update_state(struct_id, 'RELAX_FAILED')
                     print(f"  {struct_id}: Relax failed")
                 else:
-                    # Job not in queue and no completion marker - likely timed out or crashed
-                    self.db.update_state(struct_id, 'RELAX_FAILED', 
-                                       error='Job terminated without completion marker (timeout or crash)')
-                    print(f"  {struct_id}: Relax FAILED (timeout or crash)")
+                    # Job not in queue and no completion marker - check if timed out
+                    relax_dir = Path(sdata['relax_dir'])
+                    err_files = list(relax_dir.glob('vasp_*.err'))
+                    is_timeout = False
+                    
+                    if err_files:
+                        err_file = max(err_files, key=lambda p: p.stat().st_mtime)
+                        try:
+                            with open(err_file, 'r') as f:
+                                if 'DUE TO TIME LIMIT' in f.read():
+                                    is_timeout = True
+                        except Exception:
+                            pass
+                    
+                    if is_timeout:
+                        # Check if electronic converged (using OUTCAR) and CONTCAR exists
+                        outcar_path = relax_dir / 'OUTCAR'
+                        contcar_path = relax_dir / 'CONTCAR'
+                        
+                        if not outcar_path.exists():
+                            self.db.update_state(struct_id, 'RELAX_FAILED',
+                                               error='Job timed out, OUTCAR not found')
+                            print(f"  {struct_id}: Relax FAILED (timeout, OUTCAR missing)")
+                        elif not contcar_path.exists() or contcar_path.stat().st_size == 0:
+                            self.db.update_state(struct_id, 'RELAX_FAILED',
+                                               error='Job timed out, CONTCAR missing/empty')
+                            print(f"  {struct_id}: Relax FAILED (timeout, CONTCAR missing)")
+                        elif check_electronic_convergence_outcar(outcar_path):
+                            self.db.update_state(struct_id, 'RELAX_TMOUT',
+                                               error='Relaxation timed out but electronic converged')
+                            print(f"  {struct_id}: Relax TMOUT (electronic converged, proceeding)")
+                        else:
+                            self.db.update_state(struct_id, 'RELAX_FAILED',
+                                               error='Job timed out, electronic not converged')
+                            print(f"  {struct_id}: Relax FAILED (timeout, electronic not converged)")
+                    else:
+                        self.db.update_state(struct_id, 'RELAX_FAILED', 
+                                           error='Job terminated without completion marker (crash)')
+                        print(f"  {struct_id}: Relax FAILED (crash)")
         
         elif state == 'SC_RUNNING':
             job_status = self.check_job_status(sdata['sc_job_id'])
@@ -1083,7 +1140,7 @@ fi
                     if self.submit_relax(struct_id, structure):
                         running_count += 1
                 
-                elif state == 'RELAX_DONE':
+                elif state == 'RELAX_DONE' or state == 'RELAX_TMOUT':
                     if self.submit_sc(struct_id, structure):
                         running_count += 1
                 
