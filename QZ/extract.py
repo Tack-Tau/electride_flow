@@ -11,7 +11,6 @@ xtals = db1.get_all_xtals()
 for row in db.db.select():
     id = row.id
     df_row = df[df['formula'] == row.structure_id]
-    #print(df_row)#; import sys; sys.exit()
     if len(df_row) > 0:
         csv_row = df_row.iloc[0]
         if max(csv_row['e0025'], csv_row['e05'], csv_row['e10']) < 20:
@@ -23,7 +22,12 @@ for row in db.db.select():
         for tol in [5e-2, 1e-2, 1e-3, 1e-4]:
             #print(id, tol)
             atoms = row.toatoms()
-            xtal.from_seed(atoms, tol=tol)
+            try:
+                xtal.from_seed(atoms, tol=tol)
+            except:
+                print('Error in spg determiation', tol)
+                continue
+
             if not xtal.valid: continue
 
             dicts = {}
