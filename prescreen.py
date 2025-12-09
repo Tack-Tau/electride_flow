@@ -123,7 +123,7 @@ def relax_structure_mattersim(pmg_struct, calculator, structure_id=None, fmax=0.
     sid_prefix = f"[{structure_id}] " if structure_id else ""
     
     # Symmetrize structure using PyXtal with progressive tolerance relaxation
-    tolerances = [0.5, 0.3, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+    tolerances = [5e-2, 1e-2, 1e-3, 1e-4, 1e-5]
     atoms = None
     
     for tol in tolerances:
@@ -455,11 +455,42 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
                     if elements_found != expected_elements:
                         missing = expected_elements - elements_found
                         print(f"    WARNING: Missing terminal phases for elements: {sorted(missing)}")
-                        print(f"    This will cause 'Missing terminal entries' errors in phase diagram!")
+                        print(f"    Querying elemental phases directly with GGA filter...")
+                        
+                        for missing_elem in sorted(missing):
+                            try:
+                                print(f"      Querying {missing_elem} elemental phases...")
+                                elem_docs = mpr.materials.summary.search(
+                                    elements=[missing_elem],
+                                    num_elements=(1, 1),
+                                    fields=['material_id', 'structure', 'energy_per_atom']
+                                )
+                                
+                                if not elem_docs:
+                                    print(f"        ERROR: No phases found for {missing_elem}")
+                                    continue
+                                gga_docs = []
+                                for doc in elem_docs:
+                                    mp_id = doc.material_id
+                                    if '-r2SCAN' in mp_id or '-SCAN' in mp_id or '_r2SCAN' in mp_id or '_SCAN' in mp_id:
+                                        continue
+                                    gga_docs.append(doc)
+                                
+                                if gga_docs:
+                                    elem_doc = sorted(gga_docs, key=lambda d: d.energy_per_atom)[0]
+                                    elem_mp_id = elem_doc.material_id
+                                    elem_structure = elem_doc.structure
+                                    print(f"        Found {elem_mp_id} (E={elem_doc.energy_per_atom:.4f} eV/atom)")
+                                    mp_phases.append((elem_mp_id, elem_structure, False))
+                                    elements_found.add(missing_elem)
+                                else:
+                                    print(f"        ERROR: No GGA phases found for {missing_elem}")
+                            except Exception as e:
+                                print(f"        ERROR querying {missing_elem}: {e}")
                     else:
                         print(f"      All terminal phases present: {sorted(elements_found)}")
                     
-                    print(f"    Relaxing {len(mp_phases)} GGA phases with MatterSim...")
+                    print(f"    Relaxing {len(mp_phases)} phases with MatterSim...")
                     
                     new_entries_data = []
                     success_count = 0
@@ -1024,7 +1055,7 @@ def main():
             batch_db_count = 0
             batch_failed_count = 0
             batch_start_idx = max(0, len(results) - len(batch))
-            tolerances_db = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.3, 0.5]
+            tolerances_db = [5e-2, 1e-2, 1e-3, 1e-4, 1e-5]
             
             for i in range(batch_start_idx, len(results)):
                 res = results[i]

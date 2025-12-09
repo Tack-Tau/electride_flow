@@ -266,7 +266,7 @@ class VASPWorkflowManager:
         if job_type == 'relax':
             # Symmetrize structure using PyXtal with progressive tolerance
             if PYXTAL_AVAILABLE:
-                tolerances = [0.5, 0.3, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+                tolerances = [5e-2, 1e-2, 1e-3, 1e-4, 1e-5]
                 symmetrized = False
                 for tol in tolerances:
                     try:
@@ -319,6 +319,7 @@ class VASPWorkflowManager:
                     'ISMEAR': 0,
                     'SIGMA': 0.05,
                     'ISPIN': 1,
+                    'ISYM': 0,
                     'LWAVE': True,
                     'LCHARG': True,
                     'LAECHG': False,
@@ -338,6 +339,7 @@ class VASPWorkflowManager:
                     'NSW': 0,
                     'ISMEAR': -5,
                     'ISPIN': 1,
+                    'ISYM': 0,
                     'LELF': True,
                     'ISTART': 1,
                     'ICHARG': 11,
@@ -363,6 +365,7 @@ class VASPWorkflowManager:
                 'ISMEAR': 1,
                 'SIGMA': 0.2,
                 'ISPIN': 1,
+                'ISYM': 0,
             }
             base_settings.update(parchg_settings)
             vis = MPStaticSet(structure, 

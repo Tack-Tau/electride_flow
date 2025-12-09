@@ -692,7 +692,7 @@ def print_hull_comparison_summary(hull_data):
     print(f"  Filtered: {stats['filtered_count']} ({stats['computational_savings']:.1%} VASP computations saved)")
     
     if stats['false_negatives'] > 0:
-        print(f"\n⚠ Warning: {stats['false_negatives']} stable structures were filtered by MatterSim!")
+        print(f"\n  Warning: {stats['false_negatives']} stable structures were filtered by MatterSim!")
     
     print("="*70)
 
