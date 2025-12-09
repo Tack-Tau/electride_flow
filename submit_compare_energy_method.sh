@@ -73,10 +73,10 @@ check_file() {
     local desc=$2
     FILES_CHECKED=$((FILES_CHECKED + 1))
     if [ -f "$file" ]; then
-        echo "  ✓ $desc: $file"
+        echo "    $desc: $file"
         FILES_FOUND=$((FILES_FOUND + 1))
     else
-        echo "  ✗ $desc: $file (missing)"
+        echo "    $desc: $file (missing)"
     fi
 }
 
