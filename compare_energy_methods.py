@@ -634,7 +634,7 @@ def print_summary(mp_results, gen_results):
         
         bias_diff = abs(mp_bias - gen_bias)
         if bias_diff > 0.02:
-            print(f"\n⚠ CRITICAL: Different biases between reference phases and target structures!")
+            print(f"\n  CRITICAL: Different biases between reference phases and target structures!")
             print(f"  Bias difference: {bias_diff:.4f} eV/atom")
             print(f"\n  This can cause non-linear hull behavior because:")
             print(f"    - Reference phases (MP) have different MatterSim bias than")
@@ -646,7 +646,7 @@ def print_summary(mp_results, gen_results):
             print(f"    - Option B: All MatterSim (prescreening only)")
             print(f"    - AVOID: Mixing MatterSim reference with DFT target (or vice versa)")
         else:
-            print(f"\n✓ Biases are consistent ({bias_diff:.4f} eV/atom difference)")
+            print(f"\n  Biases are consistent ({bias_diff:.4f} eV/atom difference)")
             print(f"  This suggests MatterSim has systematic offset from DFT,")
             print(f"  but it's consistent across different structure types.")
     
