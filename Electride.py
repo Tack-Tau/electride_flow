@@ -1,8 +1,53 @@
 #!/usr/bin/env python
 import os
+import time
 import numpy as np
 import codecs
 from pymatgen.core.periodic_table import Element
+
+def wait_for_file(filepath, timeout=30, check_interval=0.2, expected_lines=None):
+    """
+    Wait for a file to exist and be readable on network filesystems.
+    
+    Increased defaults for HPC environments with heavy parallel workloads.
+    
+    Args:
+        filepath: Path to file to wait for
+        timeout: Maximum time to wait in seconds (default: 30s for HPC)
+        check_interval: Time between checks in seconds (default: 0.2s)
+        expected_lines: If provided, validate file has this many lines (for text files)
+    
+    Returns:
+        bool: True if file exists and is valid, False if timeout
+    """
+    elapsed = 0
+    while elapsed < timeout:
+        if os.path.exists(filepath):
+            try:
+                # Use os.stat to force metadata cache refresh
+                stat_info = os.stat(filepath)
+                size = stat_info.st_size
+                
+                # Extra safety: verify file is not empty
+                if size > 0:
+                    # For PARCHG-m files with expected line count, validate completeness
+                    if expected_lines is not None and filepath.endswith('-m'):
+                        try:
+                            with open(filepath, 'r') as f:
+                                actual_lines = sum(1 for _ in f)
+                            if actual_lines == expected_lines:
+                                return True
+                            # File exists but incomplete, keep waiting
+                        except:
+                            pass
+                    else:
+                        return True
+            except:
+                pass
+        time.sleep(check_interval)
+        elapsed += check_interval
+    return False
+
 
 class electride:
     """
@@ -37,9 +82,23 @@ class electride:
             clean_cmd2 = 'rm -f PARCHG-m bader_log ACF.dat BCF.dat AVF.dat'
 
             cell, coor, radii, grid = self.Read_ELFCAR(ELFCAR_path, ELF_min)
-            os.system(cmd + 'ELFCAR-m > bader_log')
-            if not os.path.exists('BCF.dat'):
-                self.error = 'bader error in parsing ELFCAR'
+            
+            # Wait for ELFCAR-m to be visible on network filesystem
+            if not wait_for_file('ELFCAR-m', timeout=30):
+                self.error = 'ELFCAR-m not created'
+                return
+            
+            # Additional sync delay before running bader under heavy parallel load
+            time.sleep(0.5)
+            ret = os.system(cmd + 'ELFCAR-m > bader_log 2>&1')
+            
+            # Wait for BCF.dat with retry for network filesystem sync
+            timeout = 30 if ret == 0 else 5
+            if not wait_for_file('BCF.dat', timeout=timeout):
+                if ret != 0:
+                    self.error = f'bader command failed (exit code {ret >> 8}) for ELFCAR'
+                else:
+                    self.error = 'bader error in parsing ELFCAR'
             else:
                 self.ELF_maxima, self.fac1 = self.Read_BCF('BCF.dat', radii, cell)
             os.system(clean_cmd1)
@@ -49,15 +108,29 @@ class electride:
                 for i, label in enumerate(self.label):
                     fpath = PARCHG_path + '-' + label
                     if os.path.exists(fpath):
-                        self.ModifyPARCHG(self.ELF_maxima, fpath)
-                        os.system(cmd + 'PARCHG-m -vac off> bader_log')
+                        expected_lines = self.ModifyPARCHG(self.ELF_maxima, fpath)
+                        
+                        # Wait for PARCHG-m to be fully written and validated
+                        if not wait_for_file('PARCHG-m', timeout=30, expected_lines=expected_lines):
+                            self.error = f'PARCHG-m not created or incomplete for {fpath}'
+                            continue
+                        
+                        # Additional sync delay before running bader under heavy parallel load
+                        time.sleep(0.5)
+                        ret = os.system(cmd + 'PARCHG-m -vac off > bader_log 2>&1')
 
-                        if os.path.exists('ACF.dat'):
+                        # Wait for ACF.dat with retry for network filesystem sync
+                        # If bader failed (non-zero return), don't wait as long
+                        timeout = 30 if ret == 0 else 5
+                        if wait_for_file('ACF.dat', timeout=timeout):
                             charge = self.Read_ACF('ACF.dat')
                             os.system(clean_cmd2)
                             self.volume[i] = self.parse_charge(charge)
                         else:
-                            self.error = f'Bader analysis failed for {fpath}'
+                            if ret != 0:
+                                self.error = f'Bader command failed (exit code {ret >> 8}) for {fpath}'
+                            else:
+                                self.error = f'Bader analysis failed for {fpath}'
         finally:
             # Always return to original directory
             os.chdir(original_dir)
@@ -72,9 +145,8 @@ class electride:
 
     @staticmethod
     def Read_ACF(filename):
-        f = open(filename, 'rb')
-        input_content = f.readlines()
-        f.close()
+        with open(filename, 'rb') as f:
+            input_content = f.readlines()
         chg = []
         for i in range(len(input_content)):
             s = input_content[i].split()
@@ -85,9 +157,8 @@ class electride:
 
     @staticmethod
     def Read_BCF(filename, radii, cell):
-        f = open(filename, 'rb')
-        input_content = f.readlines()
-        f.close()
+        with open(filename, 'rb') as f:
+            input_content = f.readlines()
         pos = []
         count = 0
         cell = np.linalg.inv(cell)
@@ -108,70 +179,78 @@ class electride:
     @staticmethod
     def ModifyPARCHG(pos, filename):
         """
-        This module modifies PARCHG for bader analysis
+        This module modifies PARCHG for bader analysis.
+        Returns the expected line count for validation.
         """
-        f1  = codecs.open(filename, 'rb', encoding='utf-8')
-        input_content = f1.readlines()
-        f1.close()
-        f2 = open('PARCHG-m', 'w')
-        f2.writelines(input_content[:5])
-        f2.write(' H '+input_content[5])
-        f2.write(str(len(pos)) + ' ' + input_content[6])
-        f2.write(input_content[7])
-        for coor in pos:
-            f2.write('%10.6f %9.6f %9.6f\n' % (coor[0], coor[1], coor[2]))
-        f2.writelines(input_content[8:])
-        f2.close()
+        with codecs.open(filename, 'r', encoding='utf-8') as f1:
+            input_content = f1.readlines()
+        
+        expected_lines = len(input_content) + len(pos)
+        
+        with open('PARCHG-m', 'w') as f2:
+            f2.writelines(input_content[:5])
+            f2.write(' H '+input_content[5])
+            f2.write(str(len(pos)) + ' ' + input_content[6])
+            f2.write(input_content[7])
+            for coor in pos:
+                f2.write('%10.6f %9.6f %9.6f\n' % (coor[0], coor[1], coor[2]))
+            f2.writelines(input_content[8:])
+            f2.flush()
+            os.fsync(f2.fileno())
+        
+        return expected_lines
 
     @staticmethod
     def Read_ELFCAR(filename, ELF_min):
         """
         This module reads ELFCAR
         """
-        f = open(filename, 'rb')
-        f1 = open('ELFCAR-m', 'w')
-        input_content = f.readlines()
-        f.close()
+        with open(filename, 'rb') as f:
+            input_content = f.readlines()
+        
         count = 0
         cell = []
         coor = []
         ELF_raw = []
         N_atoms = 0
         grid = []
-        for line in input_content:
-            line=str(line,'utf-8')
-            count = count + 1
-            if count < 3:
-               f1.write(line)
-            elif (count>=3) and (count<=5):
-               cell.append([float(f) for f in line.split()])
-               f1.write(line)
-            elif count==6:
-               f1.write(line)
-               symbol = line.split()
-            elif count==7:
-               f1.write(line)
-               numIons = [int(f) for f in line.split()]
-               N_atoms = sum(numIons)
-               f1.write('Direct\n')
-            elif (count>=9) and (count<9+N_atoms):
-               f1.write(line)
-               coor.append([float(f) for f in line.split()])
-            elif count == 10+N_atoms:
-               f1.write('\n')
-               f1.write(line)
-               grid = [int(f) for f in line.split()]
-            elif count > 10+N_atoms:
-               ELF_raw = line.split()
-               for i, f in enumerate(ELF_raw):
-                   if float(f)<ELF_min:
-                      f = '0.00000'
-                   if i==0:
-                      f1.write('%8s' % (f))
-                   else:
-                      f1.write('%12s' % (f))
-               f1.write('\n')
-        f1.close()
+        
+        with open('ELFCAR-m', 'w') as f1:
+            for line in input_content:
+                line=str(line,'utf-8')
+                count = count + 1
+                if count < 3:
+                   f1.write(line)
+                elif (count>=3) and (count<=5):
+                   cell.append([float(f) for f in line.split()])
+                   f1.write(line)
+                elif count==6:
+                   f1.write(line)
+                   symbol = line.split()
+                elif count==7:
+                   f1.write(line)
+                   numIons = [int(f) for f in line.split()]
+                   N_atoms = sum(numIons)
+                   f1.write('Direct\n')
+                elif (count>=9) and (count<9+N_atoms):
+                   f1.write(line)
+                   coor.append([float(f) for f in line.split()])
+                elif count == 10+N_atoms:
+                   f1.write('\n')
+                   f1.write(line)
+                   grid = [int(f) for f in line.split()]
+                elif count > 10+N_atoms:
+                   ELF_raw = line.split()
+                   for i, f in enumerate(ELF_raw):
+                       if float(f)<ELF_min:
+                          f = '0.00000'
+                       if i==0:
+                          f1.write('%8s' % (f))
+                       else:
+                          f1.write('%12s' % (f))
+                   f1.write('\n')
+            f1.flush()
+            os.fsync(f1.fileno())
 
         radii = np.array([])
         for ele in range(len(symbol)):

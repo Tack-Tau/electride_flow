@@ -32,6 +32,8 @@ from Electride import electride
 from pyxtal import pyxtal
 from pyxtal.db import database_topology
 from pymatgen.io.vasp.outputs import Poscar
+from pymatgen.io.ase import AseAtomsAdaptor
+from ase.geometry import get_distances
 
 
 def load_existing_results(csv_path):
@@ -102,11 +104,36 @@ def get_spacegroup_from_contcar(relax_dir):
         struct = poscar.structure
         
         # Try PyXtal symmetrization with progressive tolerances
-        tolerances = [0.5, 0.3, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+        tolerances = [5e-2, 1e-2, 1e-3, 1e-4, 1e-5]
         for tol in tolerances:
             try:
                 xtal = pyxtal()
                 xtal.from_seed(struct, tol=tol)
+                
+                # Check for overlapping atoms (distance < 0.5 Å)
+                atoms = xtal.to_ase()
+                positions = atoms.get_positions()
+                cell = atoms.get_cell()
+                pbc = atoms.get_pbc()
+                
+                # Use ASE get_distances for robust PBC-aware distance calculation
+                _, distance_matrix = get_distances(positions, cell=cell, pbc=pbc)
+                
+                # Check all unique pairs (upper triangle, excluding diagonal)
+                has_overlap = False
+                for i in range(len(atoms)):
+                    for j in range(i+1, len(atoms)):
+                        if distance_matrix[i, j] < 0.5:
+                            has_overlap = True
+                            break
+                    if has_overlap:
+                        break
+                
+                if has_overlap:
+                    # Skip this tolerance - overlapping atoms detected
+                    continue
+                
+                # Valid structure - return space group
                 return xtal.group.number
             except:
                 continue
@@ -402,6 +429,29 @@ def save_to_database(struct_id, relax_dir, composition, e_above_hull, is_electri
             try:
                 xtal = pyxtal()
                 xtal.from_seed(struct, tol=tol)
+                
+                # Check for overlapping atoms (distance < 0.5 Å)
+                atoms = xtal.to_ase()
+                positions = atoms.get_positions()
+                cell = atoms.get_cell()
+                pbc = atoms.get_pbc()
+                
+                # Use ASE get_distances for robust PBC-aware distance calculation
+                _, distance_matrix = get_distances(positions, cell=cell, pbc=pbc)
+                
+                # Check all unique pairs (upper triangle, excluding diagonal)
+                has_overlap = False
+                for i in range(len(atoms)):
+                    for j in range(i+1, len(atoms)):
+                        if distance_matrix[i, j] < 0.5:
+                            has_overlap = True
+                            break
+                    if has_overlap:
+                        break
+                
+                if has_overlap:
+                    # Skip this tolerance - overlapping atoms detected
+                    continue
                 db.add_xtal(
                     xtal,
                     kvp={
@@ -416,26 +466,24 @@ def save_to_database(struct_id, relax_dir, composition, e_above_hull, is_electri
             except:
                 continue
         
-        # If all tolerances failed, use P1 (no symmetry) as final fallback
+        # If all tolerances failed, save structure without symmetrization
+        # Use ASE database directly to avoid PyXtal artifacts
         try:
-            xtal = pyxtal()
-            xtal.from_seed(struct, tol=1.0)
-            db.add_xtal(
-                xtal,
-                kvp={
-                    'structure_id': struct_id,
-                    'e_above_hull': e_above_hull,
-                    'composition': composition,
-                    'symmetrized': True,
-                    'is_electride': is_electride,
-                    'spacegroup': 1  # P1 fallback
-                }
+            adaptor = AseAtomsAdaptor()
+            atoms = adaptor.get_atoms(struct)
+            db.db.write(
+                atoms,
+                structure_id=struct_id,
+                e_above_hull=e_above_hull,
+                composition=composition,
+                symmetrized=False,
+                is_electride=is_electride,
+                space_group_number=1
             )
-            print(f"    Using P1 fallback for {struct_id}")
+            print(f"    Saved to database without symmetrization for {struct_id}")
             return True
-        except:
-            pass
-        
+        except Exception as e2:
+            print(f"    Warning: Could not save {struct_id} even without symmetrization: {e2}")
         return False
     except Exception as e:
         print(f"  Warning: Could not save {struct_id} to database: {e}")
@@ -601,7 +649,7 @@ def main():
         'e_above_hull': []
     }
     
-    tolerances = [0.5, 0.3, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+    tolerances = [5e-2, 1e-2, 1e-3, 1e-4, 1e-5]
     db_saved_count = 0
     db_failed_count = 0
     electride_count = 0

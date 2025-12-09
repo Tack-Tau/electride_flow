@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=64G
+#SBATCH --mem=128G
 #SBATCH --time=3-00:00:00
 #SBATCH --output=electride_analysis_%j.out
 #SBATCH --error=electride_analysis_%j.err
@@ -91,7 +91,6 @@ fi
 
 # Run analysis script
 echo "Running electride analysis..."
-echo "Note: Metals use ELFCAR only, Semiconductors use ELFCAR + PARCHG"
 echo ""
 
 python3 analyze.py \
