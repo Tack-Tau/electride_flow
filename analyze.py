@@ -33,7 +33,6 @@ from pyxtal import pyxtal
 from pyxtal.db import database_topology
 from pymatgen.io.vasp.outputs import Poscar
 from pymatgen.io.ase import AseAtomsAdaptor
-from ase.geometry import get_distances
 
 
 def load_existing_results(csv_path):
@@ -111,25 +110,7 @@ def get_spacegroup_from_contcar(relax_dir):
                 xtal.from_seed(struct, tol=tol)
                 
                 # Check for overlapping atoms (distance < 0.5 Å)
-                atoms = xtal.to_ase()
-                positions = atoms.get_positions()
-                cell = atoms.get_cell()
-                pbc = atoms.get_pbc()
-                
-                # Use ASE get_distances for robust PBC-aware distance calculation
-                _, distance_matrix = get_distances(positions, cell=cell, pbc=pbc)
-                
-                # Check all unique pairs (upper triangle, excluding diagonal)
-                has_overlap = False
-                for i in range(len(atoms)):
-                    for j in range(i+1, len(atoms)):
-                        if distance_matrix[i, j] < 0.5:
-                            has_overlap = True
-                            break
-                    if has_overlap:
-                        break
-                
-                if has_overlap:
+                if len(xtal.check_short_distance(r=0.5)) > 0:
                     # Skip this tolerance - overlapping atoms detected
                     continue
                 
@@ -431,25 +412,7 @@ def save_to_database(struct_id, relax_dir, composition, e_above_hull, is_electri
                 xtal.from_seed(struct, tol=tol)
                 
                 # Check for overlapping atoms (distance < 0.5 Å)
-                atoms = xtal.to_ase()
-                positions = atoms.get_positions()
-                cell = atoms.get_cell()
-                pbc = atoms.get_pbc()
-                
-                # Use ASE get_distances for robust PBC-aware distance calculation
-                _, distance_matrix = get_distances(positions, cell=cell, pbc=pbc)
-                
-                # Check all unique pairs (upper triangle, excluding diagonal)
-                has_overlap = False
-                for i in range(len(atoms)):
-                    for j in range(i+1, len(atoms)):
-                        if distance_matrix[i, j] < 0.5:
-                            has_overlap = True
-                            break
-                    if has_overlap:
-                        break
-                
-                if has_overlap:
+                if len(xtal.check_short_distance(r=0.5)) > 0:
                     # Skip this tolerance - overlapping atoms detected
                     continue
                 db.add_xtal(
