@@ -173,15 +173,11 @@ class WorkflowDatabase:
             'structure_idx': struct_idx,
             'state': 'PENDING',
             'relax_job_id': None,
-            'sc_job_id': None,
-            'elf_job_id': None,
-            'parchg_job_ids': [],
+            'spe_job_id': None,
             'band_gap': None,
             'is_semiconductor': None,
             'relax_dir': str(base_dir / struct_id / 'Relax'),
-            'sc_dir': str(base_dir / struct_id / 'SC'),
-            'elf_dir': str(base_dir / struct_id / 'ELF'),
-            'parchg_dir': str(base_dir / struct_id / 'PARCHG'),
+            'spe_dir': str(base_dir / struct_id / 'SPE'),
             'last_updated': datetime.now().isoformat(),
             'error': None
         }
@@ -405,7 +401,7 @@ class VASPWorkflowManager:
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
 #SBATCH --mem=32G
-#SBATCH --time=00:20:00
+#SBATCH --time=00:30:00
 #SBATCH --output={job_dir}/vasp_%j.out
 #SBATCH --error={job_dir}/vasp_%j.err
 
@@ -434,116 +430,284 @@ cd {job_dir}
 
 """
         
-        # For SC: copy CONTCAR from Relax (prev_dir is Relax)
-        if prev_dir and job_type == 'sc':
+        # SPE job type: unified SC-PARCHG-ELF sequential calculation
+        if job_type == 'spe':
             script += f"""
-# Copy CONTCAR from relaxation as POSCAR
-echo "Checking for relaxed structure..."
-if [ ! -f "{prev_dir}/CONTCAR" ] || [ ! -s "{prev_dir}/CONTCAR" ]; then
-    echo "ERROR: CONTCAR not found or empty in {prev_dir}"
-    echo "Cannot proceed with SC calculation without relaxed structure"
-    touch VASP_FAILED
-    exit 1
-fi
+# ========================================
+# SPE Job: SC -> PARCHG (5x) -> ELF
+# ========================================
 
-cp "{prev_dir}/CONTCAR" POSCAR
-echo "Copied CONTCAR from {prev_dir} as POSCAR (size: $(du -h POSCAR | cut -f1))"
-
-"""
-        
-        # For ELF: copy CONTCAR from Relax (relax_dir must be provided separately)
-        if relax_dir and job_type == 'elf':
-            script += f"""
 # Copy CONTCAR from relaxation as POSCAR
 echo "Checking for relaxed structure..."
 if [ ! -f "{relax_dir}/CONTCAR" ] || [ ! -s "{relax_dir}/CONTCAR" ]; then
     echo "ERROR: CONTCAR not found or empty in {relax_dir}"
-    echo "Cannot proceed with ELF calculation without relaxed structure"
-    touch VASP_FAILED
+    echo "VASP calculation failed at SC" > VASP_FAILED
     exit 1
 fi
 
 cp "{relax_dir}/CONTCAR" POSCAR
 echo "Copied CONTCAR from {relax_dir} as POSCAR (size: $(du -h POSCAR | cut -f1))"
 
-"""
-        
-        if prev_dir and job_type == 'elf':
-            script += f"""
-# Copy CHGCAR and WAVECAR from static calculation
-echo "Checking for required files from SC calculation..."
-if [ ! -f "{prev_dir}/CHGCAR" ] || [ ! -s "{prev_dir}/CHGCAR" ]; then
-    echo "ERROR: CHGCAR not found or empty in {prev_dir}"
-    echo "Cannot proceed with ELF calculation"
-    touch VASP_FAILED
+# Verify copy succeeded
+if [ ! -f "POSCAR" ] || [ ! -s "POSCAR" ]; then
+    echo "ERROR: Failed to copy CONTCAR as POSCAR"
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    exit 1
+fi
+echo "Successfully verified POSCAR is present"
+
+# ========================================
+# Stage 1: SC Calculation
+# ========================================
+echo ""
+echo "========================================  "
+echo "Stage 1: SC Calculation"
+echo "========================================"
+cp INCAR-SC INCAR
+
+$VASP_CMD
+
+EXIT_CODE=$?
+echo "SC calculation exit code: $EXIT_CODE"
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    echo "ERROR: SC calculation failed with exit code $EXIT_CODE"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     exit 1
 fi
 
-if [ ! -f "{prev_dir}/WAVECAR" ] || [ ! -s "{prev_dir}/WAVECAR" ]; then
-    echo "ERROR: WAVECAR not found or empty in {prev_dir}"
-    echo "Cannot proceed with ELF calculation"
-    touch VASP_FAILED
-    exit 1
-fi
-
-cp "{prev_dir}/CHGCAR" .
-echo "Copied CHGCAR from {prev_dir} (size: $(du -h {prev_dir}/CHGCAR | cut -f1))"
-
-cp "{prev_dir}/WAVECAR" .
-echo "Copied WAVECAR from {prev_dir} (size: $(du -h {prev_dir}/WAVECAR | cut -f1))"
-
-# Verify copies succeeded
+# Verify SC outputs
 if [ ! -f "CHGCAR" ] || [ ! -s "CHGCAR" ]; then
-    echo "ERROR: Failed to copy CHGCAR"
-    touch VASP_FAILED
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    echo "ERROR: CHGCAR missing or empty"
+    [ ! -f "CHGCAR" ] && echo "  CHGCAR does not exist"
+    [ -f "CHGCAR" ] && [ ! -s "CHGCAR" ] && echo "  CHGCAR is empty"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     exit 1
 fi
 
 if [ ! -f "WAVECAR" ] || [ ! -s "WAVECAR" ]; then
-    echo "ERROR: Failed to copy WAVECAR"
-    touch VASP_FAILED
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    echo "ERROR: WAVECAR missing or empty"
+    [ ! -f "WAVECAR" ] && echo "  WAVECAR does not exist"
+    [ -f "WAVECAR" ] && [ ! -s "WAVECAR" ] && echo "  WAVECAR is empty"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     exit 1
 fi
 
-echo "Successfully verified CHGCAR and WAVECAR are present"
+if [ ! -f "vasprun.xml" ] || [ ! -s "vasprun.xml" ]; then
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    echo "ERROR: vasprun.xml missing or empty"
+    [ ! -f "vasprun.xml" ] && echo "  vasprun.xml does not exist"
+    [ -f "vasprun.xml" ] && [ ! -s "vasprun.xml" ] && echo "  vasprun.xml is empty"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+    exit 1
+fi
 
+echo "Verified CHGCAR ($(du -h CHGCAR | cut -f1)), WAVECAR ($(du -h WAVECAR | cut -f1)), and vasprun.xml exist"
+
+# Save SC outputs with -SC suffix
+mv OSZICAR OSZICAR-SC
+cp vasprun.xml vasprun.xml-SC
+cp CHGCAR CHGCAR-SC
+cp WAVECAR WAVECAR-SC
+touch SC_DONE
+echo "SC calculation completed successfully"
+
+# Cleanup SC calculation outputs for next stage
+rm -f OSZICAR vasprun.xml OUTCAR 2>/dev/null
+
+# ========================================
+# Stage 2: Generate PARCHG INCARs
+# ========================================
+echo ""
+echo "========================================"
+echo "Stage 2: Generating PARCHG INCARs"
+echo "========================================"
+
+python3 generate_parchg_incars.py vasprun.xml-SC 64
+
+if [ $? -ne 0 ]; then
+    echo "VASP calculation failed at PARCHG INCAR generation" > VASP_FAILED
+    echo "ERROR: Failed to generate PARCHG INCARs"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+    exit 1
+fi
+
+# ========================================
+# Stage 3: PARCHG Calculations
+# ========================================
+echo ""
+echo "========================================"
+echo "Stage 3: PARCHG Calculations"
+echo "========================================"
+
+for label in e0025 e05 e10 band0 band1; do
+    echo ""
+    echo "Running PARCHG-$label..."
+    cp INCAR-PARCHG-$label INCAR
+    cp CHGCAR-SC CHGCAR
+    cp WAVECAR-SC WAVECAR
+    
+    $VASP_CMD
+    
+    EXIT_CODE=$?
+    echo "PARCHG-$label exit code: $EXIT_CODE"
+    
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "VASP calculation failed at PARCHG-$label" > VASP_FAILED
+        echo "ERROR: PARCHG-$label failed with exit code $EXIT_CODE"
+        # Clean up large intermediate files to save disk space
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+        exit 1
+    fi
+    
+    if [ ! -f "PARCHG" ] || [ ! -s "PARCHG" ]; then
+        echo "VASP calculation failed at PARCHG-$label" > VASP_FAILED
+        echo "ERROR: PARCHG file missing or empty for $label"
+        # Clean up large intermediate files to save disk space
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+        exit 1
+    fi
+    
+    mv PARCHG PARCHG-$label
+    echo "PARCHG-$label completed successfully"
+    
+    # Cleanup before next PARCHG run
+    rm -f CHG WFULL TMPCAR OSZICAR vasprun.xml OUTCAR 2>/dev/null
+done
+
+touch PARCHG_DONE
+echo "All PARCHG calculations completed successfully"
+
+# Cleanup before ELF calculation
+rm -f CHG WFULL TMPCAR OSZICAR vasprun.xml OUTCAR 2>/dev/null
+
+# ========================================
+# Stage 4: ELF Calculation
+# ========================================
+echo ""
+echo "========================================"
+echo "Stage 4: ELF Calculation"
+echo "========================================"
+cp INCAR-ELF INCAR
+cp CHGCAR-SC CHGCAR
+cp WAVECAR-SC WAVECAR
+
+$VASP_CMD
+
+EXIT_CODE=$?
+echo "ELF calculation exit code: $EXIT_CODE"
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "VASP calculation failed at ELF" > VASP_FAILED
+    echo "ERROR: ELF calculation failed with exit code $EXIT_CODE"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+    exit 1
+fi
+
+if [ ! -f "ELFCAR" ] || [ ! -s "ELFCAR" ]; then
+    echo "VASP calculation failed at ELF" > VASP_FAILED
+    echo "ERROR: ELFCAR missing or empty"
+    [ ! -f "ELFCAR" ] && echo "  ELFCAR does not exist"
+    [ -f "ELFCAR" ] && [ ! -s "ELFCAR" ] && echo "  ELFCAR is empty"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+    exit 1
+fi
+
+echo "Verified ELFCAR exists ($(du -h ELFCAR | cut -f1))"
+echo "ELF calculation completed successfully"
+touch ELF_DONE
+
+# ========================================
+# Stage 5: Compress PARCHG files
+# ========================================
+echo ""
+echo "========================================"
+echo "Stage 5: Compress PARCHG files"
+echo "========================================"
+
+# Validate and compress PARCHG files to save disk space
+# Only compress if we have all 5 PARCHG files (band0, band1, e0025, e05, e10)
+echo "Validating PARCHG files..."
+
+PARCHG_FILES="PARCHG-band0 PARCHG-band1 PARCHG-e0025 PARCHG-e05 PARCHG-e10"
+ALL_VALID=true
+
+# Check if all 5 expected PARCHG files exist and are non-empty
+for pf in $PARCHG_FILES; do
+    if [ ! -f "$pf" ] || [ ! -s "$pf" ]; then
+        echo "  Warning: $pf is missing or empty"
+        ALL_VALID=false
+    fi
+done
+
+if [ "$ALL_VALID" = true ]; then
+    if [ ! -f "PARCHG.tar.gz" ]; then
+        echo "  All 5 PARCHG files validated (non-empty)"
+        if tar czf PARCHG.tar.gz $PARCHG_FILES 2>/dev/null; then
+            echo "  Created PARCHG.tar.gz"
+            
+            # Remove original PARCHG-* files to save space
+            rm -f PARCHG-*
+            echo "  Removed original PARCHG-* files (archive preserved)"
+            echo "  Disk space saved: PARCHG files compressed into single archive"
+        else
+            echo "  ERROR: Failed to create PARCHG.tar.gz"
+            echo "  Keeping original PARCHG files"
+        fi
+    else
+        echo "  PARCHG.tar.gz already exists"
+    fi
+else
+    echo "  ERROR: Not all PARCHG files are valid - skipping compression"
+    echo "  This indicates PARCHG calculations may have failed"
+    echo "  Keeping original files for debugging"
+fi
+
+# Mark entire SPE workflow as complete
+touch VASP_DONE
+
+# ========================================
+# Stage 6: Cleanup
+# ========================================
+echo ""
+echo "========================================"
+echo "Stage 6: Cleanup"
+echo "========================================"
+
+# Clean up SPE directory
+rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR 2>/dev/null
+rm -f CHGCAR-SC WAVECAR-SC vasprun.xml 2>/dev/null
+echo "Cleaned up SPE/ directory"
+
+# Clean up Relax directory
+if [ -d "{relax_dir}" ]; then
+    rm -f "{relax_dir}/CHGCAR" "{relax_dir}/CHG" "{relax_dir}/WAVECAR" "{relax_dir}/WFULL" "{relax_dir}/AECCAR"* "{relax_dir}/TMPCAR" 2>/dev/null
+    echo "Cleaned up Relax/ directory"
+fi
+
+echo ""
+echo "========================================"
+echo "SPE Job Completed Successfully"
+echo "========================================"
 """
+            with open(script_path, 'w') as f:
+                f.write(script)
+            os.chmod(script_path, 0o755)
+            return script_path
         
-        # For PARCHG: copy CONTCAR, CHGCAR, and WAVECAR from SC
-        if job_type == 'parchg':
+        # Relax job type - only job type besides 'spe' that's still used
+        if job_type == 'relax':
             script += f"""
-# Copy CONTCAR from relaxation as POSCAR
-echo "Checking for relaxed structure..."
-if [ ! -f "{relax_dir}/CONTCAR" ] || [ ! -s "{relax_dir}/CONTCAR" ]; then
-    echo "ERROR: CONTCAR not found or empty in {relax_dir}"
-    touch VASP_FAILED
-    exit 1
-fi
-
-cp "{relax_dir}/CONTCAR" POSCAR
-echo "Copied CONTCAR from {relax_dir} as POSCAR"
-
-# Copy CHGCAR and WAVECAR from SC calculation
-echo "Checking for required files from SC calculation..."
-if [ ! -f "{prev_dir}/CHGCAR" ] || [ ! -s "{prev_dir}/CHGCAR" ]; then
-    echo "ERROR: CHGCAR not found or empty in {prev_dir}"
-    touch VASP_FAILED
-    exit 1
-fi
-
-if [ ! -f "{prev_dir}/WAVECAR" ] || [ ! -s "{prev_dir}/WAVECAR" ]; then
-    echo "ERROR: WAVECAR not found or empty in {prev_dir}"
-    touch VASP_FAILED
-    exit 1
-fi
-
-cp "{prev_dir}/CHGCAR" .
-cp "{prev_dir}/WAVECAR" .
-echo "Copied CHGCAR and WAVECAR from {prev_dir}"
-
-"""
-        
-        script += f"""
 # Run VASP
 echo "Starting VASP calculation: {job_type}"
 echo "Working directory: $(pwd)"
@@ -559,113 +723,6 @@ echo "Exit code: $EXIT_CODE"
 
 # Check if successful
 if [ $EXIT_CODE -eq 0 ]; then
-"""
-        
-        # Add job-specific validation
-        if job_type == 'sc':
-            script += """
-    # Verify critical files for SC calculation
-    if [ -f "CHGCAR" ] && [ -s "CHGCAR" ] && [ -f "WAVECAR" ] && [ -s "WAVECAR" ]; then
-        echo "VASP calculation completed successfully"
-        echo "Verified CHGCAR and WAVECAR exist"
-        
-        # Keep CHGCAR and WAVECAR for downstream ELF/PARCHG jobs
-        # They will be cleaned up after ELF calculation finishes
-        rm -f CHG WFULL AECCAR* TMPCAR 2>/dev/null
-        
-        touch VASP_DONE
-    else
-        echo "VASP calculation failed: CHGCAR or WAVECAR missing/empty"
-        [ ! -f "CHGCAR" ] && echo "  CHGCAR does not exist"
-        [ -f "CHGCAR" ] && [ ! -s "CHGCAR" ] && echo "  CHGCAR is empty"
-        [ ! -f "WAVECAR" ] && echo "  WAVECAR does not exist"
-        [ -f "WAVECAR" ] && [ ! -s "WAVECAR" ] && echo "  WAVECAR is empty"
-        touch VASP_FAILED
-    fi
-"""
-        elif job_type == 'elf':
-            # Generate relative paths to SC and PARCHG directories for cleanup
-            elf_to_sc = os.path.relpath(prev_dir, job_dir) if prev_dir else None
-            elf_to_parchg = "../PARCHG"
-            
-            script += f"""
-    # Verify critical files for ELF calculation
-    if [ -f "ELFCAR" ] && [ -s "ELFCAR" ]; then
-        echo "VASP calculation completed successfully"
-        echo "Verified ELFCAR exists"
-        
-        # ELF is typically the last job - clean up CHGCAR/WAVECAR from all directories
-        # Clean up in current ELF directory
-        rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR 2>/dev/null
-"""
-            
-            if elf_to_sc:
-                script += f"""        
-        # Clean up in SC directory
-        if [ -d "{elf_to_sc}" ]; then
-            echo "  Cleaning {elf_to_sc}/"
-            rm -f "{elf_to_sc}/CHGCAR" "{elf_to_sc}/WAVECAR" "{elf_to_sc}/CHG" "{elf_to_sc}/WFULL" 2>/dev/null
-        fi
-"""
-            
-            script += f"""        
-        # Clean up in all PARCHG subdirectories
-        if [ -d "{elf_to_parchg}" ]; then
-            echo "  Cleaning {elf_to_parchg}/*/"
-            find "{elf_to_parchg}" -maxdepth 2 -type f \\( -name "CHGCAR" -o -name "WAVECAR" -o -name "CHG" -o -name "WFULL" \\) -delete 2>/dev/null
-        fi
-        
-        # Compress PARCHG files in ELF directory into a single tar.gz archive
-        # Only compress if we have all 5 PARCHG files (band0, band1, e0025, e05, e10)
-        echo "  Validating and compressing PARCHG files..."
-        
-        # Check if all 5 expected PARCHG files exist and are non-empty
-        PARCHG_FILES="PARCHG-band0 PARCHG-band1 PARCHG-e0025 PARCHG-e05 PARCHG-e10"
-        ALL_VALID=true
-        
-        for pf in $PARCHG_FILES; do
-            if [ ! -f "$pf" ] || [ ! -s "$pf" ]; then
-                echo "    Warning: $pf is missing or empty"
-                ALL_VALID=false
-            fi
-        done
-        
-        if [ "$ALL_VALID" = true ]; then
-            if [ ! -f "PARCHG.tar.gz" ]; then
-                echo "    All 5 PARCHG files validated (non-empty)"
-                if tar czf PARCHG.tar.gz $PARCHG_FILES 2>/dev/null; then
-                    echo "    Created PARCHG.tar.gz in ELF directory"
-                    
-                    # Remove PARCHG-* files from ELF directory
-                    rm -f PARCHG-*
-                    echo "    Removed PARCHG-* files from ELF directory"
-                    
-                    # Remove PARCHG-* files from all PARCHG subdirectories
-                    if [ -d "{elf_to_parchg}" ]; then
-                        find "{elf_to_parchg}" -maxdepth 2 -type f -name "PARCHG-*" -delete 2>/dev/null
-                        echo "    Removed PARCHG-* files from {elf_to_parchg}/*/ subdirectories"
-                    fi
-                    
-                    echo "    Disk space saved: PARCHG files compressed into single archive"
-                else
-                    echo "    ERROR: Failed to create PARCHG.tar.gz"
-                fi
-            else
-                echo "    PARCHG.tar.gz already exists"
-            fi
-        else
-            echo "    ERROR: Not all PARCHG files are valid - skipping compression"
-            echo "    This indicates PARCHG jobs may have failed"
-        fi
-        
-        touch VASP_DONE
-    else
-        echo "VASP calculation failed: ELFCAR missing/empty"
-        touch VASP_FAILED
-    fi
-"""
-        elif job_type == 'relax':
-            script += """
     # Verify critical files for Relax calculation
     if [ -f "CONTCAR" ] && [ -s "CONTCAR" ]; then
         echo "VASP calculation completed successfully"
@@ -677,32 +734,14 @@ if [ $EXIT_CODE -eq 0 ]; then
         touch VASP_DONE
     else
         echo "VASP calculation failed: CONTCAR missing/empty"
+        # Clean up large intermediate files to save disk space
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
         touch VASP_FAILED
     fi
-"""
-        elif job_type == 'parchg':
-            parchg_file = f"PARCHG-{parchg_label}" if parchg_label else "PARCHG"
-            script += f"""
-    # Verify PARCHG file and rename with label
-    if [ -f "PARCHG" ] && [ -s "PARCHG" ]; then
-        echo "VASP calculation completed successfully"
-        echo "Verified PARCHG exists"
-        mv PARCHG "{parchg_file}"
-        echo "Renamed PARCHG to {parchg_file}"
-        
-        # Clean up large unnecessary files to save disk space
-        rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR 2>/dev/null
-        
-        touch VASP_DONE
-    else
-        echo "VASP calculation failed: PARCHG missing/empty"
-        touch VASP_FAILED
-    fi
-"""
-        
-        script += """
 else
     echo "VASP calculation failed with exit code $EXIT_CODE"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
 fi
 """
@@ -777,174 +816,65 @@ fi
             self.db.update_state(struct_id, 'RELAX_FAILED', error=str(e))
             return False
     
-    def submit_sc(self, struct_id, structure):
-        """Submit SC job for a structure."""
+    def submit_spe(self, struct_id, structure):
+        """
+        Submit unified SPE (SC-PARCHG-ELF) job for a structure.
+        
+        The SPE job runs sequentially in one SLURM script:
+        1. SC calculation
+        2. PARCHG calculations (5 energy windows)
+        3. ELF calculation
+        
+        Stage markers (SC_DONE, PARCHG_DONE, VASP_DONE) track progress.
+        """
         sdata = self.db.get_structure(struct_id)
         if not sdata:
             return False
         
-        sc_dir = Path(sdata['sc_dir'])
+        spe_dir = Path(sdata['spe_dir'])
         relax_dir = Path(sdata['relax_dir'])
         job_name = struct_id
         
-        print(f"  Submitting SC: {struct_id}")
+        print(f"  Submitting SPE: {struct_id}")
         
         try:
-            self.create_vasp_inputs(structure, sc_dir, 'sc')
-            script = self.create_slurm_script(sc_dir, job_name, 'sc', prev_dir=relax_dir)
+            spe_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate INCAR-SC using sc job type
+            sc_temp_dir = spe_dir / 'temp_sc'
+            sc_temp_dir.mkdir(exist_ok=True)
+            self.create_vasp_inputs(structure, sc_temp_dir, 'sc')
+            shutil.move(sc_temp_dir / 'INCAR', spe_dir / 'INCAR-SC')
+            shutil.rmtree(sc_temp_dir)
+            
+            # Generate INCAR-ELF using elf job type
+            elf_temp_dir = spe_dir / 'temp_elf'
+            elf_temp_dir.mkdir(exist_ok=True)
+            self.create_vasp_inputs(structure, elf_temp_dir, 'elf')
+            shutil.move(elf_temp_dir / 'INCAR', spe_dir / 'INCAR-ELF')
+            shutil.rmtree(elf_temp_dir)
+            
+            # Generate POSCAR, POTCAR, KPOINTS using sc job type
+            # (These will be deleted, CONTCAR will be copied in the script)
+            self.create_vasp_inputs(structure, spe_dir, 'sc')
+            
+            # Copy PARCHG INCAR generator helper script
+            helper_script = Path(__file__).parent / 'generate_parchg_incars.py'
+            if helper_script.exists():
+                shutil.copy2(helper_script, spe_dir / 'generate_parchg_incars.py')
+            else:
+                raise FileNotFoundError("generate_parchg_incars.py not found in workflow directory")
+            
+            # Create unified SPE SLURM script
+            script = self.create_slurm_script(spe_dir, job_name, 'spe', relax_dir=relax_dir)
             job_id = self.submit_job(script)
             
-            self.db.update_state(struct_id, 'SC_RUNNING', sc_job_id=job_id)
-            print(f"    SC job ID: {job_id}")
+            self.db.update_state(struct_id, 'SC_RUNNING', spe_job_id=job_id)
+            print(f"    SPE job ID: {job_id}")
             return True
         except Exception as e:
             print(f"    Error: {e}")
             self.db.update_state(struct_id, 'SC_FAILED', error=str(e))
-            return False
-    
-    def submit_elf(self, struct_id, structure):
-        """Submit ELF job for a structure."""
-        sdata = self.db.get_structure(struct_id)
-        if not sdata:
-            return False
-        
-        elf_dir = Path(sdata['elf_dir'])
-        sc_dir = Path(sdata['sc_dir'])
-        relax_dir = Path(sdata['relax_dir'])
-        parchg_dir = Path(sdata['parchg_dir'])
-        job_name = struct_id
-        
-        print(f"  Submitting ELF: {struct_id}")
-        
-        try:
-            # Ensure ELF directory exists before copying PARCHG files
-            elf_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Copy PARCHG files from PARCHG/*/ subdirectories to ELF/ directory
-            # This ensures Electride.py can find them for analysis
-            parchg_labels = ['band0', 'band1', 'e0025', 'e05', 'e10']
-            copied_files = []
-            
-            for label in parchg_labels:
-                parchg_file = parchg_dir / label / f'PARCHG-{label}'
-                if parchg_file.exists():
-                    dest = elf_dir / f'PARCHG-{label}'
-                    shutil.copy2(parchg_file, dest)
-                    copied_files.append(label)
-            
-            if copied_files:
-                print(f"    Copied PARCHG files to ELF dir: {', '.join(copied_files)}")
-            else:
-                print(f"    Warning: No PARCHG files found to copy (will use ELFCAR only)")
-            
-            self.create_vasp_inputs(structure, elf_dir, 'elf')
-            script = self.create_slurm_script(elf_dir, job_name, 'elf', prev_dir=sc_dir, relax_dir=relax_dir)
-            job_id = self.submit_job(script)
-            
-            self.db.update_state(struct_id, 'ELF_RUNNING', elf_job_id=job_id)
-            print(f"    ELF job ID: {job_id}")
-            return True
-        except Exception as e:
-            print(f"    Error: {e}")
-            self.db.update_state(struct_id, 'ELF_FAILED', error=str(e))
-            return False
-    
-    def submit_parchg(self, struct_id, structure):
-        """
-        Submit PARCHG jobs for semiconductors.
-        Checks band gap from SC/vasprun.xml and submits band-specific PARCHG if needed.
-        """
-        sdata = self.db.get_structure(struct_id)
-        if not sdata:
-            return False
-        
-        sc_dir = Path(sdata['sc_dir'])
-        parchg_dir = Path(sdata['parchg_dir'])
-        relax_dir = Path(sdata['relax_dir'])
-        
-        vasprun_path = sc_dir / 'vasprun.xml'
-        if not vasprun_path.exists():
-            print(f"  {struct_id}: vasprun.xml not found in SC, skipping PARCHG")
-            self.db.update_state(struct_id, 'PARCHG_SKIPPED', 
-                               is_semiconductor=False, 
-                               band_gap=None)
-            return False
-        
-        print(f"  {struct_id}: Parsing band structure for PARCHG...")
-        band_gap, is_semiconductor = parse_band_gap_from_vasprun(vasprun_path)
-        
-        self.db.update_state(struct_id, sdata['state'], 
-                           band_gap=band_gap, 
-                           is_semiconductor=is_semiconductor)
-        
-        if band_gap is None:
-            print(f"    Warning: Could not parse band structure")
-            print(f"    Will still attempt PARCHG (following HT-electride methodology)")
-        else:
-            material_type = "Semiconductor" if is_semiconductor else "Metal"
-            print(f"    {material_type} (gap={band_gap:.4f} eV)")
-        
-        print(f"    Submitting PARCHG jobs (following HT-electride: PARCHG for ALL materials)...")
-        
-        try:
-            vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=True)
-            
-            # Get highest occupied band (VBM) from NELECT
-            nelect = int(vr.parameters['NELECT'])
-            is_soc = vr.parameters.get('LSORBIT', False)
-            fac = 1 if is_soc else 2  # SOC: 1 electron per band, no SOC: 2 electrons per band
-            
-            if nelect % 2 == 0:
-                iband = int(nelect / fac)  # Highest occupied band (VBM)
-            else:
-                iband = int(nelect / fac) + 1  # Odd electrons
-            
-            grid = [vr.parameters['NGXF'], vr.parameters['NGYF'], vr.parameters['NGZF']]
-            
-            print(f"      NELECT={nelect}, VBM band index={iband}, NBANDS={vr.parameters['NBANDS']}")
-            
-            parchg_jobs = []
-            
-            # Band-specific PARCHG: VBM (band0) and VBM-1 (band1)
-            for idx, band_offset in enumerate([0, -1]):
-                band_idx = iband + band_offset
-                label = f"band{idx}"
-                job_dir = parchg_dir / label
-                job_dir.mkdir(parents=True, exist_ok=True)
-                
-                parchg_settings = get_parchg_incar_settings_band(band_idx, grid)
-                self.create_vasp_inputs(structure, job_dir, 'parchg', parchg_settings=parchg_settings)
-                script = self.create_slurm_script(job_dir, f"{struct_id}_parchg", 'parchg', 
-                                                prev_dir=sc_dir, relax_dir=relax_dir, 
-                                                parchg_label=label)
-                job_id = self.submit_job(script)
-                parchg_jobs.append(job_id)
-                print(f"      PARCHG {label}: job ID {job_id}")
-            
-            # Energy-window PARCHG: below Fermi level
-            # EINT format: "E_min(relative to E_fermi) E_width"
-            # Negative E_min means below Fermi level
-            for e_val in [0.025, 0.5, 1.0]:
-                label = f"e{str(e_val).replace('.', '')}"
-                job_dir = parchg_dir / label
-                job_dir.mkdir(parents=True, exist_ok=True)
-                
-                eint_str = f"{-e_val} 0.025"  # e.g., "-0.5 0.025" = 0.5 eV below E_fermi, width 25 meV
-                parchg_settings = get_parchg_incar_settings_energy(eint_str, grid)
-                self.create_vasp_inputs(structure, job_dir, 'parchg', parchg_settings=parchg_settings)
-                script = self.create_slurm_script(job_dir, f"{struct_id}_parchg", 'parchg', 
-                                                prev_dir=sc_dir, relax_dir=relax_dir, 
-                                                parchg_label=label)
-                job_id = self.submit_job(script)
-                parchg_jobs.append(job_id)
-                print(f"      PARCHG {label}: job ID {job_id}")
-            
-            self.db.update_state(struct_id, 'PARCHG_RUNNING', parchg_job_ids=parchg_jobs)
-            return True
-            
-        except Exception as e:
-            print(f"    Error submitting PARCHG: {e}")
-            self.db.update_state(struct_id, 'PARCHG_FAILED', error=str(e))
             return False
     
     def update_structure_status(self, struct_id):
@@ -1025,88 +955,112 @@ fi
                         print(f"  {struct_id}: Relax FAILED (crash)")
         
         elif state == 'SC_RUNNING':
-            job_status = self.check_job_status(sdata['sc_job_id'])
-            if job_status == 'NOTFOUND':
-                local_status = self.check_local_status(sdata['sc_dir'])
-                if local_status == 'DONE':
-                    # Check convergence before marking as done
-                    vasprun_path = Path(sdata['sc_dir']) / 'vasprun.xml'
-                    if vasprun_path.exists():
-                        try:
-                            vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-                            if not vr.converged_electronic:
-                                self.db.update_state(struct_id, 'SC_FAILED', 
-                                                   error='Electronic SCF not converged')
-                                print(f"  {struct_id}: SC FAILED (electronic not converged)")
-                            else:
-                                self.db.update_state(struct_id, 'SC_DONE')
-                                print(f"  {struct_id}: SC completed (electronic converged)")
-                        except Exception as e:
-                            self.db.update_state(struct_id, 'SC_FAILED', 
-                                               error=f'Could not check convergence: {e}')
-                            print(f"  {struct_id}: SC FAILED (convergence check error)")
-                    else:
-                        self.db.update_state(struct_id, 'SC_FAILED', 
-                                           error='vasprun.xml not found')
-                        print(f"  {struct_id}: SC FAILED (vasprun.xml missing)")
-                elif local_status == 'FAILED':
-                    self.db.update_state(struct_id, 'SC_FAILED')
-                    print(f"  {struct_id}: SC failed")
+            # SPE workflow: check stage markers
+            spe_dir = Path(sdata['spe_dir'])
+            job_status = self.check_job_status(sdata['spe_job_id'])
+            
+            # Check for stage completion marker
+            if (spe_dir / 'SC_DONE').exists():
+                # SC stage completed, transition to PARCHG_RUNNING (same job continues)
+                self.db.update_state(struct_id, 'PARCHG_RUNNING')
+                print(f"  {struct_id}: SC completed, PARCHG stage starting")
+            elif (spe_dir / 'VASP_FAILED').exists():
+                error_msg = (spe_dir / 'VASP_FAILED').read_text().strip()
+                if 'at SC' in error_msg:
+                    self.db.update_state(struct_id, 'SC_FAILED', error=error_msg)
+                    print(f"  {struct_id}: SC FAILED - {error_msg}")
+            elif job_status == 'NOTFOUND':
+                # Job finished but no markers - likely timed out or crashed
+                err_files = list(spe_dir.glob('vasp_*.err'))
+                is_timeout = False
+                if err_files:
+                    err_file = max(err_files, key=lambda p: p.stat().st_mtime)
+                    try:
+                        with open(err_file, 'r') as f:
+                            if 'DUE TO TIME LIMIT' in f.read():
+                                is_timeout = True
+                    except Exception:
+                        pass
+                
+                if is_timeout:
+                    self.db.update_state(struct_id, 'SC_FAILED',
+                                       error='SPE job timed out during SC stage')
+                    print(f"  {struct_id}: SC FAILED (timeout)")
                 else:
-                    # Job not in queue and no completion marker - likely timed out or crashed
-                    self.db.update_state(struct_id, 'SC_FAILED', 
-                                       error='Job terminated without completion marker (timeout or crash)')
-                    print(f"  {struct_id}: SC FAILED (timeout or crash)")
-        
-        elif state == 'ELF_RUNNING':
-            job_status = self.check_job_status(sdata['elf_job_id'])
-            if job_status == 'NOTFOUND':
-                local_status = self.check_local_status(sdata['elf_dir'])
-                if local_status == 'DONE':
-                    self.db.update_state(struct_id, 'ELF_DONE')
-                    print(f"  {struct_id}: ELF completed")
-                elif local_status == 'FAILED':
-                    self.db.update_state(struct_id, 'ELF_FAILED')
-                    print(f"  {struct_id}: ELF failed")
-                else:
-                    # Job not in queue and no completion marker - likely timed out or crashed
-                    self.db.update_state(struct_id, 'ELF_FAILED', 
-                                       error='Job terminated without completion marker (timeout or crash)')
-                    print(f"  {struct_id}: ELF FAILED (timeout or crash)")
+                    self.db.update_state(struct_id, 'SC_FAILED',
+                                       error='SPE job terminated without completion marker (crash)')
+                    print(f"  {struct_id}: SC FAILED (crash)")
         
         elif state == 'PARCHG_RUNNING':
-            all_done = True
-            any_failed = False
-            parchg_dir = Path(sdata['parchg_dir'])
+            # SPE workflow: PARCHG stage running, check for completion
+            spe_dir = Path(sdata['spe_dir'])
+            job_status = self.check_job_status(sdata['spe_job_id'])
             
-            for job_id in sdata.get('parchg_job_ids', []):
-                job_status = self.check_job_status(job_id)
-                if job_status == 'RUNNING':
-                    all_done = False
-                    break
-            
-            if all_done:
-                # Check local status for each PARCHG job (no convergence check needed)
-                for subdir in ['band0', 'band1', 'e0025', 'e05', 'e10']:
-                    job_dir = parchg_dir / subdir
-                    if job_dir.exists():
-                        local_status = self.check_local_status(job_dir)
-                        if local_status == 'FAILED':
-                            any_failed = True
-                            break
-                        elif local_status == 'UNKNOWN':
-                            # Job terminated without completion marker (timeout or crash)
-                            any_failed = True
-                            print(f"    {subdir}: no completion marker (timeout or crash)")
-                            break
+            if (spe_dir / 'PARCHG_DONE').exists():
+                # PARCHG stage completed, transition to ELF_RUNNING (same job continues)
+                self.db.update_state(struct_id, 'ELF_RUNNING')
+                print(f"  {struct_id}: PARCHG completed, ELF stage starting")
+            elif (spe_dir / 'VASP_FAILED').exists():
+                error_msg = (spe_dir / 'VASP_FAILED').read_text().strip()
+                if 'at PARCHG' in error_msg:
+                    self.db.update_state(struct_id, 'PARCHG_FAILED', error=error_msg)
+                    print(f"  {struct_id}: PARCHG FAILED - {error_msg}")
+            elif job_status == 'NOTFOUND':
+                # Job finished but no markers - likely timed out or crashed
+                err_files = list(spe_dir.glob('vasp_*.err'))
+                is_timeout = False
+                if err_files:
+                    err_file = max(err_files, key=lambda p: p.stat().st_mtime)
+                    try:
+                        with open(err_file, 'r') as f:
+                            if 'DUE TO TIME LIMIT' in f.read():
+                                is_timeout = True
+                    except Exception:
+                        pass
                 
-                if any_failed:
+                if is_timeout:
                     self.db.update_state(struct_id, 'PARCHG_FAILED',
-                                       error='One or more PARCHG jobs terminated without completion marker')
-                    print(f"  {struct_id}: PARCHG failed")
+                                       error='SPE job timed out during PARCHG stage')
+                    print(f"  {struct_id}: PARCHG FAILED (timeout)")
                 else:
-                    self.db.update_state(struct_id, 'PARCHG_DONE')
-                    print(f"  {struct_id}: PARCHG completed")
+                    self.db.update_state(struct_id, 'PARCHG_FAILED',
+                                       error='SPE job terminated without completion marker (crash)')
+                    print(f"  {struct_id}: PARCHG FAILED (crash)")
+        
+        elif state == 'ELF_RUNNING':
+            # SPE workflow: ELF stage running, check for completion
+            spe_dir = Path(sdata['spe_dir'])
+            job_status = self.check_job_status(sdata['spe_job_id'])
+            
+            if (spe_dir / 'VASP_DONE').exists():
+                self.db.update_state(struct_id, 'ELF_DONE')
+                print(f"  {struct_id}: ELF completed")
+            elif (spe_dir / 'VASP_FAILED').exists():
+                error_msg = (spe_dir / 'VASP_FAILED').read_text().strip()
+                if 'at ELF' in error_msg:
+                    self.db.update_state(struct_id, 'ELF_FAILED', error=error_msg)
+                    print(f"  {struct_id}: ELF FAILED - {error_msg}")
+            elif job_status == 'NOTFOUND':
+                # Job finished but no markers - likely timed out or crashed
+                err_files = list(spe_dir.glob('vasp_*.err'))
+                is_timeout = False
+                if err_files:
+                    err_file = max(err_files, key=lambda p: p.stat().st_mtime)
+                    try:
+                        with open(err_file, 'r') as f:
+                            if 'DUE TO TIME LIMIT' in f.read():
+                                is_timeout = True
+                    except Exception:
+                        pass
+                
+                if is_timeout:
+                    self.db.update_state(struct_id, 'ELF_FAILED',
+                                       error='SPE job timed out during ELF stage')
+                    print(f"  {struct_id}: ELF FAILED (timeout)")
+                else:
+                    self.db.update_state(struct_id, 'ELF_FAILED',
+                                       error='SPE job terminated without completion marker (crash)')
+                    print(f"  {struct_id}: ELF FAILED (crash)")
     
     def monitor_and_submit(self, structures_dict):
         """Main monitoring loop that checks status and submits new jobs."""
@@ -1146,16 +1100,8 @@ fi
                         running_count += 1
                 
                 elif state == 'RELAX_DONE' or state == 'RELAX_TMOUT':
-                    if self.submit_sc(struct_id, structure):
-                        running_count += 1
-                
-                elif state == 'SC_DONE':
-                    # Always submit PARCHG (following HT-electride methodology)
-                    if self.submit_parchg(struct_id, structure):
-                        running_count += 1
-                
-                elif state == 'PARCHG_DONE' or state == 'PARCHG_SKIPPED':
-                    if self.submit_elf(struct_id, structure):
+                    # Submit unified SPE job (SC->PARCHG->ELF)
+                    if self.submit_spe(struct_id, structure):
                         running_count += 1
             
             # Print statistics

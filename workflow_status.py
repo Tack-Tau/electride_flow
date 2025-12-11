@@ -50,7 +50,7 @@ def print_summary(data):
         print(f"  {state:20s}: {count:4d} ({pct:5.1f}%)")
     
     # Running count
-    running_states = ['RELAX_RUNNING', 'SC_RUNNING', 'ELF_RUNNING']
+    running_states = ['RELAX_RUNNING', 'SC_RUNNING', 'PARCHG_RUNNING', 'ELF_RUNNING']
     running = sum(state_counts[s] for s in running_states)
     print(f"\n  Currently running: {running}")
     
@@ -124,7 +124,7 @@ def print_compositions(data):
         total = sum(stats.values())
         done = stats.get('ELF_DONE', 0)
         failed = sum(stats[s] for s in stats if 'FAILED' in s)
-        running = sum(stats[s] for s in ['RELAX_RUNNING', 'SC_RUNNING', 'ELF_RUNNING'])
+        running = sum(stats[s] for s in ['RELAX_RUNNING', 'SC_RUNNING', 'PARCHG_RUNNING', 'ELF_RUNNING'])
         pending = total - done - failed - running
         
         print(f"{comp:<15s} {total:6d} {done:6d} {failed:6d} {running:6d} {pending:6d}")
@@ -159,10 +159,8 @@ def print_failed(data):
         # Print job directories
         if s['state'] == 'RELAX_FAILED':
             print(f"  Check: {s['relax_dir']}")
-        elif s['state'] == 'SC_FAILED':
-            print(f"  Check: {s['sc_dir']}")
-        elif s['state'] == 'ELF_FAILED':
-            print(f"  Check: {s['elf_dir']}")
+        elif s['state'] in ['SC_FAILED', 'PARCHG_FAILED', 'ELF_FAILED']:
+            print(f"  Check: {s['spe_dir']}")
     
     print("="*70 + "\n")
 
@@ -190,12 +188,15 @@ def print_running(data):
         if state == 'RELAX_RUNNING':
             stage = 'Relax'
             job_id = s.get('relax_job_id', 'N/A')
-        elif state == 'SC_RUNNING':
-            stage = 'SC'
-            job_id = s.get('sc_job_id', 'N/A')
-        elif state == 'ELF_RUNNING':
-            stage = 'ELF'
-            job_id = s.get('elf_job_id', 'N/A')
+        elif state in ['SC_RUNNING', 'PARCHG_RUNNING', 'ELF_RUNNING']:
+            # All SPE stages use the same job ID
+            if state == 'SC_RUNNING':
+                stage = 'SPE (SC)'
+            elif state == 'PARCHG_RUNNING':
+                stage = 'SPE (PARCHG)'
+            elif state == 'ELF_RUNNING':
+                stage = 'SPE (ELF)'
+            job_id = s.get('spe_job_id', 'N/A')
         else:
             stage = 'Unknown'
             job_id = 'N/A'

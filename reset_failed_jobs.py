@@ -4,9 +4,9 @@ Reset failed VASP jobs to allow retry.
 
 This script resets structures that failed at various stages:
 - RELAX_FAILED -> PENDING (retry from scratch)
-- SC_FAILED -> RELAX_DONE (retry SC stage)
-- PARCHG_FAILED -> SC_DONE (retry PARCHG stage)
-- ELF_FAILED -> PARCHG_DONE or PARCHG_SKIPPED (retry ELF stage)
+- SC_FAILED -> RELAX_DONE (retry SC stage in SPE)
+- PARCHG_FAILED -> SC_DONE (retry PARCHG stage in SPE)
+- ELF_FAILED -> PARCHG_DONE (retry ELF stage in SPE)
 
 Usage:
     python3 reset_failed_jobs.py [--db workflow.json] [--stage STAGE] [--clean] [--dry-run]
@@ -15,10 +15,10 @@ Options:
     --db PATH           Path to workflow.json (default: ./VASP_JOBS/workflow.json)
     --stage STAGE       Only reset specific stage: RELAX, SC, PARCHG, or ELF (default: all)
     --clean             Clean calculation directories to proper restart state:
-                        - RELAX_FAILED: Remove entire directory
-                        - SC_FAILED: Remove all SC files (keeps Relax/CONTCAR)
-                        - PARCHG_FAILED: Remove PARCHG subdirs (keeps SC/CHGCAR,WAVECAR)
-                        - ELF_FAILED: Remove ELF files (keeps PARCHG-* files)
+                        - RELAX_FAILED: Remove entire Relax directory
+                        - SC_FAILED: Remove all SPE directory contents (keeps Relax/CONTCAR)
+                        - PARCHG_FAILED: Remove PARCHG and intermediate files (keeps SC outputs)
+                        - ELF_FAILED: Remove ELF and intermediate files (keeps PARCHG files)
     --dry-run           Show what would be done without making changes
     --list              List all failed structures and exit
 
@@ -107,11 +107,14 @@ def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
         data = json.load(f)
     
     # Define reset mappings: failed_state -> (new_state, job_id_to_clear, dir_to_check)
+    # Note: SC/PARCHG/ELF all reset to RELAX_DONE because SPE is a unified job
+    # that runs all three stages sequentially. The workflow only triggers submit_spe()
+    # when state is RELAX_DONE or RELAX_TMOUT.
     reset_map = {
         'RELAX_FAILED': ('PENDING', 'relax_job_id', 'relax_dir'),
-        'SC_FAILED': ('RELAX_DONE', 'sc_job_id', 'sc_dir'),
-        'PARCHG_FAILED': ('SC_DONE', 'parchg_job_ids', 'parchg_dir'),
-        'ELF_FAILED': (None, 'elf_job_id', 'elf_dir'),  # new_state determined dynamically
+        'SC_FAILED': ('RELAX_DONE', 'spe_job_id', 'spe_dir'),
+        'PARCHG_FAILED': ('RELAX_DONE', 'spe_job_id', 'spe_dir'),
+        'ELF_FAILED': ('RELAX_DONE', 'spe_job_id', 'spe_dir'),
     }
     
     # Filter by stage if requested
@@ -143,14 +146,6 @@ def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
         new_state, job_field, dir_field = reset_map[state]
         job_dir = Path(sdata[dir_field])
         
-        # Special handling for ELF_FAILED: determine whether PARCHG was done or skipped
-        if state == 'ELF_FAILED':
-            parchg_job_ids = sdata.get('parchg_job_ids', [])
-            if parchg_job_ids:
-                new_state = 'PARCHG_DONE'
-            else:
-                new_state = 'PARCHG_SKIPPED'
-        
         print(f"\n{struct_id} ({state}):")
         print(f"  Current state: {state}")
         print(f"  Will reset to: {new_state}")
@@ -161,10 +156,7 @@ def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
             sdata['state'] = new_state
             
             # Clear job IDs
-            if job_field == 'parchg_job_ids':
-                sdata[job_field] = []
-            else:
-                sdata[job_field] = None
+            sdata[job_field] = None
             
             # Clear error message
             sdata['error'] = None
@@ -185,18 +177,20 @@ def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
                     cleaned_dirs.append(str(job_dir))
             
             elif state == 'SC_FAILED':
-                # Keep Relax/CONTCAR (in parent directory), remove all SC files
-                print(f"    - Removing all SC calculation files")
+                # Relax/CONTCAR is in separate relax_dir and will be preserved
+                print(f"    - Removing all SPE directory contents for SC retry")
                 relax_dir = Path(sdata['relax_dir'])
                 print(f"    - Relax/CONTCAR will be preserved at: {relax_dir / 'CONTCAR'}")
                 
                 if not dry_run:
-                    vasp_files = ['INCAR', 'KPOINTS', 'POTCAR', 'POSCAR', 'CONTCAR',
-                                  'OUTCAR', 'OSZICAR', 'vasprun.xml', 'EIGENVAL', 'DOSCAR',
-                                  'CHGCAR', 'CHG', 'WAVECAR', 'WFULL', 'AECCAR0', 'AECCAR1', 'AECCAR2',
-                                  'PROCAR', 'LOCPOT', 'TMPCAR', 'PCDAT', 'XDATCAR', 'REPORT',
-                                  'VASP_FAILED', 'VASP_DONE', 'job.sh']
-                    vasp_patterns = ['vasp_*.out', 'vasp_*.err']
+                    vasp_files = ['INCAR', 'INCAR-SC', 'INCAR-ELF', 'KPOINTS', 'POTCAR', 'POSCAR', 'CONTCAR',
+                                  'OUTCAR', 'OSZICAR', 'OSZICAR-SC', 'vasprun.xml', 'vasprun.xml-SC',
+                                  'EIGENVAL', 'DOSCAR', 'CHGCAR', 'CHGCAR-SC', 'CHG', 'WAVECAR', 'WAVECAR-SC',
+                                  'WFULL', 'AECCAR0', 'AECCAR1', 'AECCAR2', 'PROCAR', 'LOCPOT', 'TMPCAR',
+                                  'PCDAT', 'XDATCAR', 'REPORT', 'ELFCAR', 'PARCHG.tar.gz', 'IBZKPT',
+                                  'SC_DONE', 'PARCHG_DONE', 'ELF_DONE', 'VASP_FAILED', 'VASP_DONE', 'job.sh',
+                                  'generate_parchg_incars.py']
+                    vasp_patterns = ['vasp_*.out', 'vasp_*.err', 'PARCHG-*', 'INCAR-PARCHG-*']
                     
                     removed_count = 0
                     for fname in vasp_files:
@@ -210,44 +204,24 @@ def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
                             f.unlink()
                             removed_count += 1
                     
-                    print(f"      Removed {removed_count} files from SC directory")
+                    print(f"      Removed {removed_count} files from SPE directory")
                     cleaned_dirs.append(str(job_dir))
             
-            elif state == 'PARCHG_FAILED':
-                # Remove all PARCHG subdirectories completely
-                # Keep SC/CHGCAR, SC/WAVECAR for retry (in SC directory)
-                print(f"    - Removing PARCHG subdirectories")
-                sc_dir = Path(sdata['sc_dir'])
-                print(f"    - SC/CHGCAR and SC/WAVECAR will be preserved at: {sc_dir}")
+            elif state in ['PARCHG_FAILED', 'ELF_FAILED']:
+                # Since we reset to RELAX_DONE, clean entire SPE directory
+                print(f"    - Removing all SPE directory contents (will redo entire SPE job)")
+                relax_dir = Path(sdata['relax_dir'])
+                print(f"    - Relax/CONTCAR will be preserved at: {relax_dir / 'CONTCAR'}")
                 
                 if not dry_run:
-                    parchg_subdirs = ['band0', 'band1', 'e0025', 'e05', 'e10']
-                    removed_count = 0
-                    for subdir_name in parchg_subdirs:
-                        subdir = job_dir / subdir_name
-                        if subdir.exists():
-                            shutil.rmtree(subdir)
-                            removed_count += 1
-                    
-                    print(f"      Removed {removed_count} PARCHG subdirectories")
-                    cleaned_dirs.append(str(job_dir))
-            
-            elif state == 'ELF_FAILED':
-                # Remove all ELF files, keep PARCHG-* files if they exist
-                print(f"    - Removing all ELF calculation files")
-                
-                # Check for PARCHG files before cleanup
-                parchg_files = list(job_dir.glob('PARCHG-*'))
-                if parchg_files:
-                    print(f"    - Will preserve {len(parchg_files)} PARCHG-* files")
-                
-                if not dry_run:
-                    vasp_files = ['INCAR', 'KPOINTS', 'POTCAR', 'POSCAR', 'CONTCAR',
-                                  'OUTCAR', 'OSZICAR', 'vasprun.xml', 'EIGENVAL', 'DOSCAR',
-                                  'CHGCAR', 'CHG', 'WAVECAR', 'WFULL', 'AECCAR0', 'AECCAR1', 'AECCAR2',
-                                  'PROCAR', 'LOCPOT', 'TMPCAR', 'PCDAT', 'XDATCAR', 'REPORT',
-                                  'ELFCAR', 'VASP_FAILED', 'VASP_DONE', 'job.sh', 'PARCHG.tar.gz']
-                    vasp_patterns = ['vasp_*.out', 'vasp_*.err']
+                    vasp_files = ['INCAR', 'INCAR-SC', 'INCAR-ELF', 'KPOINTS', 'POTCAR', 'POSCAR', 'CONTCAR',
+                                  'OUTCAR', 'OSZICAR', 'OSZICAR-SC', 'vasprun.xml', 'vasprun.xml-SC',
+                                  'EIGENVAL', 'DOSCAR', 'CHGCAR', 'CHGCAR-SC', 'CHG', 'WAVECAR', 'WAVECAR-SC',
+                                  'WFULL', 'AECCAR0', 'AECCAR1', 'AECCAR2', 'PROCAR', 'LOCPOT', 'TMPCAR',
+                                  'PCDAT', 'XDATCAR', 'REPORT', 'ELFCAR', 'PARCHG.tar.gz', 'IBZKPT',
+                                  'SC_DONE', 'PARCHG_DONE', 'ELF_DONE', 'VASP_FAILED', 'VASP_DONE', 'job.sh',
+                                  'generate_parchg_incars.py']
+                    vasp_patterns = ['vasp_*.out', 'vasp_*.err', 'PARCHG-*', 'INCAR-PARCHG-*']
                     
                     removed_count = 0
                     for fname in vasp_files:
@@ -261,7 +235,7 @@ def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
                             f.unlink()
                             removed_count += 1
                     
-                    print(f"      Removed {removed_count} files from ELF directory")
+                    print(f"      Removed {removed_count} files from SPE directory")
                     cleaned_dirs.append(str(job_dir))
     
     # Save updated database

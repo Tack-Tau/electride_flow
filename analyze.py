@@ -135,12 +135,12 @@ def load_workflow_db(db_path):
     semiconductors = []
     
     for struct_id, sdata in data['structures'].items():
-        if sdata['state'] == 'ELF_DONE' and sdata.get('elf_dir'):
-            elf_dir = sdata['elf_dir']
+        if sdata['state'] == 'ELF_DONE':
+            spe_dir = sdata.get('spe_dir')
             relax_dir = sdata.get('relax_dir', '')
             elf_done.append({
                 'id': struct_id,
-                'dir': elf_dir,
+                'dir': spe_dir,
                 'relax_dir': relax_dir,
                 'composition': sdata.get('composition', ''),
                 'is_semi': sdata.get('is_semiconductor', False)
@@ -415,6 +415,8 @@ def save_to_database(struct_id, relax_dir, composition, e_above_hull, is_electri
                 if len(xtal.check_short_distance(r=0.5)) > 0:
                     # Skip this tolerance - overlapping atoms detected
                     continue
+                
+                # Structure is valid - save it
                 db.add_xtal(
                     xtal,
                     kvp={
@@ -432,8 +434,10 @@ def save_to_database(struct_id, relax_dir, composition, e_above_hull, is_electri
         # If all tolerances failed, save structure without symmetrization
         # Use ASE database directly to avoid PyXtal artifacts
         try:
+            # Convert pymatgen Structure to ASE Atoms
             adaptor = AseAtomsAdaptor()
             atoms = adaptor.get_atoms(struct)
+            
             db.db.write(
                 atoms,
                 structure_id=struct_id,
@@ -447,7 +451,7 @@ def save_to_database(struct_id, relax_dir, composition, e_above_hull, is_electri
             return True
         except Exception as e2:
             print(f"    Warning: Could not save {struct_id} even without symmetrization: {e2}")
-        return False
+            return False
     except Exception as e:
         print(f"  Warning: Could not save {struct_id} to database: {e}")
         return False
