@@ -400,10 +400,10 @@ With **correct functional filtering** (MP GGA vs VASP PBE), typical energy diffe
 
 ### Validation Criteria
 
-✅ **Excellent:** Δ < 0.02 eV/atom - Setup perfectly matches MP
-✅ **Good:** Δ = 0.02-0.05 eV/atom - Normal variation, setup is correct
-⚠️ **Check:** Δ = 0.05-0.1 eV/atom - May be +U, magnetic, or k-point differences
-❌ **Problem:** Δ > 0.1 eV/atom - Configuration mismatch or missing +U corrections
+  **Excellent:** Δ < 0.02 eV/atom - Setup perfectly matches MP
+  **Good:** Δ = 0.02-0.05 eV/atom - Normal variation, setup is correct
+  **Check:** Δ = 0.05-0.1 eV/atom - May be +U, magnetic, or k-point differences
+  **Problem:** Δ > 0.1 eV/atom - Configuration mismatch or missing +U corrections
 
 ## Files Generated
 

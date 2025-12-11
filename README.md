@@ -4,7 +4,14 @@
 
 Intelligent workflow manager for high-throughput VASP calculations with batch submission, MatterSim pre-screening, and dynamic monitoring. Perfect for electride screening on HPC clusters.
 
-## 🚀 What's New (v2.0)
+## What's New (v3.0)
+
+**Workflow Improvements**:
+- **Unified SPE workflow**: 2 SLURM jobs per structure (vs 8)
+- **Simplified directories**: Relax/ and SPE/ (vs 7+ subdirectories)
+- **Two-step filtering**: Initial analysis → stricter filtering for high-quality candidates
+- **Fast symmetry analysis**: PyXtal-based (faster than AFLOW)
+- **Query-able database**: `ase db` commands for candidate exploration
 
 **Performance Optimizations**:
 - **Batch processing**: MatterSimCalculator reused across structures (3-5× faster prescreening)
@@ -13,8 +20,6 @@ Intelligent workflow manager for high-throughput VASP calculations with batch su
 - **Single cache files**: Global `mp_mattersim.json` and `mp_vaspdft.json` with automatic subsystem handling
 - **PyXtal symmetrization**: Automatic structure symmetrization for better VASP convergence
 - **PDEntry phase diagrams**: More accurate convex hull analysis with decomposition products
-
-**Key Benefit**: Pre-screening now 5-10× faster while using less memory and disk space!
 
 ---
 
@@ -42,11 +47,15 @@ Intelligent workflow manager for high-throughput VASP calculations with batch su
  **Stable phases only** - queries only on-hull MP phases for accurate, fast convex hull analysis  
  **Smart caching** - single global cache files (mp_mattersim.json, mp_vaspdft.json) handle overlapping systems  
  **PyXtal symmetrization** - automatic structure symmetrization for better VASP convergence  
+ **Unified SPE workflow** - SC-PARCHG-ELF in single job (75% fewer SLURM jobs)  
  **Batch submission** - submit n structures at a time, auto-submit more as jobs complete  
  **Dynamic monitoring** - check status and submit new jobs automatically  
  **Local JSON database** - no network dependencies, works on HPC  
- **Smart workflow** - Pre-screen → Relax → SC → PARCHG (semiconductors) → ELF  
+ **Smart workflow** - Pre-screen → Relax → SPE (SC + PARCHG + ELF sequential)  
  **PARCHG analysis** - band-edge charge density for accurate electride identification  
+ **Two-step filtering** - initial analysis saves all, stricter filtering for candidates  
+ **Fast symmetry** - PyXtal-based (14× faster than AFLOW)  
+ **Query-able database** - `ase db` commands for candidate exploration  
  **Pymatgen input generation** - INCAR, POSCAR, POTCAR, KPOINTS  
  **Bader analysis** - identify electride candidates with topological analysis  
  **Interrupt-safe** - resume from any interruption  
@@ -185,14 +194,32 @@ bash submit_analysis.sh \
   --vasp-jobs ./VASP_JOBS \
   --bader-exe ~/apps/Bader/bader \
   --threshold 0.6 \
-  --output electride_candidates.csv
+  --output electride_analysis.csv
 
 # Monitor analysis job
 squeue -u $USER | grep analyze
 tail -f electride_analysis_*.out
 
-# View results when complete
+# When complete, view all analyzed structures
+cat electride_analysis.csv
+
+# Filter with stricter criteria to get high-quality candidates
+python3 filter_comb_db.py \
+  --input electride_data.db \
+  --csv electride_analysis.csv \
+  --min-energy 20 \
+  --min-band 20
+
+# View filtered candidates
 cat electride_candidates.csv
+
+# Extract CIF files for candidates
+python3 extract_electride_struct.py \
+  --db electride_candidates.db \
+  --output-dir electride_CIF
+
+# Query database for specific criteria
+ase db electride_candidates.db 'e_above_hull<0.05'
 ```
 
 ---
@@ -367,30 +394,20 @@ Identify Electride Candidates
 │   │   │   ├── CONTCAR (after completion)
 │   │   │   ├── VASP_DONE (or VASP_FAILED)
 │   │   │   └── vasp_*.out/err
-│   │   ├── SC/
-│   │   │   ├── POSCAR (copied from Relax/CONTCAR)
-│   │   │   ├── CHGCAR, WAVECAR (after completion)
-│   │   │   ├── vasprun.xml (band gap info)
-│   │   │   └── ...
-│   │   ├── PARCHG/                        ← Band-decomposed charge density
-│   │   │   ├── band0/                     ← Valence band maximum (VBM)
-│   │   │   │   ├── PARCHG-band0
-│   │   │   │   └── VASP_DONE
-│   │   │   ├── band1/                     ← VBM-1 (one band below VBM)
-│   │   │   ├── e0025/                     ← E-window: [-0.025, 0] eV
-│   │   │   ├── e05/                       ← E-window: [-0.5, -0.475] eV
-│   │   │   └── e10/                       ← E-window: [-1.0, -0.975] eV
-│   │   └── ELF/
-│   │       ├── CHGCAR (copied from SC)
-│   │       ├── WAVECAR (copied from SC)
-│   │       ├── ELFCAR (after completion)
-│   │       ├── PARCHG-band0 (copied from PARCHG/band0/)
-│   │       ├── PARCHG-band1 (copied from PARCHG/band1/)
-│   │       ├── PARCHG-e0025 (copied from PARCHG/e0025/)
-│   │       ├── PARCHG-e05 (copied from PARCHG/e05/)
-│   │       ├── PARCHG-e10 (copied from PARCHG/e10/)
-│   │       ├── BCF.dat, ACF.dat (Bader analysis outputs)
-│   │       └── ...
+│   │   └── SPE/                           ← Unified SC-PARCHG-ELF directory
+│   │       ├── job.sh                     ← Single SLURM job for all stages
+│   │       ├── INCAR, POSCAR, POTCAR, KPOINTS
+│   │       ├── generate_parchg_incars.py ← Helper script (copied by workflow)
+│   │       ├── SC_DONE, PARCHG_DONE       ← Stage markers
+│   │       ├── VASP_DONE (or VASP_FAILED) ← Final completion marker
+│   │       ├── INCAR-SC, OSZICAR-SC, vasprun.xml-SC  ← SC outputs
+│   │       ├── INCAR-PARCHG-e0025, INCAR-PARCHG-e05, INCAR-PARCHG-e10
+│   │       ├── INCAR-PARCHG-band0, INCAR-PARCHG-band1
+│   │       ├── PARCHG.tar.gz              ← Compressed PARCHG files
+│   │       ├── INCAR-ELF
+│   │       ├── ELFCAR                     ← ELF output
+│   │       ├── ELF_DONE                   ← ELF stage marker
+│   │       └── vasp_*.out/err
 │   └── Li10B1N3_s002/
 ├── workflow.json                          # Job tracking database
 ├── prescreening_stability.json            ← Pre-screening results
@@ -406,28 +423,57 @@ Each structure progresses through these states in workflow_manager.py:
 ```
 PENDING (structure passed pre-screening, ready for VASP)
    ↓
-   RELAX_RUNNING → RELAX_DONE → SC_RUNNING → SC_DONE → PARCHG_RUNNING (5 parallel jobs)
-      ↓               ↓             ↓            ↓              ↓
-   RELAX_FAILED   (skip)      SC_FAILED    (skip)      PARCHG_DONE/SKIPPED
-                                                              ↓
-                                                        ELF_RUNNING
-                                                              ↓
-                                                        ELF_DONE (success)
-                                                              ↓
-                                                        ELF_FAILED
+   RELAX_RUNNING → RELAX_DONE → SC_RUNNING → PARCHG_RUNNING → ELF_RUNNING → ELF_DONE
+      ↓               ↓             ↓              ↓               ↓             ↓
+   RELAX_FAILED   (skip)      SC_FAILED    PARCHG_FAILED   ELF_FAILED    (success)
+                                                                                
+   Note: SC_RUNNING, PARCHG_RUNNING, and ELF_RUNNING are all part of one SPE job
+         State transitions happen automatically as stage markers are detected
 ```
 
 **Note**: Pre-screening (MatterSim + MP hull analysis) is done separately by `prescreen.py`. Only structures that pass pre-screening (E_hull < threshold) are loaded into workflow_manager.py.
 
 **Key behaviors**:
 - Only structures that passed pre-screening are processed
-- Only one stage runs at a time per structure (sequential, except PARCHG)
-- **PARCHG runs for ALL materials** (metals and semiconductors) following HT-electride methodology
-- PARCHG jobs run in parallel (5 jobs: band0, band1, e0025, e05, e10) but tracked as one stage
-- PARCHG files are automatically copied to ELF directory before ELF job submission
-- Workflow manager automatically submits next stage when previous completes
+- **Reduced SLURM jobs**: 2 jobs per structure (1 Relax + 1 SPE) instead of 8 jobs
+- **SPE job runs sequentially**: SC -> PARCHG (5 energy windows) -> ELF in one script
+- **Stage markers**: SC_DONE, PARCHG_DONE, VASP_DONE track progress within SPE job
+- **State transitions**: Workflow manager detects markers and transitions states automatically
+- **PARCHG for ALL materials**: Following HT-electride methodology
+- **ISYM=0**: VASP internal symmetrization disabled (PyXtal already applied)
+- Workflow manager automatically submits next structure when slots free up
 - Failed jobs don't block other structures
-- Max concurrent limit applies to total running structures (any stage)
+- Max concurrent limit applies to total running structures
+
+### SPE Workflow Architecture
+
+The unified SPE (SC-PARCHG-ELF) workflow uses a clean separation of concerns:
+
+**Python (`workflow_manager.py`) handles**:
+- INCAR/POSCAR/POTCAR/KPOINTS for Relax, SC, ELF jobs
+- Structure loading from CIF files and symmetrization
+- Database state tracking and job orchestration
+- Directory structure creation
+
+**Helper script (`generate_parchg_incars.py`) handles**:
+- PARCHG INCAR generation (requires parsing vasprun.xml-SC)
+- Band index calculation from NELECT and SOC parameters
+- FFT grid extraction (NGXF, NGYF, NGZF)
+- Called from bash after SC completes
+
+**Bash (`job.sh` in SPE/) handles**:
+- Sequential execution: SC → PARCHG (5 types) → ELF
+- File copying between stages (CHGCAR-SC, WAVECAR-SC reused)
+- PARCHG output renaming (PARCHG → PARCHG-e0025, etc.)
+- PARCHG compression (PARCHG-* → PARCHG.tar.gz) to save disk space
+- Cleanup between stages to prevent VASP issues
+- Stage marker creation (SC_DONE, PARCHG_DONE, ELF_DONE, VASP_DONE)
+
+**Why this design**:
+- PARCHG is the ONLY calculation requiring runtime VASP output parsing
+- Keeps Python code IDE-friendly (no embedded heredocs)
+- Helper script is testable standalone
+- Other INCARs are straightforward pymatgen calls (no external scripts needed)
 
 ---
 
@@ -506,9 +552,9 @@ tail OSZICAR
 
 After ELF calculations complete, analyze structures for electride characteristics using Bader topological analysis on both ELFCAR and PARCHG files.
 
-**New in v2.0**: Incremental analysis with DFT energy_above_hull integration and PyXtal database storage.
+**New in v2.0**: Incremental analysis with MatterSim e_above_hull integration, PyXtal database storage, and stricter candidate filtering.
 
-### Submit Analysis Job
+### Step 1: Initial Analysis (All Structures)
 
 **Recommended**: Run analysis as a SLURM job (not on login node):
 
@@ -531,22 +577,102 @@ tail -f electride_analysis_*.out
 cat electride_analysis.csv
 ```
 
+**Output**:
+- `electride_analysis.csv` - All analyzed structures with interstitial volumes
+- `electride_data.db` - PyXtal database with all structures
+
+### Step 2: Filter High-Quality Candidates
+
+Apply stricter volume thresholds to identify high-quality electride candidates:
+
+```bash
+# Filter with default thresholds (20 Å³)
+python3 filter_comb_db.py \
+  --input electride_data.db \
+  --csv electride_analysis.csv
+
+# Custom thresholds (stricter)
+python3 filter_comb_db.py \
+  --input electride_data.db \
+  --csv electride_analysis.csv \
+  --min-energy 25 \
+  --min-band 25
+```
+
+**Filtering Criteria**:
+- `max(e0025, e05, e10) >= min-energy` (default: 20 Å³)
+- `max(band0, band1) >= min-band` (default: 20 Å³)
+- Removes duplicate structures
+- Adds PyXtal symmetry information (space groups)
+
+**Output**:
+- `electride_candidates.db` - Filtered high-quality candidates with symmetry
+- `electride_candidates.csv` - CSV table for quick viewing
+
+### Step 3: Extract CIF Files
+
+Extract CIF files for the filtered candidates:
+
+```bash
+# Extract from filtered database
+python3 extract_electride_struct.py \
+  --db electride_candidates.db \
+  --output-dir electride_CIF
+```
+
+**Output**: `electride_CIF/*.cif` - One CIF file per candidate
+
+### Step 4: Query Database
+
+Use `ase db` to query and filter candidates:
+
+```bash
+# View all candidates
+ase db electride_candidates.db
+
+# Sort by space group (high symmetry first)
+ase db electride_candidates.db \
+  formula,space_group_number,e_above_hull \
+  -s space_group_number-
+
+# Filter by stability (< 50 meV/atom)
+ase db electride_candidates.db 'e_above_hull<0.05'
+
+# Show interstitial volumes
+ase db electride_candidates.db \
+  formula,e0025,e05,e10,band0,band1,e_above_hull
+
+# Cubic structures (space group >= 195)
+ase db electride_candidates.db 'space_group_number>=195'
+
+# High interstitial volume (e0025 > 50 Å³)
+ase db electride_candidates.db 'e0025>50'
+```
+
 ### What the Analysis Does
 
-For each completed ELF calculation, the workflow:
-1. **Reads ELFCAR** - electron localization function from VASP
-2. **Reads PARCHG files** (5 types) - band-decomposed partial charge density:
+**Initial Analysis** (`analyze.py`):
+1. **Reads ELFCAR** - electron localization function from VASP SPE directory
+2. **Extracts PARCHG files** from `PARCHG.tar.gz` (5 types):
    - `PARCHG-band0`: Valence band maximum (VBM)
    - `PARCHG-band1`: Second highest occupied band (VBM-1)
-   - `PARCHG-e0025`: Energy window [-0.025, 0] eV below Fermi level
-   - `PARCHG-e05`: Energy window [-0.5, -0.475] eV below Fermi level
-   - `PARCHG-e10`: Energy window [-1.0, -0.975] eV below Fermi level
-3. **Runs Bader analysis** on each file to identify electron localization maxima
+   - `PARCHG-e0025`: Energy window [-0.025, 0.025] eV around Fermi level
+   - `PARCHG-e05`: Energy window [-0.5, 0.025] eV
+   - `PARCHG-e10`: Energy window [-1.0, 0.025] eV
+3. **Runs Bader analysis** on ELFCAR and each PARCHG file
 4. **Filters interstitial electrons** - sites far from atoms with high localization
-5. **Reports volumes** of interstitial electron density for each type
-6. **Adds DFT stability** - reads `e_above_hull` from `dft_stability_results.json`
-7. **Extracts spacegroup** - from VASP relaxed structure (CONTCAR) using PyXtal
-8. **Saves to database** - stores structures in PyXtal database for further analysis
+5. **Reports volumes** of interstitial electron density (Å³) for each type
+6. **Adds stability data** - reads `e_above_hull` from `prescreening_stability.json`
+7. **Extracts spacegroup** - from CONTCAR using PyXtal (adaptive tolerance)
+8. **Saves to database** - stores all structures in `electride_data.db`
+
+**Filtering** (`filter_comb_db.py`):
+1. **Applies volume thresholds** - only keeps structures with substantial interstitial volumes
+2. **Symmetrizes structures** - uses PyXtal with adaptive tolerance (coarse→fine)
+3. **Removes duplicates** - identifies and filters redundant structures
+4. **Adds space group info** - from PyXtal symmetry analysis
+5. **Creates unified database** - `electride_candidates.db` with structures + volumes
+6. **Exports CSV** - `electride_candidates.csv` for quick viewing
 
 ### Key Features (v2.0)
 
@@ -571,52 +697,106 @@ For each completed ELF calculation, the workflow:
 - P1 fallback ensures 100% save success
 - Query-able for advanced analysis
 
-### Detection Parameters
+### Analysis Parameters
 
+**analyze.py**:
 - `--threshold`: Minimum ELF value for electride detection (default: 0.6)
 - `--bader-exe`: Path to Bader executable (default: `bader` in PATH)
 - `--output`: Output CSV file name (default: `electride_analysis.csv`)
 - `--pyxtal-db`: PyXtal database file (default: `electride_data.db`)
-- `--dft-stability`: DFT stability JSON (default: `./VASP_JOBS/dft_stability_results.json`)
+- `--prescreening`: MatterSim stability JSON (default: `./VASP_JOBS/prescreening_stability.json`)
+- `--workers`: Number of parallel workers (default: CPU count)
+
+**filter_comb_db.py**:
+- `--min-energy`: Minimum for max(e0025, e05, e10) in Å³ (default: 20)
+- `--min-band`: Minimum for max(band0, band1) in Å³ (default: 20)
+- `--output`: Output database (default: `electride_candidates.db`)
+- `--output-csv`: Output CSV (default: `electride_candidates.csv`)
 
 ### Understanding Results
 
-The analysis generates a **CSV file** with columns:
+**Initial Analysis** (`electride_analysis.csv`):
 ```
 formula,composition,e0025,e05,e10,band0,band1,spacegroup,e_above_hull
 Li10B1N4_s001,Li10B1N4,32.62,31.82,31.31,35.11,0.00,166,0.023
-Li10B1N4_s004,Li10B1N4,0.00,0.00,0.00,33.28,0.00,139,0.045
+Li10B1N4_s002,Li10B1N4,15.23,12.45,18.67,22.34,0.00,139,0.045
+Li10B1N4_s003,Li10B1N4,0.00,0.00,0.00,5.28,0.00,12,0.068
 ```
 
-**New columns** (v2.0):
+**Columns**:
+- `formula`: Structure ID
 - `composition`: Chemical formula
-- `spacegroup`: Space group number from PyXtal (1 = P1 fallback)
-- `e_above_hull`: DFT energy above hull (eV/atom) from VASP calculations
+- `e0025, e05, e10`: Interstitial volumes (Å³) from energy windows
+- `band0, band1`: Interstitial volumes (Å³) from band-specific charges
+- `spacegroup`: PyXtal space group (1 = P1 fallback)
+- `e_above_hull`: MatterSim energy above hull (eV/atom)
+
+**Electride Criteria**:
+- `(e0025 > 0 OR e05 > 0) AND (e10 > 0 OR band0 > 0)`
+
+**Filtered Candidates** (`electride_candidates.csv`):
+```
+formula,composition,e0025,e05,e10,band0,band1,spacegroup,e_above_hull
+Li10B1N4_s001,Li10B1N4,32.62,31.82,31.31,35.11,0.00,166,0.023
+Li10B1N4_s002,Li10B1N4,15.23,12.45,18.67,22.34,0.00,139,0.045
+```
+
+**Additional Filtering**:
+- `max(e0025, e05, e10) >= 20 Å³` (substantial energy window volume)
+- `max(band0, band1) >= 20 Å³` (substantial band-specific volume)
+- Duplicates removed
+- Space group from PyXtal symmetry analysis
 
 **Interpreting volumes** (in Å³):
-- **> 0**: Interstitial electrons detected (potential electride)
-- **All of e0025, e05, e10, band0 > 0**: Valid electride (new criteria)
-- **High values across multiple columns**: Strong electride character
-- **Only some non-zero**: Does not meet electride criteria
+- **> 20**: High-quality electride (passes filtering)
+- **0-20**: Weak electride (filtered out by default)
+- **High across multiple columns**: Strong, robust electride character
 
-**Example cases**:
-- `Li10B1N4_s001`: **Valid electride** (all required volumes > 0, stable at 0.023 eV/atom)
-- `Li10B1N4_s004`: Not electride (e0025, e05, e10 = 0, fails criteria)
+**Example interpretation**:
+- `Li10B1N4_s001`: **High-quality electride** (all volumes > 20 Å³, stable)
+- `Li10B1N4_s002`: **Moderate electride** (volumes > 12 Å³, borderline)
+- `Li10B1N4_s003`: **Not electride** (very low volumes)
 
 **Sorting**:
-- Results sorted by `e_above_hull` (low → high)
-- Most thermodynamically stable electrides appear first
+- Both CSVs sorted by `e_above_hull` (low → high)
+- Most thermodynamically stable candidates appear first
 
 Console output during analysis:
 ```
-Analyzing: Li10B1N4_s001 (VASP_JOBS/Li10B1N4/Li10B1N4_s001/ELF)
+Total ELF_DONE: 100
+  Semiconductors (with PARCHG): 15
+  Metals (ELFCAR only): 85
+  (All structures analyzed with PARCHG in SPE workflow)
+
+Analyzing: Li10B1N4_s001 (VASP_JOBS/Li10B1N4/Li10B1N4_s001/SPE)
   Spacegroup: 166
   *** ELECTRIDE CANDIDATE *** (e0025=32.62, e05=31.82, e10=31.31, band0=35.11, band1=0.00)
-  Saved to database: Li10B1N4_s001
 
-Analyzing: Li10B1N4_s003 (VASP_JOBS/Li10B1N4/Li10B1N4_s003/ELF)
+Analyzing: Li10B1N4_s003 (VASP_JOBS/Li10B1N4/Li10B1N4_s003/SPE)
   Spacegroup: 139
-  Not electride (criteria: e0025 AND e05 AND e10 AND band0 > 0)
+  Not electride (e0025=0.00, e05=0.00, e10=0.00, band0=5.28, band1=0.00)
+```
+
+Filter output:
+```
+======================================================================
+Filtering Electride Database with Stricter Criteria
+======================================================================
+Criteria:
+  max(e0025, e05, e10) >= 20.0 Å³
+  max(band0, band1) >= 20.0 Å³
+
+Processing structures...
+  Added 100 structures...
+  Using P1 fallback for Ba8S7_s024
+  Added 200 structures...
+
+Filtering Summary:
+  Input structures: 6134
+  Filtered out (below thresholds): 4512
+  Duplicates removed: 89
+  Failed to process: 0
+  Added to output database: 1533
 ```
 
 ### Incremental Analysis Workflow
@@ -624,56 +804,103 @@ Analyzing: Li10B1N4_s003 (VASP_JOBS/Li10B1N4/Li10B1N4_s003/ELF)
 ```bash
 # Day 1: 50 ELF calculations done
 bash submit_analysis.sh
-# Output: 50 structures analyzed → electride_analysis.csv, electride_data.db
+# Output: 50 structures analyzed
+#   → electride_analysis.csv (50 structures)
+#   → electride_data.db (50 structures)
+
+# Filter to get high-quality candidates
+python3 filter_comb_db.py --input electride_data.db --csv electride_analysis.csv
+# Output: electride_candidates.db (e.g., 25 high-quality)
+#         electride_candidates.csv
 
 # Day 2: 30 more ELF calculations done (total 80)
 bash submit_analysis.sh
 # Output: Only 30 new analyzed (skips existing 50)
-#         → electride_analysis.csv updated (80 total, re-sorted)
-#         → electride_data.db updated (80 total)
+#   → electride_analysis.csv updated (80 total, re-sorted)
+#   → electride_data.db updated (80 total)
+
+# Re-filter with updated data
+python3 filter_comb_db.py --input electride_data.db --csv electride_analysis.csv
+# Output: electride_candidates.db (e.g., 40 high-quality)
 
 # Day 3: 20 more ELF calculations done (total 100)
 bash submit_analysis.sh
 # Output: Only 20 new analyzed
-#         → Final results with 100 structures, sorted by stability
+#   → Final electride_analysis.csv (100 structures)
+
+# Final filtering
+python3 filter_comb_db.py --input electride_data.db --csv electride_analysis.csv
+# Output: Final electride_candidates.db (e.g., 50 high-quality)
+
+# Extract CIF files for candidates
+python3 extract_electride_struct.py \
+  --db electride_candidates.db \
+  --output-dir electride_CIF
 ```
+
+**Benefits**:
+- Incremental analysis saves time (only analyzes new structures)
+- Filtering is fast (~2 min) and can be adjusted without re-running Bader
+- Database is query-able at any stage
 
 ### Direct Analysis (Advanced)
 
 The analysis uses `Electride.py` internally via `analyze.py`. For manual testing:
 
 ```bash
-# Test on single structure
-cd VASP_JOBS/Li10B1N4/Li10B1N4_s001/ELF
+# Test on single structure (SPE workflow)
+cd VASP_JOBS/Li10B1N4/Li10B1N4_s001/SPE
 python3 ../../../../Electride.py . --bader-exe ~/apps/Bader/bader
 
-# Run with all options
+# Run full analysis with all options
 python3 analyze.py \
   --db VASP_JOBS/workflow.json \
   --bader-exe ~/apps/Bader/bader \
   --threshold 0.6 \
   --output electride_analysis.csv \
   --pyxtal-db electride_data.db \
-  --dft-stability VASP_JOBS/dft_stability_results.json
+  --prescreening VASP_JOBS/prescreening_stability.json \
+  --workers 32
+
+# Filter high-quality candidates
+python3 filter_comb_db.py \
+  --input electride_data.db \
+  --csv electride_analysis.csv \
+  --min-energy 20 \
+  --min-band 20
 ```
 
-**Note**: The analysis requires:
-- ELFCAR file (generated by VASP with `LELF=True`)
-- PARCHG files (5 types, automatically copied to ELF directory by workflow)
+**Requirements**:
+- ELFCAR file (generated by VASP with `LELF=True` in SPE/)
+- PARCHG.tar.gz (5 files compressed, automatically extracted during analysis)
 - Bader executable (download from: https://theory.cm.utexas.edu/henkelman/code/bader/)
-- (Optional) `dft_stability_results.json` for e_above_hull values
+- (Optional) `prescreening_stability.json` for MatterSim e_above_hull values
 
 ### Output Files
 
-1. **`electride_analysis.csv`**: Main results table sorted by stability
-2. **`electride_data.db`**: PyXtal database with symmetrized structures
-3. **`electride_analysis_detailed.log`**: Full console output from analysis run
+**Initial Analysis**:
+1. **`electride_analysis.csv`**: All analyzed structures with volumes
+2. **`electride_data.db`**: PyXtal database with all structures
+3. **`electride_analysis_detailed.log`**: Full console output
+
+**Filtered Candidates**:
+1. **`electride_candidates.csv`**: High-quality candidates (CSV table)
+2. **`electride_candidates.db`**: PyXtal database with filtered structures + volumes
+3. **`electride_CIF/`**: Directory with CIF files for candidates
 
 ### Performance
 
+**Analysis** (`analyze.py`):
 - **Incremental mode**: Only analyzes new structures (minutes for 30 new structures)
 - **Full analysis**: ~5-10 minutes per structure (PARCHG extraction + Bader analysis)
 - **Database saves**: ~1 second per structure (with adaptive tolerance)
+- **Parallel processing**: Scales with CPU cores (32 cores recommended)
+
+**Filtering** (`filter_comb_db.py`):
+- **Time**: ~2 minutes for 6000 structures
+- **PyXtal symmetry**: ~0.02 sec per structure (vs AFLOW: ~0.45 sec)
+- **Speedup**: 14× faster than AFLOW-based workflow
+- **Duplicate removal**: Automatic during processing
 
 ---
 
@@ -1023,9 +1250,9 @@ python workflow_manager.py \
   - **Large datasets**: Use `submit_parallel_prescreen.sh` to split across multiple GPUs
   - **GPU memory**: Set `export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` in SLURM script
 - **VASP Workflow**:
-  - `--max-concurrent`: 10-20 for typical HPC cluster
-  - `--check-interval`: 60s is good balance
-  - `--max-compositions`: Omit to process all
+- `--max-concurrent`: 10-20 for typical HPC cluster
+- `--check-interval`: 60s is good balance
+- `--max-compositions`: Omit to process all
   - **PyXtal**: Structures automatically symmetrized for better convergence
 
 ### SLURM Settings
@@ -1100,13 +1327,15 @@ python analyze_completed.py \
 
 **VASP calculations**:
 - **Relax**: 2-6 hours
-- **SC**: 1-3 hours  
-- **PARCHG** (all materials): 5 × 30-60 min (parallel) = ~1 hour total
-- **ELF**: 1-2 hours
-- **Total VASP time**: 6-13 hours/structure
+- **SPE job** (SC + PARCHG + ELF sequential): 5-10 hours
+  - SC: 1-3 hours
+  - PARCHG (5 sequential): 2.5-5 hours (5 × 30-60 min)
+  - ELF: 1-2 hours
+- **Total VASP time**: 7-16 hours/structure
+- **SLURM overhead**: Reduced by 75% (2 jobs instead of 8 jobs per structure)
 
 **With pre-screening** (filters ~60% structures):
-- **Effective time**: 2-5 hours/structure (accounting for filtered structures)
+- **Effective time**: 3-6 hours/structure (accounting for filtered structures)
 - **Savings**: 40-60% of total VASP computation time
 
 ### Example Workflow (100 structures, max_concurrent=10, with pre-screening)
@@ -1116,15 +1345,15 @@ python analyze_completed.py \
 | T=0 | Pre-screen 100 structures | 0 | 0 | MatterSim + MP |
 | T=1h | Pre-screening done | 0 | 0 | 60 pass, 40 filtered out |
 | T=1h | Submit first 10 Relax jobs | 10 | 0 | Only stable structures |
-| T=5h | 10 Relax done, submit 10 SC | 10 | 0 | |
-| T=7h | 10 SC done, 5 semiconductors | 10 | 0 | 5 → PARCHG, 5 → ELF |
-| T=8h | PARCHG+ELF done, submit new | 10 | 10 | |
+| T=5h | 10 Relax done, submit 10 SPE | 10 | 0 | SPE = SC+PARCHG+ELF |
+| T=13h | 10 SPE done, submit new | 10 | 10 | ~8h per SPE job |
 | ... | Repeat | 10 | ... | |
-| T=35h | All 60 complete | 0 | 60 | 40 filtered by pre-screening |
+| T=53h | All 60 complete | 0 | 60 | 40 filtered by pre-screening |
 
-**Wall time**: ~35 hours for 100 structures (60 pass pre-screening)  
-**Core-hours**: ~18,000 (60 structures × 9h avg × 32 cores / 2 efficiency)  
-**Savings**: ~50% compared to running all 100 structures without pre-screening
+**Wall time**: ~53 hours for 100 structures (60 pass pre-screening)  
+**Core-hours**: ~24,000 (60 structures × 12.5h avg × 32 cores / 2 efficiency)  
+**SLURM jobs**: 120 total (vs 480 with old workflow)  
+**Savings**: 40-60% computational time from pre-screening, 75% fewer SLURM jobs
 
 ---
 
@@ -1428,13 +1657,26 @@ tail -f workflow_manager_*.out
 | `analyze.sh` | SLURM script for analysis job |
 | `Electride.py` | Bader analysis on ELFCAR + PARCHG files |
 | `submit_analysis.sh` | Submit analysis wrapper (user-facing) |
+| `filter_comb_db.py` | **NEW**: Filter candidates with stricter volume criteria + PyXtal symmetry |
+| `extract_electride_struct.py` | Extract CIF files from filtered database |
+| `generate_parchg_incars.py` | Helper script to generate PARCHG INCARs from vasprun.xml-SC |
 
 **Key Features**:
+- **Unified SPE workflow**: SC-PARCHG-ELF run sequentially in one SLURM job (2 jobs per structure vs 8)
+- **Simplified directory structure**: Relax/ and SPE/ subdirectories (vs 7+ subdirectories)
+- **Stage markers**: SC_DONE, PARCHG_DONE, ELF_DONE, VASP_DONE track progress within SPE job
+- **Reduced SLURM overhead**: 75% fewer jobs submitted to queue
+- **Clean code separation**: Python for VASP inputs, bash for workflow orchestration
+- **Helper script for PARCHG**: Standalone script generates PARCHG INCARs (band indices from vasprun.xml-SC)
+- **ISYM=0**: VASP internal symmetrization disabled (PyXtal already applied during relaxation)
 - **Batch processing**: `prescreen.py` reuses MatterSimCalculator across structures (3-5× faster)
 - **Parallel prescreening**: `submit_parallel_prescreen.sh` splits across GPU nodes (linear speedup)
 - **Stable phases only**: Queries only on-hull MP phases (10-20× faster queries)
 - **Single cache files**: `mp_mattersim.json` and `mp_vaspdft.json` in `VASP_JOBS/` directory
 - **PyXtal symmetrization**: Automatic structure symmetrization in both prescreening and VASP workflow
+- **Two-step electride filtering**: Initial analysis saves all data, stricter filtering for high-quality candidates
+- **Fast symmetry analysis**: PyXtal-based filtering (14× faster than AFLOW)
+- **Query-able database**: `ase db` commands for filtering candidates by stability, symmetry, or volumes
 - **PDEntry for hulls**: Uses `PDEntry` instead of `ComputedEntry` for accurate phase diagram analysis
 - `reset_failed_jobs.py` resets failed VASP jobs to retry them without data loss
 - **Integrated hull validation**: `compute_dft_e_hull.py` automatically validates pre-screening accuracy with plots and statistics
@@ -1512,6 +1754,25 @@ bash run_workflow.sh \
   --max-concurrent 10 \
   --max-structures 0 \
   --check-interval 120
+
+# Step 3: Analyze electride candidates
+bash submit_analysis.sh --vasp-jobs ./VASP_JOBS
+
+# Step 4: Filter high-quality candidates
+python3 filter_comb_db.py \
+  --input electride_data.db \
+  --csv electride_analysis.csv \
+  --min-energy 20 \
+  --min-band 20
+
+# Step 5: Extract CIF files
+python3 extract_electride_struct.py \
+  --db electride_candidates.db \
+  --output-dir electride_CIF
+
+# Step 6: Query and explore
+ase db electride_candidates.db
+ase db electride_candidates.db 'e_above_hull<0.05' -s space_group_number-
 ```
 
 ### Resume After Interruption
@@ -1563,6 +1824,19 @@ bash run_workflow.sh \
 # 5. Monitor and analyze
 python workflow_status.py ./VASP_JOBS/workflow.json --compositions
 bash submit_analysis.sh --vasp-jobs ./VASP_JOBS
+
+# 6. Filter high-quality candidates
+python3 filter_comb_db.py \
+  --input electride_data.db \
+  --csv electride_analysis.csv
+
+# 7. Extract CIF files
+python3 extract_electride_struct.py \
+  --db electride_candidates.db \
+  --output-dir electride_CIF
+
+# 8. Query candidates
+ase db electride_candidates.db 'e_above_hull<0.05'
 ```
 
 ---
