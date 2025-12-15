@@ -39,6 +39,8 @@ except ImportError:
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib.colors import LinearSegmentedColormap
+from scipy.stats import gaussian_kde
 
 # Use non-interactive backend for cluster
 mpl.use('Agg')
@@ -53,6 +55,10 @@ def get_vasp_energy_from_relax(relax_dir):
     """
     Extract final energy from VASP relaxation.
     
+    Tries multiple sources in order:
+    1. vasprun.xml (preferred, has structure)
+    2. OUTCAR (fallback if vasprun.xml missing/corrupted) + CONTCAR for structure
+    
     Checks electronic convergence before returning energy (same as workflow_manager.py).
     If electronic SCF is not converged, returns (None, None).
     
@@ -62,29 +68,78 @@ def get_vasp_energy_from_relax(relax_dir):
     Returns:
         tuple: (energy_per_atom, structure) or (None, None) if failed/not converged
     """
-    vasprun_path = Path(relax_dir) / 'vasprun.xml'
+    relax_dir = Path(relax_dir)
+    vasprun_path = relax_dir / 'vasprun.xml'
+    outcar_path = relax_dir / 'OUTCAR'
+    contcar_path = relax_dir / 'CONTCAR'
     
-    if not vasprun_path.exists():
-        return None, None
+    if vasprun_path.exists():
+        try:
+            vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
+            
+            # Check electronic convergence
+            if not vr.converged_electronic:
+                print(f"    Warning: VASP electronic SCF not converged (from vasprun.xml)")
+                return None, None
+            
+            final_energy = vr.final_energy  # Total energy in eV
+            structure = vr.final_structure
+            n_atoms = len(structure)
+            energy_per_atom = final_energy / n_atoms
+            
+            return energy_per_atom, structure
+            
+        except Exception as e:
+            print(f"    Warning: Could not parse vasprun.xml: {e}")
+            print(f"    Trying OUTCAR fallback...")
     
-    try:
-        vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-        
-        # Check electronic convergence (same as workflow_manager.py)
-        if not vr.converged_electronic:
-            print(f"    Warning: VASP electronic SCF not converged")
+    # Fallback: Try OUTCAR + CONTCAR
+    if outcar_path.exists():
+        try:
+            electronic_converged = False
+            with open(outcar_path, 'r') as f:
+                outcar_content = f.read()
+                if 'aborting loop because EDIFF is reached' in outcar_content:
+                    electronic_converged = True
+            
+            if not electronic_converged:
+                print(f"    Warning: VASP electronic SCF not converged (from OUTCAR)")
+                return None, None
+            
+            # Extract final energy from OUTCAR
+            final_energy = None
+            with open(outcar_path, 'r') as f:
+                for line in f:
+                    if 'free energy    TOTEN' in line:
+                        try:
+                            parts = line.split('=')
+                            if len(parts) >= 2:
+                                energy_str = parts[1].split()[0]
+                                final_energy = float(energy_str)
+                        except (ValueError, IndexError):
+                            continue
+            
+            if final_energy is None:
+                print(f"    Warning: Could not extract energy from OUTCAR")
+                return None, None
+            
+            if not contcar_path.exists():
+                print(f"    Warning: CONTCAR not found, cannot get structure")
+                return None, None
+            
+            from pymatgen.core import Structure
+            structure = Structure.from_file(str(contcar_path))
+            n_atoms = len(structure)
+            energy_per_atom = final_energy / n_atoms
+            
+            print(f"    Energy extracted from OUTCAR (vasprun.xml not available)")
+            return energy_per_atom, structure
+            
+        except Exception as e:
+            print(f"    Error parsing OUTCAR: {e}")
             return None, None
-        
-        final_energy = vr.final_energy  # Total energy in eV
-        structure = vr.final_structure
-        n_atoms = len(structure)
-        energy_per_atom = final_energy / n_atoms
-        
-        return energy_per_atom, structure
-        
-    except Exception as e:
-        print(f"    Error parsing vasprun.xml: {e}")
-        return None, None
+    print(f"    Error: Neither vasprun.xml nor OUTCAR found/readable")
+    return None, None
 
 
 def save_dft_cache(new_entries_data, dft_cache_file):
@@ -358,8 +413,68 @@ def get_mp_stable_phases_dft(chemsys, mp_api_key, dft_cache_file, pure_pbe=False
             if elements_found != expected_elements:
                 missing = expected_elements - elements_found
                 print(f"    WARNING: Missing terminal phases for elements: {sorted(missing)}")
-                print(f"    This may cause 'Missing terminal entries' error in phase diagram construction")
-                print(f"    Elements found: {sorted(elements_found)}")
+                print(f"    Querying elemental phases directly with GGA filter...")
+                
+                for missing_elem in sorted(missing):
+                    try:
+                        print(f"      Querying {missing_elem} elemental phases...")
+                        elem_docs = mpr.materials.summary.search(
+                            elements=[missing_elem],
+                            num_elements=(1, 1),
+                            fields=['material_id', 'structure', 'energy_per_atom']
+                        )
+                        
+                        if not elem_docs:
+                            print(f"        ERROR: No phases found for {missing_elem}")
+                            continue
+                        
+                        gga_docs = []
+                        for doc in elem_docs:
+                            mp_id = doc.material_id
+                            if '-r2SCAN' in mp_id or '-SCAN' in mp_id or '_r2SCAN' in mp_id or '_SCAN' in mp_id:
+                                continue
+                            gga_docs.append(doc)
+                        
+                        if gga_docs:
+                            elem_doc = sorted(gga_docs, key=lambda d: d.energy_per_atom)[0]
+                            elem_entries = mpr.get_entries(elem_doc.material_id)
+                            gga_elem_entries = []
+                            for e in elem_entries:
+                                eid = e.entry_id
+                                if '-r2SCAN' not in eid and '_r2SCAN' not in eid and '-SCAN' not in eid and '_SCAN' not in eid:
+                                    gga_elem_entries.append(e)
+                            
+                            if gga_elem_entries:
+                                elem_entry = sorted(gga_elem_entries, key=lambda e: e.energy_per_atom)[0]
+                                try:
+                                    uncorrected_energy = elem_entry.uncorrected_energy
+                                except AttributeError:
+                                    uncorrected_energy = elem_entry.energy
+                                
+                                composition = elem_entry.composition
+                                entry = PDEntry(
+                                    composition=composition,
+                                    energy=uncorrected_energy,
+                                    name=elem_entry.entry_id
+                                )
+                                entries.append(entry)
+                                doc_elements = sorted([str(el) for el in composition.elements])
+                                doc_chemsys = '-'.join(doc_elements)
+                                new_entries_data.append({
+                                    'chemsys': doc_chemsys,
+                                    'composition': {str(el): float(amt) for el, amt in composition.items()},
+                                    'energy': uncorrected_energy,
+                                    'entry_id': elem_entry.entry_id,
+                                    'mp_id': elem_doc.material_id
+                                })
+                                elements_found.add(missing_elem)
+                                print(f"        Found {elem_entry.entry_id} (E={elem_entry.energy_per_atom:.4f} eV/atom)")
+                            else:
+                                print(f"        ERROR: No GGA entries found for {missing_elem}")
+                        else:
+                            print(f"        ERROR: No GGA phases found for {missing_elem}")
+                    except Exception as e:
+                        print(f"        ERROR querying {missing_elem}: {e}")
             else:
                 print(f"      All terminal phases present: {sorted(elements_found)}")
             
@@ -443,17 +558,21 @@ def load_mattersim_results(prescreen_json):
     return mattersim_lookup
 
 
-def match_and_analyze_hulls(dft_results, mattersim_lookup, threshold=0.1):
+def match_and_analyze_hulls(dft_results, mattersim_lookup, threshold=0.1, outlier_threshold=0.5):
     """
     Match DFT and MatterSim hull results and compute statistics.
+    
+    Filters outliers (structures with unreasonably high DFT energy_above_hull) using
+    absolute threshold to avoid skewing statistics and plots with failed/unreasonable structures.
     
     Args:
         dft_results: List of DFT result dicts
         mattersim_lookup: Dict from load_mattersim_results
         threshold: E_hull threshold for stability (eV/atom)
+        outlier_threshold: Absolute DFT E_hull threshold for outlier detection (eV/atom, default: 0.5)
     
     Returns:
-        dict: Statistics and matched structure data
+        dict: Statistics and matched structure data (outliers filtered)
     """
     matched = []
     
@@ -478,10 +597,28 @@ def match_and_analyze_hulls(dft_results, mattersim_lookup, threshold=0.1):
     if not matched:
         return None
     
-    # Calculate statistics
-    mattersim_vals = np.array([d['mattersim_e_hull'] for d in matched])
-    dft_vals = np.array([d['dft_e_hull'] for d in matched])
-    passed = np.array([d['passed_prescreen'] for d in matched])
+    # Filter outliers using absolute threshold on DFT energy_above_hull
+    matched_filtered = []
+    skipped_outliers = []
+    
+    for entry in matched:
+        dft_e = entry['dft_e_hull']
+        
+        # Only use absolute threshold (structures passed prescreening should be near threshold)
+        if dft_e > outlier_threshold:
+            skipped_outliers.append(entry)
+        else:
+            matched_filtered.append(entry)
+    
+    if skipped_outliers:
+        print(f"\n  Filtered {len(skipped_outliers)} outliers for hull comparison "
+              f"(DFT E_hull > {outlier_threshold:.1f} eV/atom)")
+        print(f"  Analyzing {len(matched_filtered)} structures after filtering")
+    
+    # Calculate statistics on filtered data
+    mattersim_vals = np.array([d['mattersim_e_hull'] for d in matched_filtered])
+    dft_vals = np.array([d['dft_e_hull'] for d in matched_filtered])
+    passed = np.array([d['passed_prescreen'] for d in matched_filtered])
     
     # Correlation and error metrics
     correlation = np.corrcoef(mattersim_vals, dft_vals)[0, 1]
@@ -500,16 +637,21 @@ def match_and_analyze_hulls(dft_results, mattersim_lookup, threshold=0.1):
     recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
     f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
     
-    # Computational savings
+    # Computational savings (based on original matched count before outlier filtering)
     total = len(matched)
+    total_filtered = len(matched_filtered)
     passed_count = true_positives + false_positives
-    filtered_count = total - passed_count
-    savings = filtered_count / total if total > 0 else 0
+    filtered_count = total_filtered - passed_count
+    savings = filtered_count / total_filtered if total_filtered > 0 else 0
     
     return {
-        'matched_structures': matched,
+        'matched_structures': matched_filtered,
+        'skipped_outliers': skipped_outliers,
         'statistics': {
             'total_matched': total,
+            'total_analyzed': total_filtered,
+            'n_outliers_filtered': len(skipped_outliers),
+            'outlier_threshold': outlier_threshold,
             'threshold': threshold,
             'correlation': correlation,
             'mae': mae,
@@ -545,26 +687,39 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
     # ===== Scatter Plot =====
     fig, ax = plt.subplots(figsize=(12, 10))
     
-    # Color by passed/filtered
-    passed = np.array([d['passed_prescreen'] for d in matched])
-    colors = np.where(passed, 'steelblue', 'lightcoral')
-    labels = ['Passed prescreening' if p else 'Filtered' for p in passed]
+    # Calculate point density for color mapping
+    x = dft_vals
+    y = mattersim_vals
+    xy = np.vstack([x, y])
+    z = gaussian_kde(xy)(xy)
     
-    # Plot with different colors
-    for pass_val, color, label in [(True, 'steelblue', 'Passed prescreening'), 
-                                     (False, 'lightcoral', 'Filtered')]:
-        mask = passed == pass_val
-        if np.any(mask):
-            ax.scatter(dft_vals[mask], mattersim_vals[mask], 
-                      alpha=0.6, s=50, c=color, edgecolors='black', 
-                      linewidth=0.5, label=label)
+    # Scale z to represent actual number of data points
+    z = z * len(x)
     
-    # Perfect agreement line
+    # Create custom colormap
+    colors_list = ['cyan', 'dodgerblue', 'black']
+    n_bins = 100
+    cmap = LinearSegmentedColormap.from_list("density", colors_list, N=n_bins)
+    
+    # Sort points by density so densest are plotted last
+    idx = z.argsort()
+    x_sorted, y_sorted, z_sorted = x[idx], y[idx], z[idx]
+    
+    # Determine plot range
     all_vals = np.concatenate([mattersim_vals, dft_vals])
     val_min, val_max = max(0, all_vals.min()), all_vals.max()
     margin = (val_max - val_min) * 0.05
     plot_min, plot_max = val_min - margin, val_max + margin
     
+    # Create scatter plot with density-based coloring
+    scatter = ax.scatter(x_sorted, y_sorted, c=z_sorted, cmap=cmap, 
+                        norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                        edgecolors='none')
+    
+    # Add colorbar
+    cbar = plt.colorbar(scatter, ax=ax, label='Point Density')
+    
+    # Perfect agreement line
     ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--', 
             linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
     
@@ -577,19 +732,26 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
     # Labels and title
     ax.set_xlabel('VASP DFT E_above_hull (eV/atom)', fontsize=12, fontweight='bold')
     ax.set_ylabel('MatterSim E_above_hull (eV/atom)', fontsize=12, fontweight='bold')
-    ax.set_title(f'MatterSim vs VASP DFT Hull Energy Comparison\n'
-                 f'(N={stats["total_matched"]}, R={stats["correlation"]:.3f})',
-                 fontsize=14, fontweight='bold')
+    
+    n_outliers = stats.get('n_outliers_filtered', 0)
+    title_text = 'MatterSim vs VASP DFT Hull Energy Comparison\n'
+    title_text += f'(N={stats["total_analyzed"]}'
+    if n_outliers > 0:
+        title_text += f', {n_outliers} outliers excluded'
+    title_text += ')'
+    ax.set_title(title_text, fontsize=14, fontweight='bold')
     
     # Statistics text box
     stats_text = (
-        f"N = {stats['total_matched']}\n"
+        f"N = {stats['total_analyzed']}\n"
         f"R = {stats['correlation']:.4f}\n"
         f"MAE = {stats['mae']:.4f} eV/atom\n"
         f"RMSE = {stats['rmse']:.4f} eV/atom\n"
         f"Precision = {stats['precision']:.2%}\n"
         f"Recall = {stats['recall']:.2%}"
     )
+    if n_outliers > 0:
+        stats_text += f"\n(Outliers: {n_outliers})"
     ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=10,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
@@ -615,14 +777,28 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
     
     residuals = mattersim_vals - dft_vals
     
-    # Plot with colors
-    for pass_val, color, label in [(True, 'steelblue', 'Passed prescreening'), 
-                                     (False, 'lightcoral', 'Filtered')]:
-        mask = passed == pass_val
-        if np.any(mask):
-            ax.scatter(dft_vals[mask], residuals[mask], 
-                      alpha=0.6, s=50, c=color, edgecolors='black', 
-                      linewidth=0.5, label=label)
+    # Calculate point density for color mapping
+    x_res = dft_vals
+    y_res = residuals
+    xy_res = np.vstack([x_res, y_res])
+    z_res = gaussian_kde(xy_res)(xy_res)
+    z_res = z_res * len(x_res)
+    
+    # Create custom colormap
+    colors_list_res = ['lime', 'forestgreen', 'black']
+    cmap_res = LinearSegmentedColormap.from_list("density_residual", colors_list_res, N=100)
+    
+    # Sort points by density
+    idx_res = z_res.argsort()
+    x_res_sorted, y_res_sorted, z_res_sorted = x_res[idx_res], y_res[idx_res], z_res[idx_res]
+    
+    # Create scatter plot with density-based coloring
+    scatter_res = ax.scatter(x_res_sorted, y_res_sorted, c=z_res_sorted, cmap=cmap_res, 
+                            norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                            edgecolors='none')
+    
+    # Add colorbar
+    cbar_res = plt.colorbar(scatter_res, ax=ax, label='Point Density')
     
     # Reference lines
     ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7, 
@@ -641,8 +817,13 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
     # Labels and title
     ax.set_xlabel('VASP DFT E_above_hull (eV/atom)', fontsize=12, fontweight='bold')
     ax.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=12, fontweight='bold')
-    ax.set_title(f'Hull Energy Residuals vs VASP DFT\n(N={stats["total_matched"]})',
-                 fontsize=14, fontweight='bold')
+    
+    n_outliers = stats.get('n_outliers_filtered', 0)
+    title_text = f'Hull Energy Residuals vs VASP DFT\n(N={stats["total_analyzed"]}'
+    if n_outliers > 0:
+        title_text += f', {n_outliers} outliers excluded'
+    title_text += ')'
+    ax.set_title(title_text, fontsize=14, fontweight='bold')
     
     # Set Y-axis range
     residual_range = max(abs(residuals.min()), abs(residuals.max()))
@@ -670,6 +851,12 @@ def print_hull_comparison_summary(hull_data):
     print("MatterSim vs VASP DFT Hull Energy Comparison")
     print("="*70)
     print(f"Matched structures: {stats['total_matched']}")
+    
+    n_outliers = stats.get('n_outliers_filtered', 0)
+    if n_outliers > 0:
+        print(f"Outliers filtered: {n_outliers} (E_hull > {stats.get('outlier_threshold', 2.0):.1f} eV/atom)")
+        print(f"Structures analyzed: {stats['total_analyzed']}")
+    
     print(f"\nCorrelation & Error:")
     print(f"  Pearson correlation: {stats['correlation']:.4f}")
     print(f"  Mean Absolute Error: {stats['mae']:.4f} eV/atom")
@@ -687,8 +874,8 @@ def print_hull_comparison_summary(hull_data):
     print(f"  F1 Score:  {stats['f1_score']:.4f}")
     
     print(f"\nComputational Savings:")
-    print(f"  Total structures: {stats['total_matched']}")
-    print(f"  Passed pre-screening: {stats['passed_count']} ({stats['passed_count']/stats['total_matched']:.1%})")
+    print(f"  Total structures: {stats['total_analyzed']}")
+    print(f"  Passed pre-screening: {stats['passed_count']} ({stats['passed_count']/stats['total_analyzed']:.1%})")
     print(f"  Filtered: {stats['filtered_count']} ({stats['computational_savings']:.1%} VASP computations saved)")
     
     if stats['false_negatives'] > 0:
@@ -743,6 +930,13 @@ def main():
         type=float,
         default=0.1,
         help="E_hull threshold for stability analysis (eV/atom, default: 0.1)"
+    )
+    parser.add_argument(
+        '--outlier-threshold',
+        type=float,
+        default=0.5,
+        help="E_hull outlier threshold for plot filtering (eV/atom, default: 0.5). "
+             "Structures with E_hull above this are excluded from comparison plots to avoid skewing."
     )
     parser.add_argument(
         '--mattersim-cache',
@@ -903,8 +1097,8 @@ def main():
         
         state = sdata['state']
         
-        # Consider RELAX_DONE and any downstream states as having completed relax
-        completed_states = ['RELAX_DONE', 'SC_RUNNING', 'SC_DONE', 'SC_FAILED',
+        # Check if VASP relaxation completed
+        completed_states = ['RELAX_DONE', 'RELAX_TMOUT', 'SC_RUNNING', 'SC_DONE',
                           'PARCHG_RUNNING', 'PARCHG_DONE', 'PARCHG_FAILED', 'PARCHG_SKIPPED',
                           'ELF_RUNNING', 'ELF_DONE', 'ELF_FAILED']
         
@@ -1003,7 +1197,7 @@ def main():
                     'structure_id': struct_id,
                     'composition': sdata['composition'],
                     'chemsys': chemsys,
-                    'vasp_energy_per_atom': energy_per_atom,
+                    'vasp_energy_per_atom': float(energy_per_atom) if energy_per_atom is not None else None,
                     'energy_above_hull': None,
                     'is_stable': None,
                     'error': 'Phase diagram calculation failed'
@@ -1012,15 +1206,15 @@ def main():
             
             print(f"    DFT E_hull: {e_hull:.6f} eV/atom")
             
-            is_stable = e_hull < 0.001
+            is_stable = bool(e_hull < 0.001)
             processed += 1
             
             results.append({
                 'structure_id': struct_id,
                 'composition': sdata['composition'],
                 'chemsys': chemsys,
-                'vasp_energy_per_atom': energy_per_atom,
-                'energy_above_hull': e_hull,
+                'vasp_energy_per_atom': float(energy_per_atom),
+                'energy_above_hull': float(e_hull),
                 'is_stable': is_stable,
                 'error': None
             })
@@ -1073,8 +1267,13 @@ def main():
             mattersim_lookup = load_mattersim_results(prescreen_path)
             print(f"Loaded {len(mattersim_lookup)} MatterSim prescreening results")
             
-            # Match and analyze
-            hull_data = match_and_analyze_hulls(results, mattersim_lookup, threshold=args.hull_threshold)
+            # Match and analyze (with outlier filtering)
+            hull_data = match_and_analyze_hulls(
+                results, 
+                mattersim_lookup, 
+                threshold=args.hull_threshold,
+                outlier_threshold=args.outlier_threshold
+            )
             
             if hull_data:
                 # Print summary

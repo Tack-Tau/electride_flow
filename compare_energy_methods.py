@@ -26,6 +26,8 @@ from pymatgen.core import Composition
 from pymatgen.io.vasp.outputs import Vasprun, UnconvergedVASPWarning
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib.colors import LinearSegmentedColormap
+from scipy.stats import gaussian_kde
 
 mpl.use('Agg')
 
@@ -207,9 +209,16 @@ def compare_mp_phases(mattersim_cache, dft_cache):
     }
 
 
-def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir):
+def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, dft_results_json=None, outlier_threshold=0.5):
     """
     Compare generated structures: MatterSim (prescreening) vs VASP-DFT (workflow).
+    
+    Args:
+        prescreen_json: Path to prescreening_stability.json
+        workflow_json: Path to workflow.json
+        vasp_jobs_dir: Path to VASP jobs directory
+        dft_results_json: Optional path to dft_stability_results.json for E_hull-based outlier filtering
+        outlier_threshold: DFT E_hull threshold for outlier detection (eV/atom, default: 0.5)
     
     Returns:
         dict: Comparison results with statistics and matched structures
@@ -245,49 +254,102 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir):
     vasp_energies = {}
     vasp_jobs_dir = Path(vasp_jobs_dir)
     vasp_not_converged = []
-    vasp_no_vasprun = []
+    vasp_no_data = []
     
     for struct_id, sdata in workflow_data['structures'].items():
         # Check if VASP relaxation completed
-        if sdata['state'] not in ['RELAX_DONE', 'SC_RUNNING', 'SC_DONE', 'SC_FAILED',
+        if sdata['state'] not in ['RELAX_DONE', 'RELAX_TMOUT', 'SC_RUNNING', 'SC_DONE',
                                    'PARCHG_RUNNING', 'PARCHG_DONE', 'PARCHG_FAILED',
                                    'ELF_RUNNING', 'ELF_DONE', 'ELF_FAILED']:
             continue
         
         relax_dir = Path(sdata['relax_dir'])
         vasprun_path = relax_dir / 'vasprun.xml'
+        outcar_path = relax_dir / 'OUTCAR'
+        contcar_path = relax_dir / 'CONTCAR'
         
-        if not vasprun_path.exists():
-            # Track structures in workflow but no vasprun.xml yet
-            if struct_id in ms_energies:
-                vasp_no_vasprun.append(struct_id)
-            continue
+        energy_per_atom = None
+        converged = False
         
-        try:
-            vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-            
-            # Check convergence
-            if not vr.converged:
+        # Try vasprun.xml first
+        if vasprun_path.exists():
+            try:
+                vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
+                
+                if vr.converged:
+                    final_energy = vr.final_energy
+                    structure = vr.final_structure
+                    energy_per_atom = final_energy / len(structure)
+                    converged = True
+                else:
+                    if struct_id in ms_energies:
+                        vasp_not_converged.append(struct_id)
+                    continue
+                
+            except Exception:
+                pass
+        
+        # Fallback to OUTCAR if vasprun.xml failed
+        if energy_per_atom is None and outcar_path.exists():
+            try:
+                # Check electronic convergence from OUTCAR
+                electronic_converged = False
+                with open(outcar_path, 'r') as f:
+                    outcar_content = f.read()
+                    if 'aborting loop because EDIFF is reached' in outcar_content:
+                        electronic_converged = True
+                
+                if not electronic_converged:
+                    if struct_id in ms_energies:
+                        vasp_not_converged.append(struct_id)
+                    continue
+                
+                # Extract final energy from OUTCAR (last TOTEN)
+                final_energy = None
+                with open(outcar_path, 'r') as f:
+                    for line in f:
+                        if 'free energy    TOTEN' in line:
+                            try:
+                                parts = line.split('=')
+                                if len(parts) >= 2:
+                                    energy_str = parts[1].split()[0]
+                                    final_energy = float(energy_str)
+                            except (ValueError, IndexError):
+                                continue
+                
+                if final_energy is None:
+                    if struct_id in ms_energies:
+                        vasp_no_data.append(struct_id)
+                    continue
+                
+                # Get structure from CONTCAR
+                if not contcar_path.exists():
+                    if struct_id in ms_energies:
+                        vasp_no_data.append(struct_id)
+                    continue
+                
+                from pymatgen.core import Structure
+                structure = Structure.from_file(str(contcar_path))
+                n_atoms = len(structure)
+                energy_per_atom = final_energy / n_atoms
+                converged = True
+                
+            except Exception:
                 if struct_id in ms_energies:
-                    vasp_not_converged.append(struct_id)
+                    vasp_no_data.append(struct_id)
                 continue
-            
-            final_energy = vr.final_energy
-            structure = vr.final_structure
-            energy_per_atom = final_energy / len(structure)
-            
+        
+        # Store if we got valid data
+        if energy_per_atom is not None and converged:
             vasp_energies[struct_id] = {
                 'energy_per_atom': energy_per_atom,
                 'composition': sdata['composition'],
                 'chemsys': sdata.get('chemsys', ''),
                 'converged': True
             }
-            
-        except Exception as e:
-            # Track parsing errors
+        else:
             if struct_id in ms_energies:
-                vasp_no_vasprun.append(struct_id)
-            continue
+                vasp_no_data.append(struct_id)
     
     print(f"VASP-DFT: {len(vasp_energies)} converged relaxations")
     
@@ -304,8 +366,8 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir):
         print(f"  Prescreened but no VASP-DFT: {len(ms_only)}")
         if len(vasp_not_converged) > 0:
             print(f"    - Not converged: {len(vasp_not_converged)}")
-        if len(vasp_no_vasprun) > 0:
-            print(f"    - No vasprun.xml / running: {len(vasp_no_vasprun)}")
+        if len(vasp_no_data) > 0:
+            print(f"    - No data (vasprun.xml/OUTCAR missing): {len(vasp_no_data)}")
         
         coverage = len(common_ids) / len(ms_energies) * 100
         print(f"  Coverage: {coverage:.1f}% of prescreened structures have VASP-DFT energies")
@@ -344,13 +406,52 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir):
             'energy_diff': ms_e - vasp_e
         })
     
-    # Calculate statistics
-    diffs = np.array([m['energy_diff'] for m in matched])
-    ms_vals = np.array([m['mattersim_energy_per_atom'] for m in matched])
-    vasp_vals = np.array([m['vasp_energy_per_atom'] for m in matched])
+    # Load DFT E_hull data for outlier filtering (same as hull_comparison)
+    dft_e_hull_lookup = {}
+    if dft_results_json:
+        dft_results_path = Path(dft_results_json)
+        if dft_results_path.exists():
+            try:
+                with open(dft_results_path, 'r') as f:
+                    dft_data = json.load(f)
+                for result in dft_data.get('results', []):
+                    if result.get('energy_above_hull') is not None:
+                        dft_e_hull_lookup[result['structure_id']] = result['energy_above_hull']
+                print(f"\n  Loaded DFT E_hull data for {len(dft_e_hull_lookup)} structures")
+            except Exception as e:
+                print(f"\n  Warning: Could not load DFT results: {e}")
+        else:
+            print(f"\n  Warning: DFT results file not found: {dft_results_path}")
+    
+    # Filter outliers based on DFT E_hull threshold (same as hull_comparison)
+    matched_filtered = []
+    skipped_outliers = []
+    
+    for entry in matched:
+        struct_id = entry['structure_id']
+        # Filter based on DFT E_hull if available
+        if struct_id in dft_e_hull_lookup:
+            dft_e_hull = dft_e_hull_lookup[struct_id]
+            if dft_e_hull > outlier_threshold:
+                skipped_outliers.append(entry)
+                continue
+        matched_filtered.append(entry)
+    
+    if skipped_outliers:
+        print(f"  Filtered {len(skipped_outliers)} outliers for energy comparison "
+              f"(DFT E_hull > {outlier_threshold:.1f} eV/atom)")
+        print(f"  Analyzing {len(matched_filtered)} structures after filtering")
+    
+    # Calculate statistics on filtered data
+    diffs = np.array([m['energy_diff'] for m in matched_filtered])
+    ms_vals = np.array([m['mattersim_energy_per_atom'] for m in matched_filtered])
+    vasp_vals = np.array([m['vasp_energy_per_atom'] for m in matched_filtered])
     
     stats = {
-        'n_structures': len(matched),
+        'n_structures': len(matched_filtered),
+        'n_total_matched': len(matched),
+        'n_outliers_filtered': len(skipped_outliers),
+        'outlier_threshold': outlier_threshold,
         'mae': np.mean(np.abs(diffs)),
         'rmse': np.sqrt(np.mean(diffs**2)),
         'mean_diff': np.mean(diffs),
@@ -364,7 +465,8 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir):
     coverage = len(common_ids) / len(ms_energies) * 100 if len(ms_energies) > 0 else 0
     
     return {
-        'matched': matched,
+        'matched': matched_filtered,
+        'skipped_outliers': skipped_outliers,
         'statistics': stats,
         'coverage': coverage,
         'n_prescreened': len(ms_energies),
@@ -390,7 +492,7 @@ def plot_mp_phase_comparison(mp_results, output_prefix='mp_phases_comparison'):
     fig, ax = plt.subplots(figsize=(12, 10))
     
     ax.scatter(dft_per_atom, ms_per_atom, alpha=0.6, s=50, 
-              c='steelblue', edgecolors='black', linewidth=0.5)
+              c='forestgreen', edgecolors='none')
     
     # Perfect agreement line
     all_vals = np.concatenate([ms_per_atom, dft_per_atom])
@@ -438,7 +540,7 @@ def plot_mp_phase_comparison(mp_results, output_prefix='mp_phases_comparison'):
     residuals = ms_per_atom - dft_per_atom
     
     ax.scatter(dft_per_atom, residuals, alpha=0.6, s=50,
-              c='steelblue', edgecolors='black', linewidth=0.5)
+              c='forestgreen', edgecolors='none')
     
     ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
               label='Zero residual')
@@ -477,23 +579,53 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
     # Scatter plot
     fig, ax = plt.subplots(figsize=(12, 10))
     
-    ax.scatter(vasp_vals, ms_vals, alpha=0.6, s=50,
-              c='forestgreen', edgecolors='black', linewidth=0.5)
+    # Calculate point density for color mapping
+    x = vasp_vals
+    y = ms_vals
+    xy = np.vstack([x, y])
+    z = gaussian_kde(xy)(xy)
     
-    # Perfect agreement line
+    # Scale z to represent actual number of data points
+    z = z * len(x)
+    
+    # Create custom colormap
+    colors_list = ['cyan', 'dodgerblue', 'black']
+    n_bins = 100
+    cmap = LinearSegmentedColormap.from_list("density", colors_list, N=n_bins)
+    
+    # Sort points by density so densest are plotted last
+    idx = z.argsort()
+    x_sorted, y_sorted, z_sorted = x[idx], y[idx], z[idx]
+    
+    # Determine plot range
     all_vals = np.concatenate([ms_vals, vasp_vals])
     val_min, val_max = all_vals.min(), all_vals.max()
     margin = (val_max - val_min) * 0.05
     plot_min, plot_max = val_min - margin, val_max + margin
     
+    # Create scatter plot with density-based coloring
+    scatter = ax.scatter(x_sorted, y_sorted, c=z_sorted, cmap=cmap, 
+                        norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                        edgecolors='none')
+    
+    # Add colorbar
+    cbar = plt.colorbar(scatter, ax=ax, label='Point Density')
+    
+    # Perfect agreement line
     ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--',
             linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
     
     # Labels
     ax.set_xlabel('VASP-DFT Energy per Atom (eV)', fontsize=12, fontweight='bold')
     ax.set_ylabel('MatterSim Energy per Atom (eV)', fontsize=12, fontweight='bold')
-    ax.set_title(f'Generated Structures: MatterSim vs VASP-DFT\n(N={stats["n_structures"]})',
-                fontsize=14, fontweight='bold')
+    
+    n_outliers = stats.get('n_outliers_filtered', 0)
+    title_text = f'Generated Structures: MatterSim vs VASP-DFT\n'
+    title_text += f'(N={stats["n_structures"]}'
+    if n_outliers > 0:
+        title_text += f', {n_outliers} outliers excluded'
+    title_text += ')'
+    ax.set_title(title_text, fontsize=14, fontweight='bold')
     
     # Statistics text
     stats_text = (
@@ -503,6 +635,8 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
         f"RMSE = {stats['rmse']:.4f} eV/atom\n"
         f"Mean Diff = {stats['mean_diff']:+.4f} eV/atom"
     )
+    if n_outliers > 0:
+        stats_text += f"\n(Outliers: {n_outliers})"
     ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=10,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
@@ -524,8 +658,28 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
     
     residuals = ms_vals - vasp_vals
     
-    ax.scatter(vasp_vals, residuals, alpha=0.6, s=50,
-              c='forestgreen', edgecolors='black', linewidth=0.5)
+    # Calculate point density for color mapping
+    x_res = vasp_vals
+    y_res = residuals
+    xy_res = np.vstack([x_res, y_res])
+    z_res = gaussian_kde(xy_res)(xy_res)
+    z_res = z_res * len(x_res)
+    
+    # Create custom colormap
+    colors_list_res = ['lime', 'forestgreen', 'black']
+    cmap_res = LinearSegmentedColormap.from_list("density_residual", colors_list_res, N=100)
+    
+    # Sort points by density
+    idx_res = z_res.argsort()
+    x_res_sorted, y_res_sorted, z_res_sorted = x_res[idx_res], y_res[idx_res], z_res[idx_res]
+    
+    # Create scatter plot with density-based coloring
+    scatter_res = ax.scatter(x_res_sorted, y_res_sorted, c=z_res_sorted, cmap=cmap_res, 
+                            norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                            edgecolors='none')
+    
+    # Add colorbar
+    cbar_res = plt.colorbar(scatter_res, ax=ax, label='Point Density')
     
     ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
               label='Zero residual')
@@ -533,10 +687,16 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
               linewidth=2, alpha=0.7,
               label=f'Mean = {stats["mean_diff"]:+.4f} eV/atom')
     
+    # Labels and title
     ax.set_xlabel('VASP-DFT Energy per Atom (eV)', fontsize=12, fontweight='bold')
     ax.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=12, fontweight='bold')
-    ax.set_title(f'Generated Structures: Energy Residuals\n(N={stats["n_structures"]})',
-                fontsize=14, fontweight='bold')
+    
+    n_outliers = stats.get('n_outliers_filtered', 0)
+    title_text = f'Generated Structures: Energy Residuals\n(N={stats["n_structures"]}'
+    if n_outliers > 0:
+        title_text += f', {n_outliers} outliers excluded'
+    title_text += ')'
+    ax.set_title(title_text, fontsize=14, fontweight='bold')
     
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.legend(loc='best')
@@ -681,6 +841,7 @@ def main():
     mp_dft_cache = vasp_jobs / "mp_vaspdft.json"
     prescreen_json = vasp_jobs / "prescreening_stability.json"
     workflow_json = vasp_jobs / "workflow.json"
+    dft_results_json = vasp_jobs / "dft_stability_results.json"
     
     print("="*70)
     print("Energy Method Comparison Script")
@@ -692,6 +853,7 @@ def main():
     print(f"  DFT MP cache: {mp_dft_cache}")
     print(f"  Prescreening results: {prescreen_json}")
     print(f"  Workflow database: {workflow_json}")
+    print(f"  DFT stability results: {dft_results_json}")
     print("="*70)
     
     # Load cache files
@@ -707,7 +869,11 @@ def main():
         print("\nWARNING: Could not load MP cache files - skipping MP phase comparison")
     
     # Compare generated structures
-    gen_results = compare_generated_structures(prescreen_json, workflow_json, vasp_jobs)
+    gen_results = compare_generated_structures(
+        prescreen_json, workflow_json, vasp_jobs, 
+        dft_results_json=dft_results_json,
+        outlier_threshold=0.5
+    )
     
     # Generate plots
     print("\n" + "="*70)
