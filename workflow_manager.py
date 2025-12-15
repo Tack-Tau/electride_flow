@@ -269,6 +269,8 @@ class VASPWorkflowManager:
                         adaptor = AseAtomsAdaptor()
                         xtal = pyxtal()
                         xtal.from_seed(structure, tol=tol)
+                        if not xtal.valid:
+                            continue
                         if len(xtal.check_short_distance(r=0.5)) > 0:
                             continue
                         atoms = xtal.to_ase()

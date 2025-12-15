@@ -108,13 +108,10 @@ def get_spacegroup_from_contcar(relax_dir):
             try:
                 xtal = pyxtal()
                 xtal.from_seed(struct, tol=tol)
-                
-                # Check for overlapping atoms (distance < 0.5 Å)
-                if len(xtal.check_short_distance(r=0.5)) > 0:
-                    # Skip this tolerance - overlapping atoms detected
+                if not xtal.valid:
                     continue
-                
-                # Valid structure - return space group
+                if len(xtal.check_short_distance(r=0.5)) > 0:
+                    continue
                 return xtal.group.number
             except:
                 continue
@@ -410,13 +407,11 @@ def save_to_database(struct_id, relax_dir, composition, e_above_hull, is_electri
             try:
                 xtal = pyxtal()
                 xtal.from_seed(struct, tol=tol)
-                
-                # Check for overlapping atoms (distance < 0.5 Å)
+                if not xtal.valid:
+                    continue
                 if len(xtal.check_short_distance(r=0.5)) > 0:
-                    # Skip this tolerance - overlapping atoms detected
                     continue
                 
-                # Structure is valid - save it
                 db.add_xtal(
                     xtal,
                     kvp={
