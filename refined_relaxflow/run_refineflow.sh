@@ -168,7 +168,7 @@ echo "  Check interval: ${CHECK_INTERVAL}s"
 echo "  Database: $DB_PATH"
 echo "  Conda env: $CONDA_ENV"
 echo ""
-echo -e "${YELLOW}Note: Structures (POSCARs) will be loaded from original VASP_JOBS directory${NC}"
+echo -e "${YELLOW}Note: Structures (CONTCARs) will be loaded from original VASP_JOBS directory${NC}"
 echo ""
 
 # Export variables for SLURM script

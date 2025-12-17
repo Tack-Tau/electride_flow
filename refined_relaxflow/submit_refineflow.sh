@@ -116,7 +116,7 @@ fi
 echo "  Check interval: ${CHECK_INTERVAL}s"
 echo "  Database: $OUTPUT_DIR/$DB_NAME"
 echo ""
-echo "Note: Structures (POSCARs) will be loaded from original VASP_JOBS directory"
+echo "Note: Structures (CONTCARs) will be loaded from original VASP_JOBS directory"
 echo ""
 
 # Check if resuming
