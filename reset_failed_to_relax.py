@@ -2,15 +2,18 @@
 """
 Reset SC_FAILED, ELF_FAILED, PARCHG_FAILED jobs to RELAX_FAILED
 
-This script resets all failed calculation stages back to RELAX_FAILED,
+This script resets all failed SPE calculation stages back to RELAX_FAILED,
 allowing reset_failed_jobs.py to restart structures from scratch.
 
-Operations:
+The SPE workflow is unified (SC → PARCHG → ELF in one job), so this script:
 1. Creates timestamped backup of workflow.json
 2. Changes SC_FAILED/ELF_FAILED/PARCHG_FAILED → RELAX_FAILED
-3. Removes SC/ELF/PARCHG directories for affected structures
+3. Removes entire SPE directory (contains all stages: SC, PARCHG, ELF)
 4. Creates/updates VASP_FAILED markers in RELAX directories
-5. Clears job_id fields (directory paths preserved for reuse)
+5. Clears spe_job_id and band gap fields (directory paths preserved for reuse)
+
+After running this script, use reset_failed_jobs.py to retry from RELAX:
+    python3 reset_failed_jobs.py --stage RELAX --clean > reset_log
 
 Usage:
     python reset_failed_to_relax.py --dry-run    # Preview changes
@@ -153,7 +156,7 @@ def process_structure(struct_id, sdata, dry_run=False):
     """Process a single failed structure."""
     results = {
         'relax_updated': False,
-        'dirs_removed': 0,
+        'spe_removed': False,
         'messages': []
     }
     
@@ -168,32 +171,16 @@ def process_structure(struct_id, sdata, dry_run=False):
     else:
         results['messages'].append(f"    - RELAX: {msg}")
     
-    # Remove SC directory
-    sc_dir = sdata.get('sc_dir', '')
-    removed, msg = remove_directory(sc_dir, 'SC', dry_run)
+    # Remove unified SPE directory
+    spe_dir = sdata.get('spe_dir', '')
+    removed, msg = remove_directory(spe_dir, 'SPE', dry_run)
     if removed:
-        results['dirs_removed'] += 1
+        results['spe_removed'] = True
         results['messages'].append(f"      {msg}")
-    elif sc_dir:
-        results['messages'].append(f"    - SC directory not found: {sc_dir}")
-    
-    # Remove ELF directory
-    elf_dir = sdata.get('elf_dir', '')
-    removed, msg = remove_directory(elf_dir, 'ELF', dry_run)
-    if removed:
-        results['dirs_removed'] += 1
-        results['messages'].append(f"      {msg}")
-    elif elf_dir:
-        results['messages'].append(f"    - ELF directory not found: {elf_dir}")
-    
-    # Remove PARCHG directory
-    parchg_dir = sdata.get('parchg_dir', '')
-    removed, msg = remove_directory(parchg_dir, 'PARCHG', dry_run)
-    if removed:
-        results['dirs_removed'] += 1
-        results['messages'].append(f"      {msg}")
-    elif parchg_dir:
-        results['messages'].append(f"    - PARCHG directory not found: {parchg_dir}")
+    elif spe_dir:
+        results['messages'].append(f"    - SPE directory not found: {spe_dir}")
+    else:
+        results['messages'].append(f"    - No SPE directory path in database")
     
     # Print messages
     for msg in results['messages']:
@@ -210,11 +197,6 @@ def update_workflow_states(data, failed_structures, dry_run=False):
     
     updated_count = 0
     failed_states = ['SC_FAILED', 'ELF_FAILED', 'PARCHG_FAILED']
-    fields_to_clear = [
-        'sc_job_id',
-        'elf_job_id',
-        'parchg_job_ids'
-    ]
     
     for struct_id in failed_structures:
         if struct_id in data['structures']:
@@ -224,9 +206,12 @@ def update_workflow_states(data, failed_structures, dry_run=False):
                 # Reset to RELAX_FAILED
                 sdata['state'] = 'RELAX_FAILED'
                 
-                # Clear calculation-related fields
-                for field in fields_to_clear:
-                    sdata.pop(field, None)
+                # Clear SPE job ID (unified job for SC-PARCHG-ELF)
+                sdata['spe_job_id'] = None
+                
+                # Clear band gap info (will be recalculated in new SPE run)
+                sdata['band_gap'] = None
+                sdata['is_semiconductor'] = None
                 
                 updated_count += 1
     
@@ -321,7 +306,7 @@ def main():
     # Step 3: Process each structure
     print("Step 3: Processing structures...")
     total_relax_updated = 0
-    total_dirs_removed = 0
+    total_spe_removed = 0
     
     for struct_id in failed['all_failed']:
         sdata = data['structures'].get(struct_id, {})
@@ -329,7 +314,8 @@ def main():
         
         if results['relax_updated']:
             total_relax_updated += 1
-        total_dirs_removed += results['dirs_removed']
+        if results['spe_removed']:
+            total_spe_removed += 1
     
     # Step 4: Update workflow.json
     print("Step 4: Updating workflow.json...")
@@ -369,7 +355,7 @@ def main():
         print()
         print(f"Would process: {total_count} structures")
         print(f"Would update: RELAX directories (VASP_DONE → VASP_FAILED)")
-        print(f"Would remove: SC/ELF/PARCHG directories")
+        print(f"Would remove: SPE directories (unified SC-PARCHG-ELF)")
         print(f"Would update workflow.json: {total_count} structures → RELAX_FAILED")
         print()
         print("To execute these changes, run without --dry-run:")
@@ -378,10 +364,13 @@ def main():
         print(f"  Backup created: {backup_path}")
         print(f"  Processed structures: {total_count}")
         print(f"  RELAX directories updated: {total_relax_updated}")
-        print(f"  Directories removed: {total_dirs_removed}")
+        print(f"  SPE directories removed: {total_spe_removed}")
         print(f"  workflow.json updated: SC_FAILED/ELF_FAILED/PARCHG_FAILED → RELAX_FAILED")
         print()
         print("All operations completed successfully!")
+        print()
+        print("Next step: Run reset_failed_jobs.py to retry from RELAX")
+        print("  python3 reset_failed_jobs.py --stage RELAX --clean > reset_log")
         print()
         print("To restore from backup if needed:")
         print(f"  cp {backup_path} {args.workflow}")
