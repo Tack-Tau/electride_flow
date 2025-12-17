@@ -63,13 +63,13 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 │  Symmetrize: PyXtal with progressive tolerance (same as original)   │
 │  Filter: Only high-symmetry candidates (space group > 15)           │
 │                                                                      │
-│  3-Step High-Precision Relaxation:                                  │
-│    Step 1: NSW=30, ISIF=3, EDIFFG=-0.005, POTIM=0.3               │
-│      → Check electronic convergence (OUTCAR)                        │
-│    Step 2: NSW=30, ISIF=3, EDIFFG=-0.005, POTIM=0.3               │
-│      → Check electronic convergence (OUTCAR)                        │
-│    Step 3: NSW=40, ISIF=3, EDIFFG=-0.002, POTIM=0.2 (final)       │
-│      → Check electronic convergence (OUTCAR)                        │
+│  3-Step Progressive Relaxation:                                     │
+│    Step 1: NSW=100, ISIF=6, EDIFFG=-0.01, POTIM=0.5               │
+│      → Aggressive initial relaxation with G-G corrections          │
+│    Step 2: NSW=100, ISIF=3, EDIFFG=-0.005, POTIM=0.3              │
+│      → Intermediate refinement                                      │
+│    Step 3: NSW=100, ISIF=3, EDIFFG=-0.001, POTIM=0.1 (final)      │
+│      → Final high-precision (0.001 eV/Å forces)                    │
 │                                                                      │
 │  Timeout handling: Continue if CONTCAR exists + electronic converged│
 │  Output: High-quality refined structures in REFINE_VASP_JOBS/       │
@@ -84,9 +84,10 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 |--------|------------------|------------------|
 | **Input structures** | Original CIFs from mattergen | Relaxed CONTCARs from VASP_JOBS |
 | **Symmetrization** | PyXtal (progressive tolerance) | PyXtal (progressive tolerance, same) |
-| **Relaxation steps** | 1 step (NSW=30) | 3 steps (30+30+40 ionic steps) |
-| **Force convergence** | EDIFFG=-0.01 eV/Å | -0.005 → -0.005 → -0.002 eV/Å |
-| **POTIM** | 0.3 (default) | 0.3 → 0.3 → 0.2 (careful) |
+| **Relaxation steps** | 1 step (NSW=30) | 3 progressive steps (NSW=100 each) |
+| **ISIF** | 3 (constant) | 6 → 3 → 3 (progressive) |
+| **Force convergence** | EDIFFG=-0.01 eV/Å | -0.01 → -0.005 → -0.001 eV/Å |
+| **POTIM** | 0.3 (default) | 0.5 → 0.3 → 0.1 (progressive) |
 | **Electronic check** | End only (vasprun.xml) | After each step (OUTCAR grep) |
 | **Structure count** | All generated (~thousands) | Filtered candidates (~hundreds) |
 | **Space group filter** | None | Only space group > 15 |
@@ -99,9 +100,31 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 ## Features
 
 ### 1. Progressive Relaxation Strategy
-- **Step 1**: Initial relaxation with moderate convergence (EDIFFG=-0.005)
-- **Step 2**: Continued relaxation with same settings
-- **Step 3**: Final high-precision relaxation (EDIFFG=-0.002, POTIM=0.2)
+Three-step relaxation with progressively tighter convergence:
+
+- **Step 1**: Aggressive initial relaxation
+  - `ISIF=6` (includes Grünwald-Gillespie corrections for better stress tensor)
+  - `EDIFFG=-0.01` eV/Å (moderate force convergence)
+  - `POTIM=0.5` (larger steps for faster convergence)
+  - Purpose: Quickly approach minimum energy configuration
+
+- **Step 2**: Intermediate refinement
+  - `ISIF=3` (standard cell + ion relaxation)
+  - `EDIFFG=-0.005` eV/Å (tighter forces)
+  - `POTIM=0.3` (moderate step size)
+  - Purpose: Refine structure with standard relaxation
+
+- **Step 3**: Final high-precision
+  - `ISIF=3` (standard cell + ion relaxation)
+  - `EDIFFG=-0.001` eV/Å (very tight forces, publication quality)
+  - `POTIM=0.1` (small steps for precise minimum)
+  - Purpose: Achieve high-precision structure for accurate ELF analysis
+
+**Benefits**:
+- ISIF=6 in step 1 provides better initial relaxation
+- Progressive tightening balances speed and accuracy
+- Final EDIFFG=-0.001 ensures atomic positions accurate to ~0.001 Å
+- Suitable for publication-quality structures
 
 ### 2. Electronic Convergence Validation
 After each step, checks OUTCAR for electronic SCF convergence:
@@ -753,7 +776,14 @@ cp workflow.json workflow_backup_$(date +%Y%m%d).json
 4. Refined Relaxation (refine_electrideflow.py)  ← THIS WORKFLOW
    → REFINE_VASP_JOBS/
    
-5. Final Analysis
+5. MatterSim Validation (optional, compute_mattersim_e_hull.py)
+   → REFINE_VASP_JOBS/mattersim_stability_results.json
+   
+6. DFT Hull Comparison (compute_dft_e_hull.py)
+   → REFINE_VASP_JOBS/dft_stability_results.json
+   → REFINE_VASP_JOBS/hull_comparison.json + plots
+   
+7. Final Analysis
    - Extract refined CONTCARs
    - Re-run ELF/PARCHG on refined structures (if needed)
    - Compare with initial screening results
@@ -773,6 +803,256 @@ Original CIFs → Initial Relax → SC/PARCHG/ELF → Analysis → Filtering
                                       ↓
                         High-quality refined structures
 ```
+
+---
+
+## MatterSim Energy Above Hull Comparison
+
+After completing the refined relaxation workflow, you can relax the refined structures with MatterSim and compare energy above hull calculations between MatterSim and VASP-DFT.
+
+### Purpose
+
+Two-step validation and comparison workflow:
+
+**Step 1: MatterSim Relaxation** (`compute_mattersim_e_hull.py`)
+- Query MP API for GGA/GGA+U reference phases
+- Relax MP phases with MatterSim using tight convergence (`fmax=0.001`, `max_steps=800`)
+- Relax refined VASP structures with MatterSim (same convergence)
+- Compute MatterSim energy_above_hull using MatterSim-relaxed MP phases
+- **Consistent convergence**: Both MP phases and structures use `fmax=0.001`, matching refined VASP
+
+**Step 2: DFT Hull Comparison** (`../compute_dft_e_hull.py`)
+- Extract VASP-DFT energies from refined relaxations
+- Compute DFT energy_above_hull using MP DFT reference phases
+- Compare MatterSim vs DFT hulls with statistics and plots
+- Quantify agreement between MatterSim and high-precision DFT
+
+### Scripts
+
+**Refined workflow scripts (in `refined_relaxflow/`)**:
+
+1. **`compute_mattersim_e_hull.py`** - Query MP, relax MP phases & structures with MatterSim
+   - Input: 
+     - `CONTCAR` files from `REFINE_VASP_JOBS/*/Relax/`
+     - MP API key (for GGA/GGA+U reference phases)
+   - Process:
+     - Query MP API for GGA/GGA+U phases
+     - Relax MP phases with MatterSim (`fmax=0.001`, `max_steps=800`)
+     - Relax refined structures with MatterSim (same convergence)
+     - Compute energy_above_hull
+   - Output: 
+     - `REFINE_VASP_JOBS/mattersim_stability_results.json` (MatterSim energies & hulls)
+     - `REFINE_VASP_JOBS/mp_mattersim.json` (MP phases relaxed with MatterSim)
+
+2. **`submit_mattersim_e_hull.sh`** - SLURM job script for MatterSim relaxation
+
+3. **`run_mattersim_e_hull.sh`** - Wrapper to validate inputs and submit MatterSim job
+
+**Existing script from parent directory**:
+
+4. **`../compute_dft_e_hull.py`** - Compute DFT hulls and compare with MatterSim
+   - Input: 
+     - VASP energies from `REFINE_VASP_JOBS/*/Relax/vasprun.xml` (or OUTCAR)
+     - MatterSim results from `REFINE_VASP_JOBS/mattersim_stability_results.json`
+   - Process: 
+     - Query MP API for DFT reference phases (GGA/GGA+U)
+     - Compute DFT energy_above_hull
+     - Compare DFT vs MatterSim hulls
+   - Output:
+     - `REFINE_VASP_JOBS/dft_stability_results.json` (DFT energies & hulls)
+     - `REFINE_VASP_JOBS/mp_vaspdft.json` (MP DFT cache)
+     - `REFINE_VASP_JOBS/hull_comparison.json` (statistics)
+     - `REFINE_VASP_JOBS/hull_comparison_*.png` (plots)
+
+### Usage
+
+**Step 1: Run MatterSim relaxation**
+
+```bash
+cd refined_relaxflow/
+
+# Export MP API key
+export MP_API_KEY="your_32_character_api_key"
+
+# Submit MatterSim job (uses GPU by default)
+bash run_mattersim_e_hull.sh \
+    --refine-jobs ../REFINE_VASP_JOBS
+
+# For CPU mode (not recommended, 3x slower)
+# bash run_mattersim_e_hull.sh --device cpu
+
+# Monitor job
+tail -f mattersim_e_hull_*.out
+```
+
+**Step 2: Compute DFT hulls and compare with MatterSim**
+
+After MatterSim job completes, use the existing `run_dft_e_hull.sh` wrapper script from the parent directory:
+
+```bash
+cd ..  # Back to main vaspflow directory
+
+# Submit DFT energy_above_hull calculation as SLURM job
+bash run_dft_e_hull.sh \
+    --vasp-jobs REFINE_VASP_JOBS/ \
+    --prescreen-results REFINE_VASP_JOBS/mattersim_stability_results.json \
+    --pure-pbe
+```
+
+**What this does**:
+1. Reads VASP-DFT energies from `REFINE_VASP_JOBS/*/Relax/vasprun.xml` (or OUTCAR)
+2. Queries MP API for DFT reference phases (GGA/GGA+U, cached to `mp_vaspdft.json`)
+3. Computes DFT energy_above_hull for each refined structure
+4. Compares DFT vs MatterSim hulls (since `--prescreen-results` points to MatterSim results)
+5. Generates comparison statistics and plots
+
+**Output files**:
+- `REFINE_VASP_JOBS/dft_stability_results.json` - VASP-DFT energies and hulls
+- `REFINE_VASP_JOBS/mp_vaspdft.json` - MP DFT reference phases (cached)
+- `REFINE_VASP_JOBS/hull_comparison.json` - Comparison statistics (correlation, MAE, RMSE, etc.)
+- `REFINE_VASP_JOBS/hull_comparison_scatter.png` - Scatter plot (DFT vs MatterSim)
+- `REFINE_VASP_JOBS/hull_comparison_residuals.png` - Residual plot
+
+### Key Features
+
+- **Consistent convergence**: Both MP phases and structures relaxed with `fmax=0.001 eV/Å`, `max_steps=800`
+- **Tighter than prescreen**: Prescreen used `fmax=0.01`, `max_steps=500`
+- **Matching refined VASP**: MatterSim convergence matches refined VASP force tolerance (EDIFFG=-0.001)
+- **Independent validation**: MP phases freshly queried and relaxed (not reused from prescreen)
+- **Publication-quality comparison**: Correlation, MAE, RMSE, precision/recall metrics, density plots
+
+### Options (run_mattersim_e_hull.sh)
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--refine-jobs` | Refined VASP jobs directory | `./REFINE_VASP_JOBS` |
+| `--device` | MatterSim device: `cpu` or `cuda` | `cuda` |
+| `--conda-env` | Conda environment name | `mattersim` |
+
+**Environment Variables**:
+- `MP_API_KEY` - Materials Project API key (required)
+
+**SLURM Resources**:
+- Partition: GPU
+- GPUs: 1x (A40/A100/H200/L40S)
+- Memory: 128 GB
+- Time limit: 2 days
+
+### Prerequisites
+
+1. **Completed refined relaxation workflow** (structures in `RELAX_DONE` state)
+   ```bash
+   grep -c '"state": "RELAX_DONE"' REFINE_VASP_JOBS/workflow.json
+   ```
+
+2. **MatterSim environment**
+   ```bash
+   conda activate mattersim
+   python3 -c "from mattersim.forcefield import MatterSimCalculator"
+   ```
+
+3. **Materials Project API key** (for both MatterSim and DFT steps)
+   ```bash
+   export MP_API_KEY="your_32_character_api_key"
+   # Get key from: https://next-gen.materialsproject.org/api
+   ```
+
+### Performance
+
+- **MatterSim relaxation (GPU)**: ~10-20 seconds per structure
+- **MatterSim relaxation (CPU)**: ~30-60 seconds per structure (not recommended)
+- **MP phase relaxation**: Variable depending on number of phases (~10-50 per chemsys)
+- **DFT comparison**: 1-5 seconds per structure
+- **Typical workflow**: 
+  - 50 refined structures across 10 chemsys
+  - MP phases: ~200-300 phases total (~30-60 minutes on GPU)
+  - Structure relaxation: ~15-20 minutes on GPU
+  - DFT comparison: ~2 minutes
+  - **Total: ~1-1.5 hours on GPU**
+
+### Example Workflow
+
+```bash
+# 1. Complete refined relaxation workflow
+bash run_refineflow.sh --vasp-jobs-dir VASP_JOBS/
+
+# Wait for all structures to reach RELAX_DONE state...
+
+# 2. Set MP API key
+export MP_API_KEY="your_32_character_api_key"
+
+# 3. Run MatterSim relaxation on refined structures (GPU)
+cd refined_relaxflow/
+bash run_mattersim_e_hull.sh
+
+# This:
+#   - Queries MP API for GGA/GGA+U reference phases
+#   - Relaxes MP phases with MatterSim (fmax=0.001, max_steps=800)
+#   - Relaxes refined structures with MatterSim (same convergence)
+#   - Computes MatterSim energy_above_hull
+#
+# Output:
+#   REFINE_VASP_JOBS/mattersim_stability_results.json  (MatterSim energies & hulls)
+#   REFINE_VASP_JOBS/mp_mattersim.json                 (MP phases relaxed with MatterSim)
+
+# 4. After MatterSim job completes, compute DFT hulls and compare
+cd ..
+bash run_dft_e_hull.sh \
+    --vasp-jobs REFINE_VASP_JOBS/ \
+    --prescreen-results REFINE_VASP_JOBS/mattersim_stability_results.json \
+    --pure-pbe
+
+# This:
+#   - Extracts VASP-DFT energies from vasprun.xml
+#   - Queries MP API for DFT reference phases (cached to mp_vaspdft.json)
+#   - Computes DFT energy_above_hull
+#   - Compares DFT vs MatterSim hulls
+#   - Generates statistics and plots
+#
+# Output:
+#   REFINE_VASP_JOBS/dft_stability_results.json        (VASP-DFT energies & hulls)
+#   REFINE_VASP_JOBS/mp_vaspdft.json                   (MP DFT reference cache)
+#   REFINE_VASP_JOBS/hull_comparison.json              (comparison statistics)
+#   REFINE_VASP_JOBS/hull_comparison_scatter.png       (scatter plot)
+#   REFINE_VASP_JOBS/hull_comparison_residuals.png     (residual plot)
+
+# 5. View comparison results
+cat REFINE_VASP_JOBS/hull_comparison.json
+```
+
+### Troubleshooting
+
+**MP API key not set**
+```bash
+# Check if set
+echo $MP_API_KEY
+
+# Set it
+export MP_API_KEY="your_32_character_api_key"
+
+# Verify it's valid (should be 32 characters)
+echo ${#MP_API_KEY}
+```
+
+**No RELAX_DONE structures**
+```bash
+# Check workflow status
+grep -c '"state": "RELAX_DONE"' REFINE_VASP_JOBS/workflow.json
+
+# If zero, complete refined workflow first
+bash run_refineflow.sh
+```
+
+**MP query/relaxation failures**
+```bash
+# Check log for specific errors
+grep "ERROR" mattersim_e_hull_*.out
+grep "Warning: Failed to relax" mattersim_e_hull_*.out
+
+# Common causes:
+# - Network issues (retry)
+# - MP API rate limiting (wait and retry)
+# - MatterSim relaxation failures for specific phases (acceptable, will skip)
 
 ---
 
@@ -799,7 +1079,4 @@ If you use this workflow, please cite:
 
 Same as the main VASP workflow package.
 
----
-
-**Last Updated**: December 2024
 
