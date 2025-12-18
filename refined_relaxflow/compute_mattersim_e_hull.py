@@ -12,6 +12,7 @@ This script:
 
 Key differences from prescreen.py:
 - Input: VASP-relaxed CONTCARs from refined 3-step relaxation (not CIFs from mattergen)
+- Symmetrization: Structures are symmetrized via PyXtal
 - Tighter convergence: fmax=0.001 vs 0.01, max_steps=800 vs 500
 - MP phases: Query and relax with same tight convergence for consistency
 - Output: Similar to compute_dft_e_hull.py for easy comparison
@@ -37,6 +38,12 @@ from pymatgen.io.ase import AseAtomsAdaptor
 
 from ase.optimize import FIRE
 from ase.filters import UnitCellFilter
+
+try:
+    from pyxtal import pyxtal
+    PYXTAL_AVAILABLE = True
+except ImportError:
+    PYXTAL_AVAILABLE = False
 
 try:
     from mattersim.forcefield import MatterSimCalculator
@@ -74,15 +81,38 @@ def relax_structure_mattersim(pmg_struct, calculator, structure_id=None, fmax=0.
     
     Returns:
         tuple: (relaxed_structure, energy_per_atom, error_message)
+    
+    Note:
+        - Symmetrizes structure using PyXtal with progressive tolerance (same as prescreen.py)
+        - Falls back to direct conversion if all tolerances fail
+        - Uses UnitCellFilter to relax both cell and atomic positions
     """
     sid_prefix = f"[{structure_id}] " if structure_id else ""
     
-    # Convert to ASE atoms
-    try:
-        adaptor = AseAtomsAdaptor()
-        atoms = adaptor.get_atoms(pmg_struct)
-    except Exception as e:
-        return None, None, f"{sid_prefix}Structure conversion failed: {e}"
+    # Symmetrize structure using PyXtal with progressive tolerance
+    tolerances = [5e-2, 1e-2, 1e-3, 1e-4, 1e-5]
+    atoms = None
+    
+    for tol in tolerances:
+        try:
+            xtal = pyxtal()
+            xtal.from_seed(pmg_struct, tol=tol)
+            if not xtal.valid:
+                continue
+            if len(xtal.check_short_distances(r=0.5)) > 0:
+                continue
+            atoms = xtal.to_ase()
+            break
+        except Exception:
+            continue
+    
+    # If all tolerances failed, try direct conversion without symmetrization
+    if atoms is None:
+        try:
+            adaptor = AseAtomsAdaptor()
+            atoms = adaptor.get_atoms(pmg_struct)
+        except Exception as e:
+            return None, None, f"{sid_prefix}Structure conversion failed: {e}"
     
     # Attach calculator
     atoms.calc = calculator
