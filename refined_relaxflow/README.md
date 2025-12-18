@@ -64,11 +64,11 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 │  Filter: Only high-symmetry candidates (space group > 15)           │
 │                                                                      │
 │  3-Step Progressive Relaxation:                                     │
-│    Step 1: NSW=100, ISIF=6, EDIFFG=-0.01, POTIM=0.5               │
-│      → Aggressive initial relaxation with G-G corrections          │
-│    Step 2: NSW=100, ISIF=3, EDIFFG=-0.005, POTIM=0.3              │
+│    Step 1: NSW=100, ISIF=2, EDIFFG=-0.01, POTIM=0.2               │
+│      → Initial relaxation with smaller time steps                   │
+│    Step 2: NSW=100, ISIF=3, EDIFFG=-0.005, POTIM=0.1              │
 │      → Intermediate refinement                                      │
-│    Step 3: NSW=100, ISIF=3, EDIFFG=-0.001, POTIM=0.1 (final)      │
+│    Step 3: NSW=100, ISIF=3, EDIFFG=-0.001, POTIM=0.05 (final)     │
 │      → Final high-precision (0.001 eV/Å forces)                    │
 │                                                                      │
 │  Timeout handling: Continue if CONTCAR exists + electronic converged│
@@ -85,9 +85,9 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 | **Input structures** | Original CIFs from mattergen | Relaxed CONTCARs from VASP_JOBS |
 | **Symmetrization** | PyXtal (progressive tolerance) | PyXtal (progressive tolerance, same) |
 | **Relaxation steps** | 1 step (NSW=30) | 3 progressive steps (NSW=100 each) |
-| **ISIF** | 3 (constant) | 6 → 3 → 3 (progressive) |
+| **ISIF** | 3 (constant) | 2 → 3 → 3 (progressive) |
 | **Force convergence** | EDIFFG=-0.01 eV/Å | -0.01 → -0.005 → -0.001 eV/Å |
-| **POTIM** | 0.3 (default) | 0.5 → 0.3 → 0.1 (progressive) |
+| **POTIM** | 0.3 (default) | 0.2 → 0.1 → 0.05 (progressive) |
 | **Electronic check** | End only (vasprun.xml) | After each step (OUTCAR grep) |
 | **Structure count** | All generated (~thousands) | Filtered candidates (~hundreds) |
 | **Space group filter** | None | Only space group > 15 |
@@ -102,26 +102,27 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 ### 1. Progressive Relaxation Strategy
 Three-step relaxation with progressively tighter convergence:
 
-- **Step 1**: Aggressive initial relaxation
-  - `ISIF=6` (includes Grünwald-Gillespie corrections for better stress tensor)
+- **Step 1**: Initial relaxation
+  - `ISIF=2` (relax ions only, fixed cell volume and shape)
   - `EDIFFG=-0.01` eV/Å (moderate force convergence)
-  - `POTIM=0.5` (larger steps for faster convergence)
-  - Purpose: Quickly approach minimum energy configuration
+  - `POTIM=0.2` (conservative step size for stability)
+  - Purpose: Relax ionic positions within fixed cell
 
 - **Step 2**: Intermediate refinement
-  - `ISIF=3` (standard cell + ion relaxation)
+  - `ISIF=3` (relax ions + cell volume and shape)
   - `EDIFFG=-0.005` eV/Å (tighter forces)
-  - `POTIM=0.3` (moderate step size)
-  - Purpose: Refine structure with standard relaxation
+  - `POTIM=0.1` (smaller step size for precision)
+  - Purpose: Refine both structure and cell with tighter convergence
 
 - **Step 3**: Final high-precision
-  - `ISIF=3` (standard cell + ion relaxation)
+  - `ISIF=3` (relax ions + cell volume and shape)
   - `EDIFFG=-0.001` eV/Å (very tight forces, publication quality)
-  - `POTIM=0.1` (small steps for precise minimum)
+  - `POTIM=0.05` (very small steps for precise minimum)
   - Purpose: Achieve high-precision structure for accurate ELF analysis
 
 **Benefits**:
-- ISIF=6 in step 1 provides better initial relaxation
+- ISIF=2 in step 1 avoids cell shape changes during initial relaxation
+- Conservative POTIM values prevent oscillations and ensure stability
 - Progressive tightening balances speed and accuracy
 - Final EDIFFG=-0.001 ensures atomic positions accurate to ~0.001 Å
 - Suitable for publication-quality structures

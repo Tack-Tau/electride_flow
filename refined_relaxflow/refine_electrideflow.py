@@ -8,10 +8,10 @@ Uses finer k-point grid and consecutive relaxation steps for more accurate struc
 Key differences from workflow_manager.py:
 - Reads electride candidates from electride_candidates.db (PyXtal/ASE database)
 - Uses reciprocal_density=250 (vs 64) for all jobs
-- RELAX: 3 consecutive steps with NELM=60, NSW=100 each
-  * Step 1: Initial relaxation
-  * Step 2: Copy CONTCAR -> POSCAR, relax again (clean WAVECAR/CHGCAR)
-  * Step 3: Copy CONTCAR -> POSCAR, final relaxation (clean WAVECAR/CHGCAR)
+- RELAX: 3 consecutive steps with progressive parameters (NELM=60, NSW=100 each)
+  * Step 1: ISIF=2, EDIFFG=-0.01, POTIM=0.2 (initial ionic relaxation, fixed cell)
+  * Step 2: ISIF=3, EDIFFG=-0.005, POTIM=0.1 (intermediate refinement)
+  * Step 3: ISIF=3, EDIFFG=-0.001, POTIM=0.05 (final high-precision)
 - SPE workflow (SC/PARCHG/ELF) is skipped - only refined relaxation
 - SLURM time limit: 2 hours (vs 20 minutes)
 - Output to REFINE_VASP_JOBS folder
@@ -339,13 +339,20 @@ class VASPWorkflowManager:
             print(f"  Warning: Could not read CONTCAR: {e}")
             return None
     
-    def create_vasp_inputs(self, structure, job_dir, job_type='relax'):
+    def create_vasp_inputs(self, structure, job_dir, job_type='relax', step=1):
         """
         Create VASP input files for refined 3-step relaxation.
+        
+        Progressive relaxation parameters:
+        - Step 1: ISIF=2, EDIFFG=-0.01, POTIM=0.2  (initial ionic relaxation, fixed cell)
+        - Step 2: ISIF=3, EDIFFG=-0.005, POTIM=0.1 (intermediate refinement)
+        - Step 3: ISIF=3, EDIFFG=-0.001, POTIM=0.05 (final high-precision)
         
         Key differences from workflow_manager.py:
         - Higher k-point density (250 vs 64)
         - More electronic/ionic steps (NELM=60, NSW=100)
+        - Progressive tightening of convergence criteria
+        - Conservative POTIM values to prevent oscillations
         
         Note: Structure is already PyXtal-symmetrized in load_electride_candidates(),
         so we use it directly here.
@@ -356,21 +363,37 @@ class VASPWorkflowManager:
         if job_type != 'relax':
             raise ValueError(f"Only 'relax' job_type supported in refined workflow, got: {job_type}")
         
+        # Progressive relaxation parameters for each step
+        if step == 1:
+            ediffg = -0.01
+            isif = 2
+            potim = 0.2
+        elif step == 2:
+            ediffg = -0.005
+            isif = 3
+            potim = 0.1
+        elif step == 3:
+            ediffg = -0.001
+            isif = 3
+            potim = 0.05
+        else:
+            raise ValueError(f"Invalid step number: {step}. Must be 1, 2, or 3.")
+        
         vis = MPRelaxSet(structure, 
             user_incar_settings={
                 'PREC': 'Accurate',
                 'ALGO': 'Fast',
                 'ADDGRID': True,
                 'EDIFF': 1e-6,
-                'EDIFFG': -0.01,
+                'EDIFFG': ediffg,
                 'IBRION': 2,
-                'ISIF': 3,
+                'ISIF': isif,
                 'NELM': 60,
                 'NSW': 100,
                 'ISMEAR': 0,
                 'SIGMA': 0.05,
                 'ISPIN': 1,
-                'POTIM': 0.3,
+                'POTIM': potim,
                 'LWAVE': False,
                 'LCHARG': False,
                 'LAECHG': False,
@@ -385,12 +408,18 @@ class VASPWorkflowManager:
     
     def create_slurm_script(self, job_dir, job_name, job_type='relax'):
         """
-        Create SLURM submission script for 3-step relaxation.
+        Create SLURM submission script for 3-step progressive relaxation.
+        
+        Progressive Relaxation Strategy:
+        --------------------------------
+        - Step 1: ISIF=2, EDIFFG=-0.01, POTIM=0.2 (initial ionic relaxation, fixed cell)
+        - Step 2: ISIF=3, EDIFFG=-0.005, POTIM=0.1 (intermediate refinement)
+        - Step 3: ISIF=3, EDIFFG=-0.001, POTIM=0.05 (final high-precision)
         
         Timeout/Failure Handling:
         -------------------------
         1. Before each step: Save POSCAR-{1,2,3} for debugging
-        2. Steps 1-2: Timeout OK if CONTCAR exists (continue to next step)
+        2. Steps 1-2: Timeout OK if CONTCAR exists + electronic converged (continue)
         3. Step 3: Timeout → RELAX_TMOUT marker (CONTCAR usable)
         4. Any VASP failure → VASP_FAILED marker (check POSCAR-* count to identify step)
         5. Exit codes 140, 143 indicate SLURM timeout
@@ -451,10 +480,14 @@ echo "Start time: $(date)"
 echo ""
 echo "========================================"
 echo "Relaxation Step 1/3"
+echo "  ISIF=2, EDIFFG=-0.01, POTIM=0.2"
 echo "========================================"
 
 # Save initial POSCAR for debugging
 cp POSCAR POSCAR-1
+
+# Use INCAR-1 for step 1
+cp INCAR-1 INCAR
 
 $VASP_CMD
 
@@ -517,10 +550,14 @@ rm -f WAVECAR CHGCAR CHG WFULL TMPCAR AECCAR* 2>/dev/null
 echo ""
 echo "========================================"
 echo "Relaxation Step 2/3"
+echo "  ISIF=3, EDIFFG=-0.005, POTIM=0.1"
 echo "========================================"
 
 # Save POSCAR for debugging (should be identical to step 1 CONTCAR)
 cp POSCAR POSCAR-2
+
+# Use INCAR-2 for step 2
+cp INCAR-2 INCAR
 
 $VASP_CMD
 
@@ -583,10 +620,14 @@ rm -f WAVECAR CHGCAR CHG WFULL TMPCAR AECCAR* 2>/dev/null
 echo ""
 echo "========================================"
 echo "Relaxation Step 3/3"
+echo "  ISIF=3, EDIFFG=-0.001, POTIM=0.05"
 echo "========================================"
 
 # Save POSCAR for debugging (should be identical to step 2 CONTCAR)
 cp POSCAR POSCAR-3
+
+# Use INCAR-3 for step 3 (final high-precision)
+cp INCAR-3 INCAR
 
 $VASP_CMD
 
@@ -707,7 +748,14 @@ touch VASP_DONE
             return 'UNKNOWN'
     
     def submit_relax(self, struct_id, structure):
-        """Submit relaxation job for a structure."""
+        """
+        Submit relaxation job for a structure.
+        
+        Generates 3 INCAR files (INCAR-1, INCAR-2, INCAR-3) with progressive parameters:
+        - INCAR-1: ISIF=2, EDIFFG=-0.01, POTIM=0.2
+        - INCAR-2: ISIF=3, EDIFFG=-0.005, POTIM=0.1
+        - INCAR-3: ISIF=3, EDIFFG=-0.001, POTIM=0.05
+        """
         sdata = self.db.get_structure(struct_id)
         if not sdata:
             return False
@@ -718,7 +766,10 @@ touch VASP_DONE
         print(f"  Submitting Relax: {struct_id}")
         
         try:
-            self.create_vasp_inputs(structure, relax_dir, 'relax')
+            for step_num in [1, 2, 3]:
+                self.create_vasp_inputs(structure, relax_dir, 'relax', step=step_num)
+                shutil.copy2(relax_dir / 'INCAR', relax_dir / f'INCAR-{step_num}')
+            
             script = self.create_slurm_script(relax_dir, job_name, 'relax')
             job_id = self.submit_job(script)
             
