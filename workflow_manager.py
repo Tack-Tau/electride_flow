@@ -271,7 +271,7 @@ class VASPWorkflowManager:
                         xtal.from_seed(structure, tol=tol)
                         if not xtal.valid:
                             continue
-                        if len(xtal.check_short_distance(r=0.5)) > 0:
+                        if len(xtal.check_short_distances(r=0.5)) > 0:
                             continue
                         atoms = xtal.to_ase()
                         structure = adaptor.get_structure(atoms)

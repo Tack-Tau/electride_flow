@@ -110,7 +110,7 @@ def get_spacegroup_from_contcar(relax_dir):
                 xtal.from_seed(struct, tol=tol)
                 if not xtal.valid:
                     continue
-                if len(xtal.check_short_distance(r=0.5)) > 0:
+                if len(xtal.check_short_distances(r=0.5)) > 0:
                     continue
                 return xtal.group.number
             except:
@@ -409,7 +409,7 @@ def save_to_database(struct_id, relax_dir, composition, e_above_hull, is_electri
                 xtal.from_seed(struct, tol=tol)
                 if not xtal.valid:
                     continue
-                if len(xtal.check_short_distance(r=0.5)) > 0:
+                if len(xtal.check_short_distances(r=0.5)) > 0:
                     continue
                 
                 db.add_xtal(

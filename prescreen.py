@@ -132,7 +132,7 @@ def relax_structure_mattersim(pmg_struct, calculator, structure_id=None, fmax=0.
             xtal.from_seed(pmg_struct, tol=tol)
             if not xtal.valid:
                 continue
-            if len(xtal.check_short_distance(r=0.5)) > 0:
+            if len(xtal.check_short_distances(r=0.5)) > 0:
                 continue
             atoms = xtal.to_ase()
             break
@@ -1080,7 +1080,7 @@ def main():
                             xtal.from_seed(res['pmg'], tol=tol)
                             if not xtal.valid:
                                 continue
-                            if len(xtal.check_short_distance(r=0.5)) > 0:
+                            if len(xtal.check_short_distances(r=0.5)) > 0:
                                 continue
                             db.add_xtal(
                                 xtal,
