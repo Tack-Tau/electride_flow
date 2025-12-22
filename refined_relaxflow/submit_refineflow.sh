@@ -36,7 +36,7 @@ echo "  - K-point density: 250 (vs 64 in original)"
 echo "  - RELAX NELM: 60 (more electronic steps)"
 echo "  - RELAX NSW: 100 (more ionic steps, vs 30 in original)"
 echo "  - 3-step consecutive relaxation workflow"
-echo "  - SLURM time per job: 2 hours (vs 20 minutes in original)"
+echo "  - SLURM time per job: 4 hours (vs 20 minutes in original)"
 echo ""
 
 # Load environment

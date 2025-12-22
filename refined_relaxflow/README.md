@@ -64,12 +64,12 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 │  Filter: Only high-symmetry candidates (space group > 15)           │
 │                                                                      │
 │  3-Step Progressive Relaxation:                                     │
-│    Step 1: NSW=100, ISIF=2, EDIFFG=-0.01, POTIM=0.2               │
-│      → Initial relaxation with smaller time steps                   │
-│    Step 2: NSW=100, ISIF=3, EDIFFG=-0.005, POTIM=0.1              │
-│      → Intermediate refinement                                      │
-│    Step 3: NSW=100, ISIF=3, EDIFFG=-0.001, POTIM=0.05 (final)     │
-│      → Final high-precision (0.001 eV/Å forces)                    │
+│    Step 1: NSW=100, ISIF=2, EDIFFG=-0.02, IBRION=2, POTIM=0.3     │
+│      → Quick ionic relaxation (CG optimizer), fixed cell            │
+│    Step 2: NSW=100, ISIF=3, EDIFFG=-0.01, IBRION=1, POTIM=0.2     │
+│      → Full relaxation with RMM-DIIS (robust optimizer)             │
+│    Step 3: NSW=100, ISIF=3, EDIFFG=-0.005, IBRION=1, POTIM=0.1    │
+│      → Final high-precision with RMM-DIIS                           │
 │                                                                      │
 │  Timeout handling: Continue if CONTCAR exists + electronic converged│
 │  Output: High-quality refined structures in REFINE_VASP_JOBS/       │
@@ -86,46 +86,52 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 | **Symmetrization** | PyXtal (progressive tolerance) | PyXtal (progressive tolerance, same) |
 | **Relaxation steps** | 1 step (NSW=30) | 3 progressive steps (NSW=100 each) |
 | **ISIF** | 3 (constant) | 2 → 3 → 3 (progressive) |
-| **Force convergence** | EDIFFG=-0.01 eV/Å | -0.01 → -0.005 → -0.001 eV/Å |
-| **POTIM** | 0.3 (default) | 0.2 → 0.1 → 0.05 (progressive) |
+| **IBRION** | 2 (CG) | 2 → 1 → 1 (CG then RMM-DIIS) |
+| **Force convergence** | EDIFFG=-0.01 eV/Å | -0.02 → -0.01 → -0.005 eV/Å |
+| **POTIM** | 0.3 (default) | 0.3 → 0.2 → 0.1 (progressive) |
 | **Electronic check** | End only (vasprun.xml) | After each step (OUTCAR grep) |
 | **Structure count** | All generated (~thousands) | Filtered candidates (~hundreds) |
 | **Space group filter** | None | Only space group > 15 |
 | **Timeout handling** | Mark as failed or timeout | Continue if electronic converged |
 | **Purpose** | Initial screening | High-precision refinement |
-| **Computational cost** | ~30 min/structure | ~1.5 hours/structure |
+| **Computational cost** | ~30 min/structure | ~2 hours/structure |
+| **SLURM wall time** | 20 minutes | 2 hours |
 
 ---
 
 ## Features
 
 ### 1. Progressive Relaxation Strategy
-Three-step relaxation with progressively tighter convergence:
+Three-step relaxation with progressively tighter convergence and robust optimizers:
 
-- **Step 1**: Initial relaxation
+- **Step 1**: Quick ionic relaxation (CG optimizer)
   - `ISIF=2` (relax ions only, fixed cell volume and shape)
-  - `EDIFFG=-0.01` eV/Å (moderate force convergence)
-  - `POTIM=0.2` (conservative step size for stability)
-  - Purpose: Relax ionic positions within fixed cell
+  - `IBRION=2` (Conjugate Gradient optimizer)
+  - `EDIFFG=-0.02` eV/Å (moderate force convergence)
+  - `POTIM=0.3` (standard step size for CG)
+  - Purpose: Quick initial relaxation of ionic positions
 
-- **Step 2**: Intermediate refinement
+- **Step 2**: Full relaxation (RMM-DIIS optimizer)
   - `ISIF=3` (relax ions + cell volume and shape)
-  - `EDIFFG=-0.005` eV/Å (tighter forces)
-  - `POTIM=0.1` (smaller step size for precision)
-  - Purpose: Refine both structure and cell with tighter convergence
+  - `IBRION=1` (RMM-DIIS optimizer - more robust than CG)
+  - `EDIFFG=-0.01` eV/Å (tighter forces)
+  - `POTIM=0.2` (smaller step size for stability)
+  - Purpose: Full cell+ion relaxation with robust optimizer
 
-- **Step 3**: Final high-precision
+- **Step 3**: Final high-precision (RMM-DIIS optimizer)
   - `ISIF=3` (relax ions + cell volume and shape)
-  - `EDIFFG=-0.001` eV/Å (very tight forces, publication quality)
-  - `POTIM=0.05` (very small steps for precise minimum)
+  - `IBRION=1` (RMM-DIIS optimizer)
+  - `EDIFFG=-0.005` eV/Å (tight forces)
+  - `POTIM=0.1` (small steps for precise minimum)
   - Purpose: Achieve high-precision structure for accurate ELF analysis
 
 **Benefits**:
 - ISIF=2 in step 1 avoids cell shape changes during initial relaxation
-- Conservative POTIM values prevent oscillations and ensure stability
+- **IBRION=1 (RMM-DIIS) in steps 2-3 avoids "ZBRENT: can't locate minimum" errors**
+- RMM-DIIS is more robust than CG for cell relaxation (ISIF=3)
 - Progressive tightening balances speed and accuracy
-- Final EDIFFG=-0.001 ensures atomic positions accurate to ~0.001 Å
-- Suitable for publication-quality structures
+- Conservative POTIM values prevent oscillations
+- Final EDIFFG=-0.005 ensures forces < 5 meV/Å
 
 ### 2. Electronic Convergence Validation
 After each step, checks OUTCAR for electronic SCF convergence:
@@ -517,7 +523,7 @@ Files to analyze:
 
 Check convergence:
 ```bash
-# Check final forces (should be < 0.002 eV/Å for step 3)
+# Check final forces (should be < 0.005 eV/Å for step 3)
 grep "TOTAL-FORCE" OUTCAR | tail -1
 
 # Check energy convergence
@@ -559,6 +565,7 @@ cat REFINE_VASP_JOBS/Ba2N_s001/Relax/OSZICAR
 - Increase EDIFF (if electronic convergence is tight)
 - Change ALGO (try All or VeryFast)
 - Check structure validity (no overlapping atoms)
+- Use IBRION=1 (RMM-DIIS) instead of IBRION=2 (CG) to avoid ZBRENT errors
 
 ---
 
@@ -593,7 +600,8 @@ After successful completion, each structure directory contains:
 
 | Resource | Original Workflow | Refined Workflow |
 |----------|------------------|------------------|
-| **Time/structure** | ~30 minutes | ~1.5 hours |
+| **Time/structure** | ~30 minutes | ~2 hours |
+| **SLURM wall time** | 20 minutes | 2 hours |
 | **CPU cores** | 16 per job | 16 per job |
 | **Memory** | 32 GB per job | 32 GB per job |
 | **Disk/structure** | ~200 MB | ~100 MB (with cleanup) |
@@ -602,8 +610,8 @@ After successful completion, each structure directory contains:
 ### Estimated Total Time
 
 For 200 filtered candidates with 10 concurrent jobs:
-- Wall time: ~30 hours (20 batches × 1.5 hours/batch)
-- Total core-hours: 200 × 1.5 × 16 = 4,800 core-hours
+- Wall time: ~40 hours (20 batches × 2 hours/batch)
+- Total core-hours: 200 × 2 × 16 = 6,400 core-hours
 - Disk usage: 200 × 100 MB = 20 GB
 
 ---
@@ -638,9 +646,16 @@ Solutions:
 ```
 Cause: VASP crashed or didn't finish before time limit
 Solutions:
-  - Increase --time in SLURM script (currently 00:30:00 per step)
+  - Increase --time in SLURM script (currently 02:00:00 total)
   - Check vasp_*.err for error messages
   - May need to reduce POTIM if oscillating
+```
+
+**5. "ZBRENT: can't locate minimum, use default step"**
+```
+Cause: Conjugate Gradient (IBRION=2) line search failed during cell relaxation
+Solution: Use IBRION=1 (RMM-DIIS) instead of IBRION=2 for ISIF=3 steps
+Note: This is already implemented in the refined workflow (IBRION=1 for steps 2-3)
 ```
 
 **5. "Too many structures, disk space running out"**
@@ -671,22 +686,32 @@ python3 reset_failed_jobs.py \
 Edit `refine_electrideflow.py` to modify INCAR settings for each step:
 
 ```python
-# Step 1 settings (line ~400)
-user_incar_settings={
-    'NSW': 30,
-    'EDIFFG': -0.005,
-    'POTIM': 0.3,
-    # Add custom settings here
-}
+# Step 1 settings (line ~367-370)
+if step == 1:
+    ediffg = -0.02   # Moderate force convergence
+    isif = 2         # Fixed cell, relax ions only
+    ibrion = 2       # Conjugate Gradient
+    potim = 0.3      # Standard CG step size
 
-# Step 3 settings (line ~430)
-user_incar_settings={
-    'NSW': 40,
-    'EDIFFG': -0.002,
-    'POTIM': 0.2,
-    # Add custom settings here
-}
+# Step 2 settings (line ~371-374)
+elif step == 2:
+    ediffg = -0.01   # Tighter forces
+    isif = 3         # Full relaxation
+    ibrion = 1       # RMM-DIIS (robust, avoids ZBRENT)
+    potim = 0.2      # Smaller step size
+
+# Step 3 settings (line ~375-378)
+elif step == 3:
+    ediffg = -0.005  # Tight forces
+    isif = 3         # Full relaxation
+    ibrion = 1       # RMM-DIIS (robust)
+    potim = 0.1      # Small step for precision
 ```
+
+**Why IBRION=1 for cell relaxation (ISIF=3)?**
+- Conjugate Gradient (IBRION=2) can fail with "ZBRENT: can't locate minimum" when relaxing cell shape
+- RMM-DIIS (IBRION=1) is more robust for variable-cell optimizations
+- This is particularly important for structures with soft modes or anisotropic cells
 
 ### Custom Space Group Filter
 

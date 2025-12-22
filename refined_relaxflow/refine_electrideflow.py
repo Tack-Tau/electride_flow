@@ -8,12 +8,13 @@ Uses finer k-point grid and consecutive relaxation steps for more accurate struc
 Key differences from workflow_manager.py:
 - Reads electride candidates from electride_candidates.db (PyXtal/ASE database)
 - Uses reciprocal_density=250 (vs 64) for all jobs
+- Uses primitive cells from PyXtal symmetrization (faster VASP calculations)
 - RELAX: 3 consecutive steps with progressive parameters (NELM=60, NSW=100 each)
-  * Step 1: ISIF=2, EDIFFG=-0.01, POTIM=0.2 (initial ionic relaxation, fixed cell)
-  * Step 2: ISIF=3, EDIFFG=-0.005, POTIM=0.1 (intermediate refinement)
-  * Step 3: ISIF=3, EDIFFG=-0.001, POTIM=0.05 (final high-precision)
+  * Step 1: ISIF=2, EDIFFG=-0.02, IBRION=2, POTIM=0.3 (quick ionic, CG optimizer)
+  * Step 2: ISIF=3, EDIFFG=-0.01, IBRION=1, POTIM=0.2 (full relax, RMM-DIIS)
+  * Step 3: ISIF=3, EDIFFG=-0.005, IBRION=1, POTIM=0.1 (tight, RMM-DIIS)
 - SPE workflow (SC/PARCHG/ELF) is skipped - only refined relaxation
-- SLURM time limit: 2 hours (vs 20 minutes)
+- SLURM time limit: 4 hours (vs 20 minutes)
 - Output to REFINE_VASP_JOBS folder
 
 Input:
@@ -344,15 +345,15 @@ class VASPWorkflowManager:
         Create VASP input files for refined 3-step relaxation.
         
         Progressive relaxation parameters:
-        - Step 1: ISIF=2, EDIFFG=-0.01, POTIM=0.2  (initial ionic relaxation, fixed cell)
-        - Step 2: ISIF=3, EDIFFG=-0.005, POTIM=0.1 (intermediate refinement)
-        - Step 3: ISIF=3, EDIFFG=-0.001, POTIM=0.05 (final high-precision)
+        - Step 1: ISIF=2, EDIFFG=-0.02, IBRION=2  (quick ionic relaxation, fixed cell)
+        - Step 2: ISIF=3, EDIFFG=-0.01, IBRION=1  (full relaxation with robust RMM-DIIS)
+        - Step 3: ISIF=3, EDIFFG=-0.005, IBRION=1 (final high-precision, robust optimizer)
         
         Key differences from workflow_manager.py:
         - Higher k-point density (250 vs 64)
         - More electronic/ionic steps (NELM=60, NSW=100)
         - Progressive tightening of convergence criteria
-        - Conservative POTIM values to prevent oscillations
+        - IBRION=1 (RMM-DIIS) for steps 2-3: more robust than CG, avoids ZBRENT errors
         
         Note: Structure is already PyXtal-symmetrized in load_electride_candidates(),
         so we use it directly here.
@@ -365,17 +366,20 @@ class VASPWorkflowManager:
         
         # Progressive relaxation parameters for each step
         if step == 1:
-            ediffg = -0.01
+            ediffg = -0.02
             isif = 2
-            potim = 0.2
+            ibrion = 2
+            potim = 0.3
         elif step == 2:
+            ediffg = -0.01
+            isif = 3
+            ibrion = 1
+            potim = 0.2
+        elif step == 3:
             ediffg = -0.005
             isif = 3
+            ibrion = 1
             potim = 0.1
-        elif step == 3:
-            ediffg = -0.001
-            isif = 3
-            potim = 0.05
         else:
             raise ValueError(f"Invalid step number: {step}. Must be 1, 2, or 3.")
         
@@ -386,7 +390,7 @@ class VASPWorkflowManager:
                 'ADDGRID': True,
                 'EDIFF': 1e-6,
                 'EDIFFG': ediffg,
-                'IBRION': 2,
+                'IBRION': ibrion,
                 'ISIF': isif,
                 'NELM': 60,
                 'NSW': 100,
@@ -412,9 +416,9 @@ class VASPWorkflowManager:
         
         Progressive Relaxation Strategy:
         --------------------------------
-        - Step 1: ISIF=2, EDIFFG=-0.01, POTIM=0.2 (initial ionic relaxation, fixed cell)
-        - Step 2: ISIF=3, EDIFFG=-0.005, POTIM=0.1 (intermediate refinement)
-        - Step 3: ISIF=3, EDIFFG=-0.001, POTIM=0.05 (final high-precision)
+        - Step 1: ISIF=2, EDIFFG=-0.02, IBRION=2, POTIM=0.3 (quick ionic, CG)
+        - Step 2: ISIF=3, EDIFFG=-0.01, IBRION=1, POTIM=0.2 (full relax, RMM-DIIS)
+        - Step 3: ISIF=3, EDIFFG=-0.005, IBRION=1, POTIM=0.1 (tight, RMM-DIIS)
         
         Timeout/Failure Handling:
         -------------------------
@@ -438,7 +442,7 @@ class VASPWorkflowManager:
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
 #SBATCH --mem=32G
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --output={job_dir}/vasp_%j.out
 #SBATCH --error={job_dir}/vasp_%j.err
 
@@ -480,7 +484,7 @@ echo "Start time: $(date)"
 echo ""
 echo "========================================"
 echo "Relaxation Step 1/3"
-echo "  ISIF=2, EDIFFG=-0.01, POTIM=0.2"
+echo "  ISIF=2, EDIFFG=-0.02, IBRION=2, POTIM=0.3"
 echo "========================================"
 
 # Save initial POSCAR for debugging
@@ -550,7 +554,7 @@ rm -f WAVECAR CHGCAR CHG WFULL TMPCAR AECCAR* 2>/dev/null
 echo ""
 echo "========================================"
 echo "Relaxation Step 2/3"
-echo "  ISIF=3, EDIFFG=-0.005, POTIM=0.1"
+echo "  ISIF=3, EDIFFG=-0.01, IBRION=1 (RMM-DIIS), POTIM=0.2"
 echo "========================================"
 
 # Save POSCAR for debugging (should be identical to step 1 CONTCAR)
@@ -620,7 +624,7 @@ rm -f WAVECAR CHGCAR CHG WFULL TMPCAR AECCAR* 2>/dev/null
 echo ""
 echo "========================================"
 echo "Relaxation Step 3/3"
-echo "  ISIF=3, EDIFFG=-0.001, POTIM=0.05"
+echo "  ISIF=3, EDIFFG=-0.005, IBRION=1 (RMM-DIIS), POTIM=0.1"
 echo "========================================"
 
 # Save POSCAR for debugging (should be identical to step 2 CONTCAR)
@@ -752,9 +756,9 @@ touch VASP_DONE
         Submit relaxation job for a structure.
         
         Generates 3 INCAR files (INCAR-1, INCAR-2, INCAR-3) with progressive parameters:
-        - INCAR-1: ISIF=2, EDIFFG=-0.01, POTIM=0.2
-        - INCAR-2: ISIF=3, EDIFFG=-0.005, POTIM=0.1
-        - INCAR-3: ISIF=3, EDIFFG=-0.001, POTIM=0.05
+        - INCAR-1: ISIF=2, EDIFFG=-0.02, IBRION=2, POTIM=0.3
+        - INCAR-2: ISIF=3, EDIFFG=-0.01, IBRION=1, POTIM=0.2
+        - INCAR-3: ISIF=3, EDIFFG=-0.005, IBRION=1, POTIM=0.1
         """
         sdata = self.db.get_structure(struct_id)
         if not sdata:
