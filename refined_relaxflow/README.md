@@ -209,6 +209,14 @@ python3 filter_comb_db.py \
   - `refine_electrideflow.py` (Python workflow manager)
   - `run_refineflow.sh` (submission wrapper)
   - `submit_refineflow.sh` (SLURM job script)
+- MatterSim e_hull scripts:
+  - `compute_mattersim_e_hull.py` (MatterSim relaxation and hull calculation)
+  - `run_mattersim_e_hull.sh` (submission wrapper)
+  - `submit_mattersim_e_hull.sh` (SLURM job script)
+- Stable electride extraction scripts:
+  - `get_stable_ele_db.py` (extract stable candidates to CSV/database)
+  - `run_get_stable_db.sh` (submission wrapper)
+  - `submit_get_stable_db.sh` (SLURM job script)
 
 ---
 
@@ -802,16 +810,20 @@ cp workflow.json workflow_backup_$(date +%Y%m%d).json
 4. Refined Relaxation (refine_electrideflow.py)  ← THIS WORKFLOW
    → REFINE_VASP_JOBS/
    
-5. MatterSim Validation (optional, compute_mattersim_e_hull.py)
+5. MatterSim Validation (compute_mattersim_e_hull.py)
    → REFINE_VASP_JOBS/mattersim_stability_results.json
    
 6. DFT Hull Comparison (compute_dft_e_hull.py)
    → REFINE_VASP_JOBS/dft_stability_results.json
    → REFINE_VASP_JOBS/hull_comparison.json + plots
    
-7. Final Analysis
-   - Extract refined CONTCARs
-   - Re-run ELF/PARCHG on refined structures (if needed)
+7. Extract Stable Electrides (get_stable_ele_db.py)
+   → REFINE_VASP_JOBS/stable_electrides.csv
+   → REFINE_VASP_JOBS/stable_electrides.db
+   
+8. Final Analysis
+   - Analyze stable_electrides.csv/db for publication
+   - Re-run ELF/PARCHG on stable structures (if needed)
    - Compare with initial screening results
 ```
 
@@ -1044,7 +1056,187 @@ bash run_dft_e_hull.sh \
 
 # 5. View comparison results
 cat REFINE_VASP_JOBS/hull_comparison.json
+
+# 6. Extract stable electride candidates (both MatterSim and DFT stable)
+cd refined_relaxflow/
+bash run_get_stable_db.sh \
+    --refine-jobs ../REFINE_VASP_JOBS \
+    --electride-csv ../electride_candidates.csv
+
+# This:
+#   - Filters structures with mattersim_e_hull < 0.005 AND dft_e_hull < 0.005
+#   - Loads refined CONTCARs and extracts spacegroups via PyXtal
+#   - Merges electride volumes (e0025, e05, e10, band0, band1) from electride_candidates.csv
+#   - Merges energy data from mattersim_stability_results.json and dft_stability_results.json
+#
+# Output:
+#   REFINE_VASP_JOBS/stable_electrides.csv  (sorted by spacegroup, descending)
+#   REFINE_VASP_JOBS/stable_electrides.db   (PyXtal database with symmetrized structures)
 ```
+
+---
+
+## Extract Stable Electride Database
+
+After completing both MatterSim and DFT hull calculations, extract the final list of thermodynamically stable electride candidates that are confirmed by both methods.
+
+### Purpose
+
+Filter and consolidate stable electride candidates:
+- **Dual validation**: Only includes structures stable by both MatterSim AND VASP-DFT
+- **High-precision structures**: Uses refined 3-step relaxed CONTCARs
+- **Complete metadata**: Combines electride volumes, energies, and e_hull values
+- **PyXtal database**: Symmetrized structures ready for further analysis
+
+### Scripts
+
+1. **`get_stable_ele_db.py`** - Main Python script
+   - Reads `hull_comparison.json` for e_hull values
+   - Reads `mattersim_stability_results.json` for MatterSim energies
+   - Reads `dft_stability_results.json` for VASP-DFT energies
+   - Reads `electride_candidates.csv` for volume data (e0025, e05, e10, band0, band1)
+   - Loads CONTCARs from `REFINE_VASP_JOBS/*/Relax/`
+   - Extracts spacegroups via PyXtal symmetrization
+   - Outputs CSV and PyXtal database
+
+2. **`submit_get_stable_db.sh`** - SLURM job script (CPU-only)
+
+3. **`run_get_stable_db.sh`** - Wrapper to validate inputs and submit job
+
+### Usage
+
+```bash
+cd refined_relaxflow/
+
+# Basic usage (uses defaults)
+bash run_get_stable_db.sh
+
+# Custom settings
+bash run_get_stable_db.sh \
+    --refine-jobs ../REFINE_VASP_JOBS \
+    --electride-csv ../electride_candidates.csv \
+    --threshold 0.005
+```
+
+### Options (run_get_stable_db.sh)
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--refine-jobs` | Refined VASP jobs directory | `./REFINE_VASP_JOBS` |
+| `--electride-csv` | Electride candidates CSV with volume data | `./electride_candidates.csv` |
+| `--threshold` | Energy above hull threshold (eV/atom) | `0.005` |
+| `--conda-env` | Conda environment name | `vaspflow` |
+
+### Input Files
+
+| File | Source | Contents |
+|------|--------|----------|
+| `hull_comparison.json` | `run_dft_e_hull.sh` | `mattersim_e_hull`, `dft_e_hull` |
+| `mattersim_stability_results.json` | `run_mattersim_e_hull.sh` | `mattersim_energy_per_atom` |
+| `dft_stability_results.json` | `run_dft_e_hull.sh` | `vasp_energy_per_atom` |
+| `electride_candidates.csv` | `filter_comb_db.py` | `e0025`, `e05`, `e10`, `band0`, `band1` |
+| `workflow.json` | `run_refineflow.sh` | Structure paths and states |
+| `*/Relax/CONTCAR` | Refined workflow | Relaxed structures |
+
+### Output Files
+
+| File | Description |
+|------|-------------|
+| `stable_electrides.csv` | CSV sorted by spacegroup (highest first) |
+| `stable_electrides.db` | PyXtal database with symmetrized structures |
+
+### CSV Columns
+
+| Column | Description |
+|--------|-------------|
+| `formula` | Structure ID (e.g., `Ba2N_s001`) |
+| `composition` | Chemical composition |
+| `e0025` | Interstitial volume at E_F-0.025 eV |
+| `e05` | Interstitial volume at E_F-0.5 eV |
+| `e10` | Interstitial volume at E_F-1.0 eV |
+| `band0` | Interstitial volume for band 0 |
+| `band1` | Interstitial volume for band 1 |
+| `spacegroup` | Space group number from PyXtal |
+| `mattersim_energy_per_atom` | MatterSim energy (eV/atom) |
+| `mattersim_e_hull` | MatterSim energy above hull (eV/atom) |
+| `vasp_energy_per_atom` | VASP-DFT energy (eV/atom) |
+| `dft_e_hull` | VASP-DFT energy above hull (eV/atom) |
+
+### Database Fields
+
+Same as CSV columns, with:
+- `space_group_number` (instead of `spacegroup`)
+- `symmetrized` (bool: True if PyXtal symmetrization succeeded)
+- Full atomic structure stored
+
+### Filtering Criteria
+
+Structures pass if **both**:
+- `mattersim_e_hull < threshold` (default: 0.005 eV/atom)
+- `dft_e_hull < threshold` (default: 0.005 eV/atom)
+
+### SLURM Resources
+
+- **Partition**: Orion, Apus (CPU-only, no GPU needed)
+- **CPUs**: 8 cores
+- **Memory**: 16 GB
+- **Time limit**: 1 hour
+
+### Example Output
+
+```
+======================================================================
+Summary
+======================================================================
+Total matched structures: 150
+Stable (both e_hull < 0.005): 42
+Successfully processed: 42
+Failed to process: 0
+Saved to database: 42
+Database save failed: 0
+
+Output CSV: REFINE_VASP_JOBS/stable_electrides.csv
+Output database: REFINE_VASP_JOBS/stable_electrides.db
+======================================================================
+
+Stable Electride Candidates (sorted by spacegroup, descending):
++-------------------+-------------+-------+------+------+-------+-------+------------+-------------------+------------+
+| formula           | composition | e0025 | e05  | e10  | band0 | band1 | spacegroup | mattersim_e_hull  | dft_e_hull |
++-------------------+-------------+-------+------+------+-------+-------+------------+-------------------+------------+
+| Ca12Al14_s001     | Ca12Al14    | 45.2  | 38.1 | 28.3 | 52.1  | 48.7  |        225 |          0.000000 |   0.001234 |
+| Ba2N_s003         | Ba2N        | 32.5  | 28.9 | 22.1 | 35.6  | 33.2  |        166 |          0.000000 |   0.002156 |
+...
+```
+
+### Troubleshooting
+
+**"mattersim_energy_per_atom: None" errors**
+```bash
+# Verify MatterSim results file exists and has data
+cat REFINE_VASP_JOBS/mattersim_stability_results.json | head -50
+
+# Check if structure is in MatterSim results
+grep "structure_id_here" REFINE_VASP_JOBS/mattersim_stability_results.json
+```
+
+**"Could not save to database" warnings**
+```bash
+# Usually means PyXtal symmetrization failed for that structure
+# Structure is still saved to CSV, just not to database
+# Check if structure has unusual geometry or very low symmetry
+```
+
+**Empty output (no stable structures)**
+```bash
+# Try increasing threshold
+bash run_get_stable_db.sh --threshold 0.01
+
+# Or check hull comparison for available structures
+jq '.matched_structures | length' REFINE_VASP_JOBS/hull_comparison.json
+jq '[.matched_structures[] | select(.mattersim_e_hull < 0.01 and .dft_e_hull < 0.01)] | length' REFINE_VASP_JOBS/hull_comparison.json
+```
+
+---
 
 ### Troubleshooting
 
