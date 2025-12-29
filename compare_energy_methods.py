@@ -279,7 +279,21 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
                 if vr.converged:
                     final_energy = vr.final_energy
                     structure = vr.final_structure
+                    
+                    # Check for float overflow (NaN or inf values)
+                    if not np.isfinite(final_energy):
+                        if struct_id in ms_energies:
+                            vasp_no_data.append(struct_id)
+                        continue
+                    
                     energy_per_atom = final_energy / len(structure)
+                    
+                    # Double-check energy_per_atom is also finite
+                    if not np.isfinite(energy_per_atom):
+                        if struct_id in ms_energies:
+                            vasp_no_data.append(struct_id)
+                        continue
+                    
                     converged = True
                 else:
                     if struct_id in ms_energies:
@@ -313,7 +327,13 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
                                 parts = line.split('=')
                                 if len(parts) >= 2:
                                     energy_str = parts[1].split()[0]
+                                    # Handle overflow markers like '*******'
+                                    if '*' in energy_str:
+                                        continue
                                     final_energy = float(energy_str)
+                                    # Check for float overflow
+                                    if not np.isfinite(final_energy):
+                                        final_energy = None
                             except (ValueError, IndexError):
                                 continue
                 
@@ -332,6 +352,13 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
                 structure = Structure.from_file(str(contcar_path))
                 n_atoms = len(structure)
                 energy_per_atom = final_energy / n_atoms
+                
+                # Check for float overflow in energy_per_atom
+                if not np.isfinite(energy_per_atom):
+                    if struct_id in ms_energies:
+                        vasp_no_data.append(struct_id)
+                    continue
+                
                 converged = True
                 
             except Exception:
