@@ -3,7 +3,7 @@
 Compute MatterSim energy_above_hull for refined VASP-relaxed structures.
 
 This script:
-1. Queries MP API for GGA/GGA+U reference phases in required chemical systems
+1. Queries MP API for GGA/GGA+U reference phases (using legacy pymatgen MPRester)
 2. Relaxes MP phases with MatterSim (fmax=0.001, max_steps=800 - matching refined VASP)
 3. Loads high-precision VASP-relaxed structures from REFINE_VASP_JOBS
 4. Relaxes refined structures with MatterSim (same tight convergence)
@@ -14,7 +14,8 @@ Key differences from prescreen.py:
 - Input: VASP-relaxed CONTCARs from refined 3-step relaxation (not CIFs from mattergen)
 - Symmetrization: Structures are symmetrized via PyXtal
 - Tighter convergence: fmax=0.001 vs 0.01, max_steps=800 vs 500
-- MP phases: Query and relax with same tight convergence for consistency
+- MP phases: Uses legacy pymatgen MPRester for complete GGA coverage (not mp_api.client)
+- MP filtering: Strict '-GGA' or '-GGA+U' suffix only
 - Output: Similar to compute_dft_e_hull.py for easy comparison
 
 Usage:
@@ -54,10 +55,10 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from mp_api.client import MPRester
+    from pymatgen.ext.matproj import MPRester
 except ImportError:
-    print("ERROR: mp-api package is required")
-    print("Install with: pip install mp-api")
+    print("ERROR: pymatgen package with MPRester is required")
+    print("Install with: pip install pymatgen")
     sys.exit(1)
 
 import numpy as np
@@ -208,12 +209,13 @@ def save_mp_cache(cache_file, entries_data):
     print(f"    Saved cache: {cache_file} ({len(entries_data)} total entries)")
 
 
-def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cached_data, calculator, fmax=0.001, max_steps=800):
+def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cached_data, calculator, fmax=0.001, max_steps=800, pure_pbe=False):
     """
     Get MP GGA phases and relax with MatterSim using tight convergence.
     
-    Uses same methodology as prescreen.py but with tighter convergence criteria
-    to match refined VASP structures (fmax=0.001, max_steps=800).
+    Uses legacy pymatgen.ext.matproj.MPRester for complete GGA entry coverage.
+    Strict filtering: only entries with '-GGA' or '-GGA+U' suffix.
+    Tighter convergence than prescreen (fmax=0.001, max_steps=800) to match refined VASP.
     
     Args:
         chemsys: Chemical system string (e.g., 'B-Li-N')
@@ -222,6 +224,8 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cached_data, calculator,
         calculator: MatterSimCalculator instance (reused)
         fmax: Force convergence criterion (default: 0.001, tighter than prescreen)
         max_steps: Maximum optimization steps (default: 800, more than prescreen)
+        pure_pbe: If True, filter to GGA-PBE only (exclude PBE+U)
+                  If False (default), accept both PBE and PBE+U
     
     Returns:
         tuple: (List of PDEntry objects, List of new cache entries to add)
@@ -259,186 +263,132 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cached_data, calculator,
         return entries, []
     
     # Need to query MP for missing data
-    print(f"    Querying MP for GGA phases in {chemsys}...")
+    print(f"    Querying MP for GGA phases in {chemsys} (using legacy API for complete coverage)...")
     if missing_chemsys:
         print(f"      Missing subsystems: {sorted(missing_chemsys)}")
     
     try:
-                with MPRester(mp_api_key) as mpr:
-                    computed_entries = mpr.get_entries_in_chemsys(
-                        elements,
-                        property_data=None,
-                        conventional_unit_cell=False,
-                        additional_criteria={}
-                    )
+        # Use legacy pymatgen MPRester which returns complete GGA entries
+        mpr = MPRester(mp_api_key)
+        
+        # Get ALL entries in this chemical system
+        computed_entries = mpr.get_entries_in_chemsys(elements)
+        
+        print(f"    Retrieved {len(computed_entries)} entries from MP (filtering for GGA...)")
+        
+        # Filter for GGA only (entry_id ending with '-GGA' or '-GGA+U')
+        mp_phases = []
+        seen_entries = {}
+        skipped_structure_retrieval = []
+        
+        for comp_entry in computed_entries:
+            entry_id = str(comp_entry.entry_id)
+            
+            # Skip if already seen
+            if entry_id in seen_entries:
+                continue
+            
+            # Only accept entries ending with '-GGA' or '-GGA+U'
+            is_pure_gga = entry_id.endswith('-GGA')
+            is_gga_u = entry_id.endswith('-GGA+U')
+            
+            # Skip non-GGA entries (r2SCAN, SCAN, or no suffix)
+            if not is_pure_gga and not is_gga_u:
+                continue
+            
+            # Skip +U if pure_pbe requested
+            if pure_pbe and is_gga_u:
+                continue
+            
+            # Extract base MP ID (e.g., 'mp-540703' from 'mp-540703-GGA')
+            parts = entry_id.split('-')
+            if len(parts) >= 2:
+                mp_id = parts[0] + '-' + parts[1]
+            else:
+                mp_id = entry_id
+            
+            # Get structure
+            structure = None
+            try:
+                structure = mpr.get_structure_by_material_id(mp_id)
+            except Exception as e:
+                skipped_structure_retrieval.append(f"{mp_id} ({comp_entry.composition.reduced_formula})")
+                continue
+            
+            if structure is None:
+                continue
+            
+            mp_phases.append((mp_id, structure, is_gga_u))
+            seen_entries[entry_id] = True
+        
+        if skipped_structure_retrieval:
+            print(f"    WARNING: Could not retrieve structures for {len(skipped_structure_retrieval)} phases")
                     
-                    print(f"    Retrieved {len(computed_entries)} entries from MP")
+        print(f"    Filtered to {len(mp_phases)} GGA phases with structures (strict '-GGA'/'-GGA+U' suffix)")
+        
+        # Verify terminal phases
+        elements_found = set()
+        for mp_id, structure, is_gga_u in mp_phases:
+            if len(structure.composition.elements) == 1:
+                elements_found.add(str(structure.composition.elements[0]))
+        
+        expected_elements = set(elements)
+        if elements_found != expected_elements:
+            missing = expected_elements - elements_found
+            print(f"    WARNING: Missing terminal phases for elements: {sorted(missing)}")
+        else:
+            print(f"      All terminal phases present: {sorted(elements_found)}")
                     
-                    # Filter for GGA/GGA+U, get structures
-                    mp_phases = []
-                    seen_formulas = {}
-                    skipped_structure_retrieval = []
-                    
-                    for comp_entry in computed_entries:
-                        entry_id = comp_entry.entry_id
-                        
-                        # Filter by functional
-                        has_U = False
-                        has_SCAN = False
-                        is_gga = False
-                        
-                        if '-GGA' in entry_id:
-                            is_gga = True
-                        elif '-GGA+U' in entry_id or '_GGA+U' in entry_id:
-                            has_U = True
-                            is_gga = True
-                        elif '-r2SCAN' in entry_id or '_r2SCAN' in entry_id:
-                            has_SCAN = True
-                        elif '-SCAN' in entry_id or '_SCAN' in entry_id:
-                            has_SCAN = True
-                        else:
-                            is_gga = True
-                        
-                        if has_SCAN or not is_gga:
-                            continue
-                        
-                        # Get MP ID
-                        mp_id_parts = entry_id.split('-')
-                        if len(mp_id_parts) >= 2:
-                            mp_id = mp_id_parts[0] + '-' + mp_id_parts[1]
-                        else:
-                            mp_id = entry_id
-                        
-                        # Extract structure
-                        structure = None
-                        try:
-                            structure = mpr.get_structure_by_material_id(mp_id)
-                        except Exception:
-                            try:
-                                summary_docs = mpr.materials.summary.search(
-                                    material_ids=[mp_id],
-                                    fields=["material_id", "structure"]
-                                )
-                                if summary_docs and len(summary_docs) > 0:
-                                    structure = summary_docs[0].structure
-                            except Exception:
-                                skipped_structure_retrieval.append(f"{mp_id} ({comp_entry.composition.reduced_formula})")
-                                continue
-                        
-                        if structure is None:
-                            continue
-                        
-                        formula = structure.composition.reduced_formula
-                        
-                        # Handle duplicates: prefer pure GGA over GGA+U
-                        if formula in seen_formulas:
-                            existing_has_U = seen_formulas[formula]['has_U']
-                            if not has_U and existing_has_U:
-                                mp_phases = [(mid, s, has_u) for mid, s, has_u in mp_phases 
-                                            if s.composition.reduced_formula != formula]
-                            else:
-                                continue
-                        
-                        mp_phases.append((mp_id, structure, has_U))
-                        seen_formulas[formula] = {'mp_id': mp_id, 'has_U': has_U}
-                    
-                    if skipped_structure_retrieval:
-                        print(f"    WARNING: Could not retrieve structures for {len(skipped_structure_retrieval)} phases")
-                    
-                    print(f"    Filtered to {len(mp_phases)} GGA/GGA+U phases with structures")
-                    
-                    # Verify terminal phases
-                    elements_found = set()
-                    for mp_id, structure, has_U in mp_phases:
-                        if len(structure.composition.elements) == 1:
-                            elements_found.add(str(structure.composition.elements[0]))
-                    
-                    expected_elements = set(elements)
-                    if elements_found != expected_elements:
-                        missing = expected_elements - elements_found
-                        print(f"    WARNING: Missing terminal phases for elements: {sorted(missing)}")
-                        print(f"    Querying elemental phases directly...")
-                        
-                        for missing_elem in sorted(missing):
-                            try:
-                                elem_docs = mpr.materials.summary.search(
-                                    elements=[missing_elem],
-                                    num_elements=(1, 1),
-                                    fields=['material_id', 'structure', 'energy_per_atom']
-                                )
-                                
-                                if not elem_docs:
-                                    continue
-                                
-                                gga_docs = []
-                                for doc in elem_docs:
-                                    mp_id = doc.material_id
-                                    if '-r2SCAN' in mp_id or '-SCAN' in mp_id or '_r2SCAN' in mp_id or '_SCAN' in mp_id:
-                                        continue
-                                    gga_docs.append(doc)
-                                
-                                if gga_docs:
-                                    elem_doc = sorted(gga_docs, key=lambda d: d.energy_per_atom)[0]
-                                    elem_mp_id = elem_doc.material_id
-                                    elem_structure = elem_doc.structure
-                                    print(f"        Found {elem_mp_id} for {missing_elem}")
-                                    mp_phases.append((elem_mp_id, elem_structure, False))
-                                    elements_found.add(missing_elem)
-                            except Exception as e:
-                                print(f"        ERROR querying {missing_elem}: {e}")
-                    else:
-                        print(f"      All terminal phases present: {sorted(elements_found)}")
-                    
-                    print(f"    Relaxing {len(mp_phases)} phases with MatterSim (fmax={fmax}, max_steps={max_steps})...")
-                    
-                    new_entries_data = []
-                    success_count = 0
-                    failed_count = 0
-                    
-                    for mp_id, structure, has_U in mp_phases:
-                        # Determine chemsys for this phase
-                        doc_elements = sorted([str(el) for el in structure.composition.elements])
-                        doc_chemsys = '-'.join(doc_elements)
-                        
-                        # Skip if already cached
-                        entry_id_cached = f"mp_mattersim_{mp_id}"
-                        cache_key = (doc_chemsys, entry_id_cached)
-                        if cache_key in cached_data:
-                            continue
-                        
-                        # Relax with MatterSim using tight convergence
-                        relaxed_struct, energy_per_atom, error_msg = relax_structure_mattersim(
-                            structure, calculator, structure_id=mp_id, fmax=fmax, max_steps=max_steps
-                        )
-                        
-                        if relaxed_struct is None or energy_per_atom is None:
-                            print(f"      Warning: Failed to relax {mp_id}: {error_msg}")
-                            failed_count += 1
-                            continue
-                        
-                        total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
-                        
-                        entry = PDEntry(
-                            composition=relaxed_struct.composition,
-                            energy=total_energy,
-                            name=f"mp_mattersim_{mp_id}"
-                        )
-                        entries.append(entry)
-                        
-                        new_entries_data.append({
-                            'chemsys': doc_chemsys,
-                            'composition': {str(el): float(amt) for el, amt in relaxed_struct.composition.items()},
-                            'energy': total_energy,
-                            'entry_id': f"mp_mattersim_{mp_id}",
-                            'mp_id': mp_id
-                        })
-                        success_count += 1
-                    
-                print(f"    Successfully relaxed {success_count} GGA phases")
-                if failed_count > 0:
-                    print(f"    Failed to relax {failed_count} phases")
-                
-                return entries, new_entries_data
+        print(f"    Relaxing {len(mp_phases)} phases with MatterSim (fmax={fmax}, max_steps={max_steps})...")
+        
+        new_entries_data = []
+        success_count = 0
+        failed_count = 0
+        
+        for mp_id, structure, is_gga_u in mp_phases:
+            # Determine chemsys for this phase
+            doc_elements = sorted([str(el) for el in structure.composition.elements])
+            doc_chemsys = '-'.join(doc_elements)
+            
+            # Skip if already cached
+            entry_id_cached = f"mp_mattersim_{mp_id}"
+            cache_key = (doc_chemsys, entry_id_cached)
+            if cache_key in cached_data:
+                continue
+            
+            # Relax with MatterSim using tight convergence
+            relaxed_struct, energy_per_atom, error_msg = relax_structure_mattersim(
+                structure, calculator, structure_id=mp_id, fmax=fmax, max_steps=max_steps
+            )
+            
+            if relaxed_struct is None or energy_per_atom is None:
+                print(f"      Warning: Failed to relax {mp_id}: {error_msg}")
+                failed_count += 1
+                continue
+            
+            total_energy = energy_per_atom * relaxed_struct.composition.num_atoms
+            
+            entry = PDEntry(
+                composition=relaxed_struct.composition,
+                energy=total_energy,
+                name=f"mp_mattersim_{mp_id}"
+            )
+            entries.append(entry)
+            
+            new_entries_data.append({
+                'chemsys': doc_chemsys,
+                'composition': {str(el): float(amt) for el, amt in relaxed_struct.composition.items()},
+                'energy': total_energy,
+                'entry_id': f"mp_mattersim_{mp_id}",
+                'mp_id': mp_id
+            })
+            success_count += 1
+        
+        print(f"    Successfully relaxed {success_count} GGA phases")
+        if failed_count > 0:
+            print(f"    Failed to relax {failed_count} phases")
+        
+        return entries, new_entries_data
                 
     except Exception as e:
         print(f"    Error querying MP for {chemsys}: {e}")
@@ -509,6 +459,13 @@ def main():
         default='mattersim_stability_results.json',
         help="Output JSON file (default: mattersim_stability_results.json)"
     )
+    parser.add_argument(
+        '--pure-pbe',
+        action='store_true',
+        help="Filter MP entries to pure GGA-PBE only (exclude PBE+U). "
+             "Default: accept both PBE and PBE+U for accurate phase diagrams. "
+             "Use this flag to match DFT calculations using pure PBE without +U corrections."
+    )
     
     args = parser.parse_args()
     
@@ -537,6 +494,12 @@ def main():
     print(f"Output file: {output_path}")
     print(f"Device: {args.device}")
     print(f"Convergence: fmax=0.001 eV/Å, max_steps=800 (tighter than prescreen)")
+    
+    if args.pure_pbe:
+        print(f"Functional filtering: Pure GGA-PBE only (PBE+U/R2SCAN/SCAN excluded)")
+    else:
+        print(f"Functional filtering: Mixed PBE/PBE+U (MP recommended methodology)")
+    
     print("="*70 + "\n")
     
     # Load workflow database
@@ -601,33 +564,94 @@ def main():
     cached_data = load_mp_cache(mp_cache_local)
     print(f"  Loaded {len(cached_data)} cached entries\n")
     
-    # Pre-fetch and relax MP stable phases with tight convergence
+    # Pre-populate MP cache with all required chemical systems
+    # This ensures complete GGA coverage for all subsystems
     print("="*70)
-    print("Querying and Relaxing MP GGA Phases (Tight Convergence)")
+    print("Pre-populating MP Cache for Complete GGA Coverage")
     print("="*70)
     print(f"Chemical systems: {len(unique_chemsys)}")
-    print(f"Convergence: fmax=0.001 eV/Å, max_steps=800 (matching refined structures)")
-    print("Strategy: Query ALL GGA/GGA+U entries, relax with MatterSim")
+    print(f"Strategy: Query ALL subsystems to match DFT cache completeness")
+    print("="*70 + "\n")
+    
+    # Build list of all required subsystems (including elementals, binaries, etc.)
+    all_required_chemsys = set()
+    for chemsys in unique_chemsys:
+        elements = chemsys.split('-')
+        # Add all subsystems
+        for n in range(1, len(elements) + 1):
+            from itertools import combinations
+            for combo in combinations(elements, n):
+                all_required_chemsys.add('-'.join(sorted(combo)))
+    
+    print(f"Total unique subsystems needed: {len(all_required_chemsys)}")
+    print(f"  (including elementals, binaries, ternaries, etc.)")
+    print()
+    
+    # Pre-populate cache by querying all subsystems
+    for chemsys in sorted(all_required_chemsys):
+        # Check if this chemsys is already complete in cache
+        elements = chemsys.split('-')
+        cached_count = 0
+        for key, item in cached_data.items():
+            item_chemsys = key[0]
+            if item_chemsys == chemsys:
+                cached_count += 1
+        
+        if cached_count > 0:
+            print(f"  {chemsys}: Using {cached_count} cached phases")
+            continue
+        
+        print(f"  {chemsys}: Querying and relaxing MP phases...")
+        sys.stdout.flush()
+        
+        try:
+            # Force query by using empty cache dict
+            _, new_cache_entries = get_mp_stable_phases_mattersim(
+                chemsys, mp_api_key, {}, calc, fmax=0.001, max_steps=800, pure_pbe=args.pure_pbe
+            )
+            
+            # Add to cache
+            for new_entry in new_cache_entries:
+                key = (new_entry['chemsys'], new_entry['entry_id'])
+                cached_data[key] = new_entry
+            
+            print(f"    → Added {len(new_cache_entries)} phases to cache")
+            
+        except Exception as e:
+            print(f"    → Error: {e}")
+        
+        sys.stdout.flush()
+    
+    print()
+    print("="*70)
+    print("MP cache pre-population complete")
+    print(f"Total cached entries: {len(cached_data)}")
+    print("="*70 + "\n")
+    
+    # Save updated cache after pre-population
+    if cached_data:
+        print("Saving pre-populated MP cache...")
+        all_cache_list = list(cached_data.values())
+        save_mp_cache(mp_cache_local, all_cache_list)
+        print()
+    
+    # Now fetch MP entries for actual structure processing
+    print("="*70)
+    print("Loading MP GGA Phases for Structure Processing")
+    print("="*70)
+    print(f"Chemical systems: {len(unique_chemsys)}")
     print("="*70 + "\n")
     
     mp_entries_cache = {}
-    all_new_cache_entries = []
     
     for chemsys in unique_chemsys:
-        print(f"Fetching MP stable phases for {chemsys}...")
+        print(f"Loading MP phases for {chemsys}...")
         sys.stdout.flush()
         try:
-            mp_entries, new_cache_entries = get_mp_stable_phases_mattersim(
-                chemsys, mp_api_key, cached_data, calc, fmax=0.001, max_steps=800
+            mp_entries, _ = get_mp_stable_phases_mattersim(
+                chemsys, mp_api_key, cached_data, calc, fmax=0.001, max_steps=800, pure_pbe=args.pure_pbe
             )
             mp_entries_cache[chemsys] = mp_entries
-            
-            # Collect new cache entries
-            for new_entry in new_cache_entries:
-                key = (new_entry['chemsys'], new_entry['entry_id'])
-                if key not in cached_data:
-                    all_new_cache_entries.append(new_entry)
-                    cached_data[key] = new_entry
             
             print(f"  → {len(mp_entries)} stable phases ready\n")
             sys.stdout.flush()
@@ -636,14 +660,8 @@ def main():
             sys.stdout.flush()
             mp_entries_cache[chemsys] = []
     
-    # Save updated cache
-    if all_new_cache_entries:
-        print(f"Saving updated MP cache ({len(all_new_cache_entries)} new entries)...")
-        all_cache_list = list(cached_data.values())
-        save_mp_cache(mp_cache_local, all_cache_list)
-    
     print("="*70)
-    print("MP stable phases query/relaxation complete")
+    print("MP GGA phases loading complete")
     print("="*70 + "\n")
     
     # Process structures
@@ -769,7 +787,8 @@ def main():
             'failed': failed,
             'energy_reference': 'MatterSim-v1.0.0-5M',
             'convergence': 'fmax=0.001, max_steps=800',
-            'mp_reference_source': 'MP API GGA/GGA+U phases relaxed with MatterSim (same convergence)',
+            'mp_reference_source': 'MP API GGA phases relaxed with MatterSim (legacy pymatgen MPRester)',
+            'mp_functional_filter': 'pure_pbe' if args.pure_pbe else 'mixed_pbe_pbeU',
             'mp_cache': str(mp_cache_local)
         },
         'results': results

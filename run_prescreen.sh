@@ -13,6 +13,7 @@ CONDA_ENV="mattersim"
 MP_API_KEY="${MP_API_KEY:-}"
 HULL_THRESHOLD=0.1
 DEVICE="cuda"
+PURE_PBE=""
 
 # Colors
 GREEN='\033[0;32m'
@@ -60,6 +61,10 @@ while [[ $# -gt 0 ]]; do
             CONDA_ENV="$2"
             shift 2
             ;;
+        --pure-pbe)
+            PURE_PBE="--pure-pbe"
+            shift
+            ;;
         --help)
             echo "Usage: bash run_prescreen.sh [options]"
             echo ""
@@ -76,6 +81,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --device DEVICE            MatterSim device: cpu or cuda (default: cuda)"
             echo "                             Note: GPU is HIGHLY RECOMMENDED (10-50x faster than CPU)"
             echo "  --conda-env NAME           Conda environment name (default: mattersim)"
+            echo "  --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)"
+            echo "                             Default: accept both PBE and PBE+U (recommended)"
             echo ""
             echo "Example:"
             echo "  bash run_prescreen.sh --max-structures 10 --hull-threshold 0.05"
@@ -126,6 +133,7 @@ echo "  Hull threshold:       ${HULL_THRESHOLD} eV/atom"
 echo "  Device:               $DEVICE"
 echo "  Conda environment:    $CONDA_ENV"
 echo "  MP API key:           ${MP_API_KEY:+[SET]}${MP_API_KEY:-[NOT SET]}"
+echo "  Functional filter:    ${PURE_PBE:+Pure PBE only}${PURE_PBE:-Mixed PBE/PBE+U (default)}"
 echo ""
 
 # Check if database already exists
@@ -153,6 +161,7 @@ export CONDA_ENV
 export MP_API_KEY
 export HULL_THRESHOLD
 export DEVICE
+export PURE_PBE
 
 JOB_ID=$(sbatch submit_prescreen.sh | awk '{print $NF}')
 

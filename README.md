@@ -16,7 +16,9 @@ Intelligent workflow manager for high-throughput VASP calculations with batch su
 **Performance Optimizations**:
 - **Batch processing**: MatterSimCalculator reused across structures (3-5× faster prescreening)
 - **Parallel prescreening**: Split across multiple GPU nodes (linear speedup with GPUs)
-- **Stable phases only**: Query only on-hull MP phases (10-20× faster MP queries)
+- **Legacy MP API**: Uses pymatgen.ext.matproj.MPRester for complete GGA coverage (modern API misses phases)
+- **Strict GGA filtering**: Only accepts entries with `-GGA` or `-GGA+U` suffix (no r2SCAN/SCAN)
+- **Uncorrected energies**: Uses raw DFT energies (no MP corrections) for accurate hull calculations
 - **Single cache files**: Global `mp_mattersim.json` and `mp_vaspdft.json` with automatic subsystem handling
 - **PyXtal symmetrization**: Automatic structure symmetrization for better VASP convergence
 - **PDEntry phase diagrams**: More accurate convex hull analysis with decomposition products
@@ -116,10 +118,13 @@ bash submit_parallel_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
   --batch-size 32 \
-  --hull-threshold 0.1 \
+  --hull-threshold 0.05 \
   --max-structures 0 \
   --device cuda \
   --compositions-per-job 400
+
+# Optional: Add --pure-pbe flag to filter MP entries to pure GGA-PBE only
+# (default is mixed PBE/PBE+U which is recommended for best accuracy)
 
 # After all parallel jobs complete, merge results (JSON + database)
 python3 merge_prescreen_batches.py --output-dir ./VASP_JOBS
@@ -1217,16 +1222,18 @@ python prescreen.py \
   --max-structures 0 \         # Max structures per composition
   --batch-size 32 \            # Structures per batch (calculator reuse)
   --mp-api-key YOUR_KEY \      # Materials Project API key
-  --hull-threshold 0.1 \       # E_hull threshold (eV/atom)
-  --device cuda                # MatterSim device: cpu or cuda
+  --hull-threshold 0.05 \       # E_hull threshold (eV/atom)
+  --device cuda \              # MatterSim device: cpu or cuda
+  --pure-pbe                   # OPTIONAL: Filter MP to pure GGA-PBE only (exclude PBE+U)
 
 # Parallel multi-GPU (recommended for large datasets)
 bash submit_parallel_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
   --batch-size 32 \
-  --hull-threshold 0.1 \
-  --compositions-per-job 400
+  --hull-threshold 0.05 \
+  --compositions-per-job 400 \
+  --pure-pbe                   # OPTIONAL: Filter MP to pure GGA-PBE only (exclude PBE+U)
 # Automatically splits compositions across GPU nodes
 ```
 
@@ -1247,6 +1254,10 @@ python workflow_manager.py \
   - `--hull-threshold`: 0.1 eV/atom filters most unstable structures, use 0.05 for stricter filtering
   - `--device`: Use `cuda` for GPU acceleration (5-10× faster than CPU)
   - `--mp-api-key`: Get your free API key at https://next-gen.materialsproject.org/api
+  - `--pure-pbe`: OPTIONAL flag to exclude PBE+U (recommended to OMIT for best accuracy)
+    - Default (no flag): Mixed PBE/PBE+U (matches MP phase diagram methodology)
+    - With flag: Pure GGA-PBE only (may reduce accuracy for transition metal systems)
+  - **MP API**: Uses legacy pymatgen.ext.matproj.MPRester for complete GGA coverage
   - **Large datasets**: Use `submit_parallel_prescreen.sh` to split across multiple GPUs
   - **GPU memory**: Set `export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` in SLURM script
 - **VASP Workflow**:
@@ -1386,8 +1397,12 @@ Pre-screening uses the MatterSim ML potential to quickly evaluate thermodynamic 
 ### How It Works
 
 1. **MatterSim Relaxation**: Structures relaxed in batches with calculator reuse for GPU memory efficiency
-2. **MP Stable Phases**: Query Materials Project for **only stable (on-hull) phases** in the chemical system
-3. **Re-relax MP Structures**: Stable MP structures are re-relaxed with MatterSim for consistent energy reference
+2. **MP Reference Phases Query**: Uses **legacy pymatgen.ext.matproj.MPRester** for complete GGA coverage
+   - The modern mp_api.client misses many stable GGA phases needed for accurate hull calculations
+   - Strict filtering: only accepts entries with `-GGA` or `-GGA+U` suffix in entry_id
+   - Uses uncorrected_energy (raw DFT, no MP corrections) to match MatterSim energies
+   - Optional `--pure-pbe` flag to exclude PBE+U (use pure GGA-PBE only)
+3. **Re-relax MP Structures**: MP GGA structures are re-relaxed with MatterSim for consistent energy reference
 4. **Convex Hull**: Build phase diagram using MatterSim energies with PDEntry
 5. **Output**: Generate `prescreening_stability.json` with structures that pass threshold
 6. **VASP Workflow Filter**: `workflow_manager.py` reads `prescreening_stability.json` and only processes structures with `E_hull < threshold` (default: 0.1 eV/atom)
@@ -1400,13 +1415,15 @@ Pre-screening uses the MatterSim ML potential to quickly evaluate thermodynamic 
 - Automatic GPU memory cleanup between batches
 - Supports CUDA memory expansion: `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
 
-**Stable Phases Only**:
-- Queries ONLY stable MP phases (`is_stable=True`) instead of all phases
-- Uses MP's authoritative determination of thermodynamic stability
-- Typical reduction: 500+ phases → 20-50 stable phases per chemical system
-- 10-20x faster MP queries and phase diagram construction
-- Random sleep (0-500 ms) after each MP query to avoid rate limiting
-- More accurate convex hull (unstable phases don't affect hull)
+**Complete GGA Coverage with Legacy API**:
+- Uses **legacy pymatgen.ext.matproj.MPRester** instead of modern mp_api.client
+- Modern API misses many stable GGA phases critical for accurate hull calculations
+- Queries ALL GGA/GGA+U entries via `get_entries_in_chemsys()`
+- **Strict suffix filtering**: Only accepts entries with `-GGA` or `-GGA+U` suffix in entry_id
+- Excludes r2SCAN, SCAN, and entries without explicit functional suffix
+- Uses **uncorrected_energy** (raw DFT, no MP anion/composition corrections)
+- Optional `--pure-pbe` flag to exclude PBE+U (for pure GGA-PBE calculations only)
+- More accurate phase diagrams with comprehensive GGA reference phases
 
 **Single Global Cache Files**:
 - `mp_mattersim.json`: All MatterSim-relaxed MP phases with `chemsys` field
@@ -1446,7 +1463,7 @@ bash run_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
   --batch-size 32 \
-  --hull-threshold 0.1 \
+  --hull-threshold 0.05 \
   --device cuda \
   --max-structures 0
 
@@ -1455,9 +1472,10 @@ bash submit_parallel_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
   --batch-size 32 \
-  --hull-threshold 0.1 \
+  --hull-threshold 0.05 \
   --max-structures 0 \
-  --compositions-per-job 400
+  --compositions-per-job 400 \
+  --pure-pbe                   # OPTIONAL: Pure GGA-PBE only (omit for best accuracy)
 
 # View all options
 bash submit_parallel_prescreen.sh --help
@@ -1671,7 +1689,10 @@ tail -f workflow_manager_*.out
 - **ISYM=0**: VASP internal symmetrization disabled (PyXtal already applied during relaxation)
 - **Batch processing**: `prescreen.py` reuses MatterSimCalculator across structures (3-5× faster)
 - **Parallel prescreening**: `submit_parallel_prescreen.sh` splits across GPU nodes (linear speedup)
-- **Stable phases only**: Queries only on-hull MP phases (10-20× faster queries)
+- **Complete GGA coverage**: Uses legacy pymatgen.ext.matproj.MPRester for comprehensive GGA/GGA+U phases
+- **Strict functional filtering**: Only accepts entries with `-GGA` or `-GGA+U` suffix (excludes r2SCAN/SCAN)
+- **Uncorrected energies**: Uses raw DFT energies (no MP corrections) for accurate hull calculations
+- **Optional pure-pbe**: `--pure-pbe` flag to filter MP entries to pure GGA-PBE only (exclude PBE+U)
 - **Single cache files**: `mp_mattersim.json` and `mp_vaspdft.json` in `VASP_JOBS/` directory
 - **PyXtal symmetrization**: Automatic structure symmetrization in both prescreening and VASP workflow
 - **Two-step electride filtering**: Initial analysis saves all data, stricter filtering for high-quality candidates
@@ -1716,7 +1737,7 @@ bash run_prescreen.sh \
   --output-dir ./VASP_JOBS \
   --device cuda \
   --batch-size 32 \
-  --hull-threshold 0.1 \
+  --hull-threshold 0.05 \
   --max-structures 0
 
 # Option B: Parallel multi-GPU (recommended for large datasets >500 compositions)
@@ -1724,7 +1745,7 @@ bash submit_parallel_prescreen.sh \
   --results-dir ./mattergen_results/ternary_csp_electrides \
   --output-dir ./VASP_JOBS \
   --batch-size 32 \
-  --hull-threshold 0.1 \
+  --hull-threshold 0.05 \
   --max-structures 0 \
   --compositions-per-job 400
 

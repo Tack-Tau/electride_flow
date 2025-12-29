@@ -9,15 +9,19 @@
 #   --refine-jobs DIR       Refined VASP jobs directory (default: ./REFINE_VASP_JOBS)
 #   --device DEVICE         Device for MatterSim: cpu or cuda (default: cuda)
 #   --conda-env ENV         Conda environment name (default: mattersim)
+#   --pure-pbe              Filter MP to pure GGA-PBE only (exclude PBE+U)
 #   --help                  Show this help message
 #
 # Environment variables:
 #   MP_API_KEY              Materials Project API key (required)
 #
 # Examples:
-#   # Basic usage (GPU by default)
+#   # Basic usage (GPU by default, mixed PBE/PBE+U)
 #   export MP_API_KEY=your_32_character_key
 #   bash run_mattersim_e_hull.sh
+#
+#   # With pure GGA-PBE filtering (to match pure PBE DFT)
+#   bash run_mattersim_e_hull.sh --pure-pbe
 #
 #   # Custom path with CPU mode (not recommended, slower)
 #   bash run_mattersim_e_hull.sh --refine-jobs /scratch/$USER/REFINE_VASP_JOBS --device cpu
@@ -29,6 +33,7 @@ set -e
 REFINE_JOBS_DIR="./REFINE_VASP_JOBS"
 DEVICE="cuda"
 CONDA_ENV="mattersim"
+PURE_PBE=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -44,6 +49,10 @@ while [[ $# -gt 0 ]]; do
         --conda-env)
             CONDA_ENV="$2"
             shift 2
+            ;;
+        --pure-pbe)
+            PURE_PBE="--pure-pbe"
+            shift
             ;;
         --help)
             head -n 30 "$0" | tail -n 24
@@ -81,6 +90,11 @@ echo "Configuration:"
 echo "  Refined VASP jobs: $REFINE_JOBS_DIR"
 echo "  Device: $DEVICE"
 echo "  Conda environment: $CONDA_ENV"
+if [ -n "$PURE_PBE" ]; then
+    echo "  Functional filter: Pure GGA-PBE only (PBE+U excluded)"
+else
+    echo "  Functional filter: Mixed PBE/PBE+U (recommended)"
+fi
 echo "  MP API key: ${MP_API_KEY:0:8}... (${#MP_API_KEY} chars)"
 echo "========================================================================"
 echo ""
@@ -114,6 +128,7 @@ echo ""
 export REFINE_JOBS_DIR
 export DEVICE
 export CONDA_ENV
+export PURE_PBE
 export MP_API_KEY
 
 # Submit job

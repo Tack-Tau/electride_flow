@@ -10,6 +10,7 @@ BATCH_SIZE=32
 HULL_THRESHOLD=0.1
 DEVICE="cuda"
 MAX_STRUCTURES=0
+PURE_PBE=""
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
@@ -42,6 +43,10 @@ while [[ $# -gt 0 ]]; do
             MAX_STRUCTURES="$2"
             shift 2
             ;;
+        --pure-pbe)
+            PURE_PBE="--pure-pbe"
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -55,6 +60,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --device DEVICE            Device: cpu or cuda (default: cuda)"
             echo "  --compositions-per-job N   Compositions per parallel job (default: 400)"
             echo "  --max-structures N         Max structures per composition (default: 5, 0=all)"
+            echo "  --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)"
             echo "  -h, --help                 Show this help message"
             echo ""
             echo "Example:"
@@ -101,6 +107,7 @@ echo "Batch size: $BATCH_SIZE"
 echo "Hull threshold: $HULL_THRESHOLD eV/atom"
 echo "Max structures per composition: $MAX_STRUCTURES"
 echo "Device: $DEVICE"
+echo "Functional filter: ${PURE_PBE:+Pure PBE only}${PURE_PBE:-Mixed PBE/PBE+U}"
 echo "========================================"
 echo ""
 
@@ -118,8 +125,11 @@ for i in $(seq 0 $((NUM_JOBS - 1))); do
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:1
-#SBATCH --mem=64G
+#SBATCH --gres=gpu:A40:1
+#SBATCH --gres=gpu:A100:1
+#SBATCH --gres=gpu:H200:1
+#SBATCH --gres=gpu:L40S:1
+#SBATCH --mem=128G
 #SBATCH --time=3-00:00:00
 #SBATCH --output=prescreen_batch${i}_%j.out
 #SBATCH --error=prescreen_batch${i}_%j.err
@@ -153,6 +163,7 @@ BATCH_SIZE=$BATCH_SIZE
 HULL_THRESHOLD=$HULL_THRESHOLD
 MAX_STRUCTURES=$MAX_STRUCTURES
 DEVICE="$DEVICE"
+PURE_PBE="$PURE_PBE"
 
 EOF_PARAMS
     
@@ -183,7 +194,8 @@ python3 prescreen.py \
     --start-composition $START_INDEX \
     --max-compositions $MAX_COMPS \
     --max-structures $MAX_STRUCTURES \
-    --batch-id $BATCH_ID
+    --batch-id $BATCH_ID \
+    $PURE_PBE
 
 EXIT_CODE=$?
 

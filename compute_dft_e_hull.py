@@ -4,13 +4,16 @@ Compute DFT energy_above_hull for VASP-relaxed structures.
 
 Uses:
 - VASP-PBE energies from completed relaxations (vasprun.xml)
-- MP DFT-PBE raw energies for competing phases (queried via MP API)
+- MP DFT-PBE raw energies for competing phases (queried via legacy pymatgen MPRester)
 - Cached MP entries from prescreening to minimize API calls
 
 Important:
-- Uses materials.thermo uncorrected_energy_per_atom (raw DFT, no anion/composition corrections)
+- Uses legacy pymatgen.ext.matproj.MPRester (not mp_api.client) for complete GGA entry coverage
+- The new mp_api.client misses many stable GGA phases needed for accurate hull calculations
+- Strict filtering: only accepts entries with '-GGA' or '-GGA+U' suffix in entry_id
+- Uses ComputedEntry.uncorrected_energy (raw DFT, no anion/composition corrections)
 - This matches VASP energies which also have no MP-style corrections
-- Filters out non-PBE functionals (R2SCAN, SCAN) and optionally GGA+U when --pure-pbe is used
+- Optionally filters to pure GGA-PBE only (excludes GGA+U) when --pure-pbe is used
 
 Output: dft_stability_results.json with DFT-level hull analysis
 """
@@ -28,12 +31,13 @@ from pymatgen.core import Composition
 from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
 
-# Require modern mp-api client for correct energy queries
+# Use legacy pymatgen MPRester for complete GGA entry retrieval
+# The new mp_api.client.MPRester misses many stable GGA phases
 try:
-    from mp_api.client import MPRester
+    from pymatgen.ext.matproj import MPRester
 except ImportError:
-    print("ERROR: mp-api package is required for DFT hull calculations")
-    print("Install with: pip install mp-api")
+    print("ERROR: pymatgen package with MPRester is required for DFT hull calculations")
+    print("Install with: pip install pymatgen")
     sys.exit(1)
 
 import numpy as np
@@ -84,8 +88,19 @@ def get_vasp_energy_from_relax(relax_dir):
             
             final_energy = vr.final_energy  # Total energy in eV
             structure = vr.final_structure
+            
+            # Check for float overflow (NaN or inf values)
+            if not np.isfinite(final_energy):
+                print(f"    Warning: Float overflow in vasprun.xml (energy is NaN or inf)")
+                return None, None
+            
             n_atoms = len(structure)
             energy_per_atom = final_energy / n_atoms
+            
+            # Double-check energy_per_atom is also finite
+            if not np.isfinite(energy_per_atom):
+                print(f"    Warning: Float overflow in energy_per_atom calculation")
+                return None, None
             
             return energy_per_atom, structure
             
@@ -115,7 +130,13 @@ def get_vasp_energy_from_relax(relax_dir):
                             parts = line.split('=')
                             if len(parts) >= 2:
                                 energy_str = parts[1].split()[0]
+                                # Handle overflow markers like '*******'
+                                if '*' in energy_str:
+                                    continue
                                 final_energy = float(energy_str)
+                                # Check for float overflow
+                                if not np.isfinite(final_energy):
+                                    final_energy = None
                         except (ValueError, IndexError):
                             continue
             
@@ -131,6 +152,11 @@ def get_vasp_energy_from_relax(relax_dir):
             structure = Structure.from_file(str(contcar_path))
             n_atoms = len(structure)
             energy_per_atom = final_energy / n_atoms
+            
+            # Check for float overflow in energy_per_atom
+            if not np.isfinite(energy_per_atom):
+                print(f"    Warning: Float overflow in energy_per_atom calculation from OUTCAR")
+                return None, None
             
             print(f"    Energy extracted from OUTCAR (vasprun.xml not available)")
             return energy_per_atom, structure
@@ -237,22 +263,20 @@ def get_mp_stable_phases_dft(chemsys, mp_api_key, dft_cache_file, pure_pbe=False
     Get MP phases using RAW GGA DFT energies (no MP corrections) for phase diagram construction.
     
     Strategy:
-    - Use get_entries_in_chemsys() to get ALL entries (not filtered by r2SCAN stability)
+    - Use legacy pymatgen MPRester.get_entries_in_chemsys() to get ALL entries
+    - Filter for GGA entries (entry_id ending with '-GGA') or GGA+U (ending with '-GGA+U')
     - Extract uncorrected_energy from ComputedEntry objects
-    - Filter for GGA/GGA+U functionals (exclude r2SCAN/SCAN based on entry_id suffix)
     - Let PhaseDiagram determine stability based on GGA energies
     - Compatible with VASP raw DFT energies for hull analysis
     
-    Note: Does NOT filter by is_stable=True to ensure we get:
-          1. GGA alternatives under different MP IDs (e.g., mp-12957 vs mp-1524462)
-          2. GGA data for phases where r2SCAN is now preferred (e.g., mp-1194653-GGA)
-          PhaseDiagram construction will determine which phases are on the GGA hull.
+    Note: The legacy pymatgen API returns more complete GGA entries compared to mp_api.client,
+          which misses many stable GGA phases (e.g., mp-540703-GGA for Cs2S, mp-2654-GGA for Al2S3).
     
     Args:
         chemsys: Chemical system (e.g., 'Li-B-N')
         mp_api_key: Materials Project API key
         dft_cache_file: Path to global DFT cache file (mp_vaspdft.json)
-        pure_pbe: If True, filter to GGA-PBE only (exclude PBE+U, R2SCAN, etc.)
+        pure_pbe: If True, filter to GGA-PBE only (exclude PBE+U)
                   If False (default), accept both PBE and PBE+U
         use_cache: If True, check cache before querying MP. If False, force MP query (for pre-population).
     
@@ -290,200 +314,106 @@ def get_mp_stable_phases_dft(chemsys, mp_api_key, dft_cache_file, pure_pbe=False
             # Multi-element system but no compounds found in cache
             print(f"    Cache incomplete (no compounds found), querying...")
     
-    # Query MP for stable phases using get_entries_in_chemsys()
-    print(f"    Querying MP for stable phases in {chemsys}...")
+    # Query MP for phases using legacy pymatgen MPRester
+    print(f"    Querying MP for phases in {chemsys} (using legacy API for complete GGA coverage)...")
     
     elements = chemsys.split('-')
     
     try:
-        with MPRester(mp_api_key) as mpr:
-            # Get ALL entries in this chemical system (not filtered by stability)
-            # This ensures we get GGA data even for phases where r2SCAN is now preferred
-            # Stability will be determined by PhaseDiagram construction on GGA energies
-            # This automatically includes all subsystems (elementals, binaries, etc.)
-            computed_entries = mpr.get_entries_in_chemsys(
-                elements,
-                property_data=None,
-                conventional_unit_cell=False,
-                additional_criteria={}  # No is_stable filter - get all GGA/GGA+U entries
-            )
+        # Use legacy pymatgen MPRester which returns complete GGA entries
+        mpr = MPRester(mp_api_key)
+        
+        # Get ALL entries in this chemical system
+        # This automatically includes all subsystems (elementals, binaries, etc.)
+        computed_entries = mpr.get_entries_in_chemsys(elements)
+        
+        print(f"    Retrieved {len(computed_entries)} entries from MP (filtering for GGA...)")
+        
+        # Process entries: filter for GGA only (entry_id ending with '-GGA' or '-GGA+U')
+        entries = []
+        new_entries_data = []
+        seen_entries = {}  # Track by entry_id to avoid duplicates
+        
+        for comp_entry in computed_entries:
+            entry_id = str(comp_entry.entry_id)
             
-            print(f"    Retrieved {len(computed_entries)} entries from MP (filtering for GGA/GGA+U...)")
+            # Skip if already seen
+            if entry_id in seen_entries:
+                continue
             
-            # Process entries: filter functionals and extract uncorrected energies
-            entries = []
-            new_entries_data = []
-            seen_formulas = {}  # Track duplicates by formula
+            # Only accept entries ending with '-GGA' or '-GGA+U'
+            is_pure_gga = entry_id.endswith('-GGA')
+            is_gga_u = entry_id.endswith('-GGA+U')
             
-            for comp_entry in computed_entries:
-                entry_id = comp_entry.entry_id
-                
-                # Filter by functional based on entry_id suffix
-                has_U = False
-                has_SCAN = False
-                is_gga = False
-                
-                if '-GGA' in entry_id:
-                    is_gga = True
-                elif '-GGA+U' in entry_id or '_GGA+U' in entry_id:
-                    has_U = True
-                    is_gga = True
-                elif '-r2SCAN' in entry_id or '_r2SCAN' in entry_id:
-                    has_SCAN = True
-                elif '-SCAN' in entry_id or '_SCAN' in entry_id:
-                    has_SCAN = True
-                else:
-                    # No explicit suffix - could be legacy or GGA
-                    # Accept it unless it's clearly SCAN
-                    is_gga = True
-                
-                # Skip r2SCAN/SCAN
-                if has_SCAN:
-                    continue
-                
-                # Skip +U if pure_pbe requested
-                if pure_pbe and has_U:
-                    continue
-                
-                # Skip if not GGA-based
-                if not is_gga:
-                    continue
-                
-                # Get uncorrected energy (raw DFT, no MP corrections)
-                try:
-                    # ComputedEntry.uncorrected_energy gives total energy without corrections
-                    uncorrected_energy = comp_entry.uncorrected_energy
-                except AttributeError:
-                    # Fallback: use corrected energy if uncorrected not available
-                    uncorrected_energy = comp_entry.energy
-                
-                composition = comp_entry.composition
-                formula = composition.reduced_formula
-                
-                # Handle duplicates: prefer pure GGA over GGA+U for same formula
-                if formula in seen_formulas:
-                    existing_has_U = '+U' in seen_formulas[formula]['entry_id']
-                    current_has_U = has_U
-                    
-                    # Replace existing if current is pure GGA and existing is +U
-                    if not current_has_U and existing_has_U:
-                        # Remove old entry
-                        entries = [e for e in entries if e.name != seen_formulas[formula]['entry_id']]
-                        new_entries_data = [d for d in new_entries_data if d['entry_id'] != seen_formulas[formula]['entry_id']]
-                    else:
-                        # Keep existing, skip current
-                        continue
-                
-                # Determine chemsys for this phase
-                doc_elements = sorted([str(el) for el in composition.elements])
-                doc_chemsys = '-'.join(doc_elements)
-                
-                # Create PDEntry with uncorrected energy
-                entry = PDEntry(
-                    composition=composition,
-                    energy=uncorrected_energy,  # Total energy (eV)
-                    name=entry_id
-                )
-                entries.append(entry)
-                
-                # Store for caching
-                new_entries_data.append({
-                    'chemsys': doc_chemsys,
-                    'composition': {str(el): float(amt) for el, amt in composition.items()},
-                    'energy': uncorrected_energy,
-                    'entry_id': entry_id,
-                    'mp_id': entry_id.split('-')[0] + '-' + entry_id.split('-')[1]  # Extract base MP ID
-                })
-                
-                # Track this formula
-                seen_formulas[formula] = {
-                    'entry_id': entry_id,
-                    'has_U': has_U
-                }
+            # Skip non-GGA entries (r2SCAN, SCAN, or no suffix)
+            if not is_pure_gga and not is_gga_u:
+                continue
             
-            print(f"    Filtered to {len(entries)} GGA/GGA+U entries (r2SCAN/SCAN excluded)")
+            # Skip +U if pure_pbe requested
+            if pure_pbe and is_gga_u:
+                continue
             
-            # Verify we have terminal (elemental) phases
-            elements_found = set()
-            for entry in entries:
-                if len(entry.composition.elements) == 1:  # Pure elemental phase
-                    elements_found.add(str(entry.composition.elements[0]))
+            # Get uncorrected energy (raw DFT, no MP corrections)
+            try:
+                uncorrected_energy = comp_entry.uncorrected_energy
+            except AttributeError:
+                # Fallback: use corrected energy if uncorrected not available
+                uncorrected_energy = comp_entry.energy
             
-            expected_elements = set(elements)
-            if elements_found != expected_elements:
-                missing = expected_elements - elements_found
-                print(f"    WARNING: Missing terminal phases for elements: {sorted(missing)}")
-                print(f"    Querying elemental phases directly with GGA filter...")
-                
-                for missing_elem in sorted(missing):
-                    try:
-                        print(f"      Querying {missing_elem} elemental phases...")
-                        elem_docs = mpr.materials.summary.search(
-                            elements=[missing_elem],
-                            num_elements=(1, 1),
-                            fields=['material_id', 'structure', 'energy_per_atom']
-                        )
-                        
-                        if not elem_docs:
-                            print(f"        ERROR: No phases found for {missing_elem}")
-                            continue
-                        
-                        gga_docs = []
-                        for doc in elem_docs:
-                            mp_id = doc.material_id
-                            if '-r2SCAN' in mp_id or '-SCAN' in mp_id or '_r2SCAN' in mp_id or '_SCAN' in mp_id:
-                                continue
-                            gga_docs.append(doc)
-                        
-                        if gga_docs:
-                            elem_doc = sorted(gga_docs, key=lambda d: d.energy_per_atom)[0]
-                            elem_entries = mpr.get_entries(elem_doc.material_id)
-                            gga_elem_entries = []
-                            for e in elem_entries:
-                                eid = e.entry_id
-                                if '-r2SCAN' not in eid and '_r2SCAN' not in eid and '-SCAN' not in eid and '_SCAN' not in eid:
-                                    gga_elem_entries.append(e)
-                            
-                            if gga_elem_entries:
-                                elem_entry = sorted(gga_elem_entries, key=lambda e: e.energy_per_atom)[0]
-                                try:
-                                    uncorrected_energy = elem_entry.uncorrected_energy
-                                except AttributeError:
-                                    uncorrected_energy = elem_entry.energy
-                                
-                                composition = elem_entry.composition
-                                entry = PDEntry(
-                                    composition=composition,
-                                    energy=uncorrected_energy,
-                                    name=elem_entry.entry_id
-                                )
-                                entries.append(entry)
-                                doc_elements = sorted([str(el) for el in composition.elements])
-                                doc_chemsys = '-'.join(doc_elements)
-                                new_entries_data.append({
-                                    'chemsys': doc_chemsys,
-                                    'composition': {str(el): float(amt) for el, amt in composition.items()},
-                                    'energy': uncorrected_energy,
-                                    'entry_id': elem_entry.entry_id,
-                                    'mp_id': elem_doc.material_id
-                                })
-                                elements_found.add(missing_elem)
-                                print(f"        Found {elem_entry.entry_id} (E={elem_entry.energy_per_atom:.4f} eV/atom)")
-                            else:
-                                print(f"        ERROR: No GGA entries found for {missing_elem}")
-                        else:
-                            print(f"        ERROR: No GGA phases found for {missing_elem}")
-                    except Exception as e:
-                        print(f"        ERROR querying {missing_elem}: {e}")
+            composition = comp_entry.composition
+            
+            # Determine chemsys for this phase
+            doc_elements = sorted([str(el) for el in composition.elements])
+            doc_chemsys = '-'.join(doc_elements)
+            
+            # Extract base MP ID (e.g., 'mp-540703' from 'mp-540703-GGA')
+            parts = entry_id.split('-')
+            if len(parts) >= 2:
+                mp_id = parts[0] + '-' + parts[1]
             else:
-                print(f"      All terminal phases present: {sorted(elements_found)}")
+                mp_id = entry_id
             
-            # Save to DFT cache
-            if new_entries_data:
-                save_dft_cache(new_entries_data, dft_cache_file)
+            # Create PDEntry with uncorrected energy
+            entry = PDEntry(
+                composition=composition,
+                energy=uncorrected_energy,  # Total energy (eV)
+                name=entry_id
+            )
+            entries.append(entry)
             
-            return entries
+            # Store for caching
+            new_entries_data.append({
+                'chemsys': doc_chemsys,
+                'composition': {str(el): float(amt) for el, amt in composition.items()},
+                'energy': uncorrected_energy,
+                'entry_id': entry_id,
+                'mp_id': mp_id
+            })
             
+            # Mark as seen
+            seen_entries[entry_id] = True
+        
+        print(f"    Filtered to {len(entries)} GGA entries (strict '-GGA'/'-GGA+U' suffix)")
+        
+        # Verify we have terminal (elemental) phases
+        elements_found = set()
+        for entry in entries:
+            if len(entry.composition.elements) == 1:  # Pure elemental phase
+                elements_found.add(str(entry.composition.elements[0]))
+        
+        expected_elements = set(elements)
+        if elements_found != expected_elements:
+            missing = expected_elements - elements_found
+            print(f"    WARNING: Missing terminal phases for elements: {sorted(missing)}")
+        else:
+            print(f"      All terminal phases present: {sorted(elements_found)}")
+        
+        # Save to DFT cache
+        if new_entries_data:
+            save_dft_cache(new_entries_data, dft_cache_file)
+        
+        return entries
+        
     except Exception as e:
         print(f"    Error processing MP entries for {chemsys}: {e}")
         import traceback
@@ -705,7 +635,7 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
     
     # Determine plot range
     all_vals = np.concatenate([mattersim_vals, dft_vals])
-    val_min, val_max = max(0, all_vals.min()), all_vals.max()
+    val_min, val_max = all_vals.min(), all_vals.max()
     margin = (val_max - val_min) * 0.05
     plot_min, plot_max = val_min - margin, val_max + margin
     
@@ -982,18 +912,17 @@ def main():
     print(f"MP DFT cache: {mp_dft_cache}")
     print(f"Output file: {output_path}")
     
-    print(f"Energy source: MP GGA/GGA+U phases (all entries, not filtered by r2SCAN stability)")
+    print(f"Energy source: MP GGA phases (using legacy pymatgen MPRester for complete coverage)")
     print(f"Energy corrections: NONE (using raw DFT energies)")
     print("  VASP: raw DFT energies from vasprun.xml")
     print("  MP: ComputedEntry.uncorrected_energy (no anion/composition corrections)")
+    print("  Filtering: Only entries with '-GGA' or '-GGA+U' suffix (strict)")
     print("  Phase diagram stability determined by pymatgen using GGA energies")
     
     if args.pure_pbe:
         print(f"Functional filtering: Pure GGA-PBE only (PBE+U/R2SCAN/SCAN excluded)")
-        print("  WARNING: This may reduce accuracy for transition metal systems")
     else:
         print(f"Functional filtering: Mixed PBE/PBE+U (MP recommended methodology)")
-        print("  Note: Matches MP phase diagram methodology for best accuracy")
     
     print("="*70 + "\n")
     
@@ -1142,9 +1071,9 @@ def main():
             mp_entries = get_mp_stable_phases_dft(chemsys, mp_api_key, mp_dft_cache, pure_pbe=args.pure_pbe, use_cache=True)
             
             if args.pure_pbe:
-                print(f"  Retrieved {len(mp_entries)} stable phases from MP (pure GGA-PBE only)")
+                print(f"  Retrieved {len(mp_entries)} GGA phases from MP (pure -GGA suffix only)")
             else:
-                print(f"  Retrieved {len(mp_entries)} stable phases from MP (mixed PBE/PBE+U)")
+                print(f"  Retrieved {len(mp_entries)} GGA phases from MP (-GGA and -GGA+U suffixes)")
         except Exception as e:
             print(f"  ERROR: Could not get MP entries: {e}")
             failed += len(struct_ids)
@@ -1198,11 +1127,26 @@ def main():
                     'vasp_energy_per_atom': float(energy_per_atom) if energy_per_atom is not None else None,
                     'energy_above_hull': None,
                     'is_stable': None,
+                    'decomposition': None,
                     'error': 'Phase diagram calculation failed'
                 })
                 continue
             
             print(f"    DFT E_hull: {e_hull:.6f} eV/atom")
+            
+            # Convert decomposition products to JSON-serializable format
+            decomp_list = []
+            if decomp:
+                for entry, fraction in decomp.items():
+                    decomp_list.append({
+                        'formula': entry.composition.reduced_formula,
+                        'fraction': float(fraction),
+                        'energy_per_atom': float(entry.energy_per_atom)
+                    })
+                # Print decomposition for debugging
+                if e_hull > 0.001:
+                    decomp_str = " + ".join([f"{d['fraction']:.3f} {d['formula']}" for d in decomp_list])
+                    print(f"    Decomposes to: {decomp_str}")
             
             is_stable = bool(e_hull < 0.001)
             processed += 1
@@ -1214,6 +1158,7 @@ def main():
                 'vasp_energy_per_atom': float(energy_per_atom),
                 'energy_above_hull': float(e_hull),
                 'is_stable': is_stable,
+                'decomposition': decomp_list if decomp_list else None,
                 'error': None
             })
     

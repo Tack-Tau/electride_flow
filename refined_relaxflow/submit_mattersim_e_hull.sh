@@ -95,6 +95,11 @@ fi
 echo "Configuration:"
 echo "  Refined VASP jobs: $REFINE_JOBS_DIR"
 echo "  Device: $DEVICE"
+if [ -n "$PURE_PBE" ]; then
+    echo "  Functional filter: Pure GGA-PBE only (PBE+U excluded)"
+else
+    echo "  Functional filter: Mixed PBE/PBE+U (recommended)"
+fi
 echo "  MP API key: ${MP_API_KEY:0:8}... (${#MP_API_KEY} chars)"
 echo ""
 echo "Parallelization settings:"
@@ -126,7 +131,8 @@ echo ""
 python3 compute_mattersim_e_hull.py \
     --refine-jobs "$REFINE_JOBS_DIR" \
     --mp-api-key "$MP_API_KEY" \
-    --device "$DEVICE"
+    --device "$DEVICE" \
+    $PURE_PBE
 
 EXIT_CODE=$?
 
