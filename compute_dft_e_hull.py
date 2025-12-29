@@ -508,10 +508,8 @@ def compute_dft_hull(target_entry, mp_entries):
         PhaseDiagram internally normalizes to per-atom basis for hull calculation.
         The returned e_hull is in eV/atom.
     """
-    all_entries = [target_entry] + mp_entries
-    
     try:
-        pd = PhaseDiagram(all_entries)
+        pd = PhaseDiagram(mp_entries)
         decomp, e_hull = pd.get_decomp_and_e_above_hull(target_entry, allow_negative=True)
         return decomp, e_hull
     except Exception as e:

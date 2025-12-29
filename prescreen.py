@@ -583,8 +583,7 @@ def compute_energy_above_hull(structure, energy_per_atom, mp_entries):
         name='generated'
     )
     
-    all_entries = list(mp_entries) + [entry]
-    pd = PhaseDiagram(all_entries)
+    pd = PhaseDiagram(mp_entries)
     decomp, e_above_hull = pd.get_decomp_and_e_above_hull(entry, allow_negative=True)
     
     return float(e_above_hull)
