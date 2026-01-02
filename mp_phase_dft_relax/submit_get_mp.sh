@@ -9,8 +9,8 @@
 #SBATCH --output=get_mp_struct_%j.out
 #SBATCH --error=get_mp_struct_%j.err
 
-# MP Structure Download Script
-# Downloads crystal structures from Materials Project for cached MP IDs
+# MP Structure Download Script (Legacy MPRester)
+# Downloads crystal structures and energies from Materials Project
 
 echo "======================================================================"
 echo "MP Structure Download"
@@ -49,6 +49,7 @@ CACHE_FILE="${CACHE_FILE:-./VASP_JOBS/mp_mattersim.json}"
 OUTPUT_DIR="${OUTPUT_DIR:-./mp_cache_structs}"
 CHEMSYS="${CHEMSYS:-}"
 FORCE="${FORCE:-}"
+PURE_PBE="${PURE_PBE:-}"
 
 # Build command
 CMD="python3 get_mp_struct.py --cache-file \"$CACHE_FILE\" --output-dir \"$OUTPUT_DIR\""
@@ -59,6 +60,10 @@ fi
 
 if [ -n "$FORCE" ]; then
     CMD="$CMD --force"
+fi
+
+if [ -n "$PURE_PBE" ]; then
+    CMD="$CMD --pure-pbe"
 fi
 
 # Display configuration
@@ -74,6 +79,11 @@ if [ -n "$FORCE" ]; then
     echo "  Force re-download: Yes"
 else
     echo "  Force re-download: No (skip existing)"
+fi
+if [ -n "$PURE_PBE" ]; then
+    echo "  Functional filtering: Pure GGA-PBE only (PBE+U excluded)"
+else
+    echo "  Functional filtering: Mixed PBE/PBE+U (recommended)"
 fi
 echo "======================================================================"
 echo ""

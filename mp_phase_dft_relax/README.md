@@ -5,11 +5,17 @@ Validates DFT energies by running VASP relaxations on MP phases used during pre-
 ## Purpose
 
 During pre-screening, MP competing phases are relaxed with MatterSim. This workflow:
-1. Downloads the original MP crystal structures
-2. Relaxes them with VASP using the **exact same settings** as the main workflow
-3. Compares VASP energies with MP database energies
+1. Downloads the original MP crystal structures and saves MP GGA-PBE energies
+2. Relaxes structures with VASP using the **exact same settings** as the main workflow
+3. Compares VASP energies with MP GGA-PBE DFT energies (loaded from JSON, no API calls)
 
 This validates energy consistency between your VASP setup and MP's DFT methodology.
+
+**Key Features:**
+- Uses legacy `pymatgen.ext.matproj.MPRester` for complete GGA coverage
+- Strict GGA filtering: only entries with `-GGA` or `-GGA+U` suffix
+- Saves MP energies to JSON during download (no API calls during comparison)
+- Optional `--pure-pbe` flag to exclude PBE+U
 
 ## Directory Structure
 
@@ -25,9 +31,9 @@ mp_phase_dft_relax/
 ├── run_compare_energies.sh     # Wrapper to submit energy comparison
 ├── submit_compare_energies.sh  # SLURM job script for energy comparison
 ├── README.md                   # This file
-├── mp_cache_structs/           # Downloaded structures
+├── mp_cache_structs/           # Downloaded structures and energies
 │   ├── mp-*.cif                # Flat structure (CIF files)
-│   └── mp_metadata.json        # Single metadata file for all structures
+│   └── mp_vaspdft.json         # MP GGA-PBE energies (for VASP comparison)
 ├── VASP_JOBS/                  # VASP calculations
 │   └── mp_B-Li-N/
 │       ├── mp-12345/Relax/
@@ -40,17 +46,17 @@ mp_phase_dft_relax/
 
 ## Workflow Steps
 
-### Step 1: Download MP Structures
+### Step 1: Download MP Structures and Energies
 
-Extract MP IDs from cached prescreening files and download structures:
+Extract chemical systems from prescreening cache and download structures with MP GGA-PBE energies:
 
 ```bash
-# Option 1: Submit as SLURM job (recommended for large downloads)
+# Option 1: Submit as SLURM job (recommended)
 bash run_get_mp.sh
 
 # Option 2: Run interactively (for testing)
 python3 get_mp_struct.py \
-    --cache-dir ./mp_mattersim_cache \
+    --cache-file ./VASP_JOBS/mp_mattersim.json \
     --output-dir ./mp_cache_structs
 ```
 
@@ -61,20 +67,26 @@ bash run_get_mp.sh --chemsys B-Li-N
 
 # Interactive
 python3 get_mp_struct.py \
-    --cache-dir ./mp_mattersim_cache \
+    --cache-file ./VASP_JOBS/mp_mattersim.json \
     --output-dir ./mp_cache_structs \
     --chemsys B-Li-N
 ```
 
-**For pure PBE filtering:**
+**For pure GGA-PBE only (exclude PBE+U):**
 ```bash
 bash run_get_mp.sh --pure-pbe
 ```
 
+**What it does:**
+- Uses legacy `pymatgen.ext.matproj.MPRester` for complete GGA coverage
+- Queries ALL GGA/GGA+U entries with strict suffix filtering (`-GGA` or `-GGA+U`)
+- Downloads MP crystal structures as CIF files
+- Extracts MP GGA-PBE uncorrected energies (raw DFT, no composition corrections)
+- Saves energies to `mp_vaspdft.json` for later comparison (no API calls needed)
+
 **Output:**
-- Structures saved to `mp_cache_structs/mp_*/mp-*/`
-- Metadata saved to `mp_cache_structs/mp_metadata.json` (single file for all structures)
-- Overlapping MP IDs between chemical systems are automatically detected and reused (symlinks)
+- Structures: `mp_cache_structs/mp-*.cif` (flat, no subdirectories)
+- Energies: `mp_cache_structs/mp_vaspdft.json` (MP GGA-PBE energies for all structures)
 
 ### Step 2: Submit VASP Workflow
 
@@ -120,14 +132,11 @@ cat mp_relax_workflow.json | jq '.structures | to_entries | map(.value.state) | 
 Use the automated comparison script to analyze energy differences:
 
 ```bash
-# Make sure MP_API_KEY is set
-export MP_API_KEY=your_api_key
-
-# Submit as SLURM job (recommended)
+# Submit as SLURM job (recommended, auto-detects mp_vaspdft.json)
 bash run_compare_energies.sh
 
-# With debug output
-bash run_compare_energies.sh --debug
+# Specify MP energies file explicitly
+bash run_compare_energies.sh --mp-energies-file mp_cache_structs/mp_vaspdft.json
 
 # Or run interactively (for testing)
 python3 compare_mp_vasp_energies.py \
@@ -136,13 +145,15 @@ python3 compare_mp_vasp_energies.py \
 ```
 
 **What it does:**
-1. Fetches MP GGA-PBE DFT energies via API (filters by functional!)
+1. Loads MP GGA-PBE DFT energies from `mp_vaspdft.json` (no API calls!)
 2. Verifies VASP convergence (reads vasprun.xml to check `vr.converged`)
 3. Filters out non-converged VASP calculations
 4. Detects and removes statistical outliers (using IQR method + absolute threshold)
 5. Compares filtered VASP energies with MP GGA-PBE energies
 6. Calculates statistics (MAE, RMSE) on clean data
 7. Generates scatter plots and residual analysis (outliers excluded)
+
+**Note:** No longer queries MP API - energies are pre-loaded from JSON file generated in Step 1
 
 **Output:**
 - `mp_vasp_comparison.json`: Detailed statistics and all structure data
@@ -210,7 +221,7 @@ The workflow database (`mp_relax_workflow.json`) contains:
 }
 ```
 
-Note: `mp_energy_per_atom` is fetched by the comparison script, not stored in the workflow database.
+Note: `mp_energy_per_atom` field is not used (always `null`). MP energies are loaded from `mp_vaspdft.json` during comparison.
 
 ## Command Line Options
 
@@ -220,22 +231,24 @@ Note: `mp_energy_per_atom` is fetched by the comparison script, not stored in th
 python3 get_mp_struct.py [OPTIONS]
 
 OPTIONS:
-  --cache-dir DIR       Directory with mp_*_mattersim.json files
-                        (default: ./mp_mattersim_cache)
-  --output-dir DIR      Output directory for structures
+  --cache-file FILE     Path to mp_mattersim.json file
+                        (default: ./VASP_JOBS/mp_mattersim.json)
+  --output-dir DIR      Output directory for structures and energies
                         (default: ./mp_cache_structs)
   --mp-api-key KEY      Materials Project API key
                         (default: from MP_API_KEY environment)
   --chemsys CHEMSYS     Process specific chemical system (e.g., 'B-Li-N')
                         (default: process all)
-  --pure-pbe            Filter to pure GGA-PBE only (exclude PBE+U, R2SCAN, SCAN)
+  --force               Force re-download even if CIF files already exist
+  --pure-pbe            Filter to pure GGA-PBE only (exclude PBE+U)
                         Use only if your VASP uses pure PBE without +U
-                        (default: accept all functionals - recommended)
+                        (default: accept both PBE and PBE+U - recommended)
 
 Note:
-  - Uses uncorrected_energy_per_atom from MP (raw DFT, no corrections)
-  - Functional filtering matches compute_dft_e_hull.py behavior
-  - Default (no --pure-pbe) is recommended for validation
+  - Uses legacy pymatgen.ext.matproj.MPRester for complete GGA coverage
+  - Strict filtering: only entries with '-GGA' or '-GGA+U' suffix
+  - Saves MP GGA-PBE uncorrected energies to mp_vaspdft.json
+  - Default (no --pure-pbe) is recommended for accurate phase diagrams
 ```
 
 ### run_mp_dft_relax.sh
@@ -266,22 +279,20 @@ python3 compare_mp_vasp_energies.py [OPTIONS]
 OPTIONS:
   --db FILE                  Workflow database file
                              (default: ./mp_relax_workflow.json)
-  --mp-api-key KEY           Materials Project API key
-                             (default: from MP_API_KEY environment)
+  --mp-energies-file FILE    Path to mp_vaspdft.json with MP energies
+                             (default: auto-detect from ./mp_cache_structs/ or ./VASP_JOBS/)
   --output FILE              Output file prefix for results
                              (default: mp_vasp_comparison.json)
                              Also creates: *_scatter.png, *_residuals.png
-  --debug                    Print detailed debugging information
-                             (default: False)
   --no-convergence-check     Skip VASP convergence verification
                              (default: False - convergence is checked)
   --outlier-threshold FLOAT  Absolute energy difference threshold (eV/atom) 
                              for outlier detection (default: 0.5)
 
 Note:
-  - Requires MP_API_KEY environment variable to be set
-  - Filters for pure GGA-PBE entries (excludes +U, r2SCAN, SCAN)
-  - Uses uncorrected_energy_per_atom field from materials.thermo
+  - Loads MP GGA-PBE energies from JSON file (no API calls)
+  - MP energies must be generated by get_mp_struct.py or compute_dft_e_hull.py
+  - Auto-detects mp_vaspdft.json in default locations if not specified
   - Automatically excludes non-converged VASP calculations (reads vasprun.xml)
   - Automatically removes statistical outliers (|Δ| > threshold or Q3+3*IQR)
   - Typical MAE should be < 0.05 eV/atom for good agreement
@@ -294,27 +305,25 @@ Note:
 bash run_compare_energies.sh [OPTIONS]
 
 OPTIONS:
-  --db FILE          Workflow database file (default: ./mp_relax_workflow.json)
-  --output FILE      Output file for results (default: ./mp_vasp_comparison.json)
-  --debug            Enable detailed debugging output
-  --help             Show help message
-
-ENVIRONMENT:
-  MP_API_KEY         Materials Project API key (required)
+  --db FILE                Workflow database file (default: ./mp_relax_workflow.json)
+  --output FILE            Output file for results (default: ./mp_vasp_comparison.json)
+  --mp-energies-file FILE  Path to mp_vaspdft.json with MP energies
+                           (default: auto-detect from ./mp_cache_structs/ or ./VASP_JOBS/)
+  --help                   Show help message
 
 EXAMPLES:
-  # Basic usage
+  # Basic usage (auto-detects mp_vaspdft.json)
   bash run_compare_energies.sh
 
-  # With debug output
-  bash run_compare_energies.sh --debug
+  # Specify MP energies file explicitly
+  bash run_compare_energies.sh --mp-energies-file mp_cache_structs/mp_vaspdft.json
 
-  # Custom database
-  bash run_compare_energies.sh --db /path/to/workflow.json
+  # Custom database and output
+  bash run_compare_energies.sh --db /path/to/workflow.json --output my_results.json
 
 Note:
   - Wrapper script that submits submit_compare_energies.sh to SLURM
-  - Automatically checks for MP_API_KEY before submitting
+  - No longer requires MP_API_KEY (loads energies from JSON)
   - Passes configuration via environment variables
 ```
 
@@ -331,9 +340,9 @@ SLURM OPTIONS:
   --time=4:00:00
 
 Note:
-  - Activated conda environment: mattersim
+  - Activated conda environment: vaspflow
   - Requires pymatgen and matplotlib
-  - Automatically validates MP_API_KEY
+  - No MP_API_KEY needed (loads from JSON)
   - Output saved to compare_energies_<jobid>.out
 ```
 
@@ -410,7 +419,7 @@ With **correct functional filtering** (MP GGA vs VASP PBE), typical energy diffe
 | File | Description |
 |------|-------------|
 | `mp_cache_structs/` | Downloaded MP structures |
-| `mp_metadata.json` | Metadata for all downloaded structures |
+| `mp_cache_structs/mp_vaspdft.json` | MP GGA-PBE energies for VASP comparison |
 | `VASP_JOBS/mp_*/` | VASP calculations |
 | `mp_relax_workflow.json` | Workflow database |
 | `mp_vasp_comparison.json` | Energy comparison statistics (JSON) |
@@ -432,19 +441,23 @@ Example: mp-23309 (ScCl3)
 - MP r2SCAN:       `uncorrected_energy_per_atom = -9.807 eV/atom`   Different functional!
 - Your VASP PBE:   `-5.066 eV/atom` → Δ = 0.022 eV/atom (excellent!)
 
-**Implementation (2025-11-20):**
-The `compare_mp_vasp_energies.py` script:
-1. Uses `materials.thermo` endpoint (stores multiple functionals)
-2. Filters for `energy_type='GGA'` entries
-3. Uses `uncorrected_energy_per_atom` (raw DFT, no composition corrections)
-4. This matches the "Final Energy/Atom" on MP website calculation summary
+**Implementation (Updated 2025-12-29):**
+The workflow now uses legacy API and JSON-based energy storage:
+1. `get_mp_struct.py`: Uses legacy `pymatgen.ext.matproj.MPRester` for complete GGA coverage
+2. Strict suffix filtering: only entries with `-GGA` or `-GGA+U` in `entry_id`
+3. Extracts `energy_per_atom` from `ComputedEntry` (uncorrected GGA-PBE energy)
+4. Saves to `mp_vaspdft.json` during download
+5. `compare_mp_vasp_energies.py`: Loads from JSON (no API calls, faster and reproducible)
 
-Without functional filtering, you would compare VASP PBE (-5.066 eV) against MP r2SCAN (-9.807 eV) and incorrectly conclude there's a huge discrepancy!
+This ensures:
+- Complete GGA phase coverage (legacy API more reliable than modern API)
+- Consistent energy source (same JSON used for download and comparison)
+- No API rate limits or connection issues during comparison
 
 **Conda Environments:**
-- `get_mp_struct.py`: Uses `mattersim` (requires mp-api)
+- `get_mp_struct.py`: Uses `mattersim` (requires pymatgen with legacy MPRester)
 - `mp_dft_relaxflow.py`: Uses `vaspflow` (requires pymatgen)
-- `compare_mp_vasp_energies.py`: Uses `mattersim` (requires mp-api, matplotlib)
+- `compare_mp_vasp_energies.py`: Uses `vaspflow` (requires pymatgen, matplotlib, no MP API)
 
 **Cluster Configuration:**
 - CPU-only jobs (no GPU needed)
@@ -458,9 +471,14 @@ Without functional filtering, you would compare VASP PBE (-5.066 eV) against MP 
 ## Quick Start (B-Li-N Test)
 
 ```bash
-# Step 1: Download structures
+# Step 1: Download structures and energies
 cd mp_phase_dft_relax
-python3 get_mp_struct.py --cache-dir ./mp_mattersim_cache --chemsys B-Li-N
+bash run_get_mp.sh --chemsys B-Li-N
+
+# Or run interactively
+python3 get_mp_struct.py \
+    --cache-file ./VASP_JOBS/mp_mattersim.json \
+    --chemsys B-Li-N
 
 # Step 2: Submit workflow
 bash run_mp_dft_relax.sh --chemsys B-Li-N --max-concurrent 5
@@ -468,12 +486,13 @@ bash run_mp_dft_relax.sh --chemsys B-Li-N --max-concurrent 5
 # Step 3: Monitor
 tail -f mp_dft_relax_*.out
 
-# Step 4: Compare energies (after completion)
-export MP_API_KEY=your_api_key_here
+# Step 4: Compare energies (after completion, no API key needed!)
 bash run_compare_energies.sh
 
-# Or with debug output
-bash run_compare_energies.sh --debug
+# Or run interactively
+python3 compare_mp_vasp_energies.py \
+    --db mp_relax_workflow.json \
+    --mp-energies-file mp_cache_structs/mp_vaspdft.json
 
 # Step 5: View results
 # View plots

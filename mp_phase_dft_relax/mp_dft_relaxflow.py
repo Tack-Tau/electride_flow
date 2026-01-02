@@ -27,6 +27,28 @@ from pymatgen.io.vasp.outputs import Vasprun
 warnings.filterwarnings('ignore', category=BadInputSetWarning)
 
 
+def check_electronic_convergence_outcar(outcar_path):
+    """
+    Check electronic convergence from OUTCAR file.
+    
+    For timed-out jobs, vasprun.xml is incomplete/corrupted. This function checks
+    OUTCAR for "aborting loop because EDIFF is reached" marker, which indicates
+    electronic SCF converged in at least one ionic step.
+    
+    Returns:
+        bool: True if electronic convergence was achieved
+    """
+    if not outcar_path.exists():
+        return False
+    
+    try:
+        with open(outcar_path, 'r') as f:
+            content = f.read()
+        return 'aborting loop because EDIFF is reached' in content
+    except Exception:
+        return False
+
+
 def load_structures_from_cache(cache_dir):
     """
     Load structures from mp_cache_structs directory (flat CIF files).
@@ -193,7 +215,11 @@ export OMP_NUM_THREADS=1
 export PMG_VASP_PSP_DIR=$HOME/apps/PBE64
 
 # Intel MPI settings for SLURM
-export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
+if [ -e /opt/slurm/lib/libpmi.so ]; then
+  export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
+else
+  export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi.so.0
+fi
 export I_MPI_FABRICS=shm:ofi
 
 # VASP executable (use srun for SLURM-native MPI launching)
@@ -421,7 +447,9 @@ def update_job_status(db):
         
         elif slurm_status is None:
             # Job not found in queue or sacct - likely timed out or crashed
-            # Check if vasprun.xml exists to distinguish partial completion from total failure
+            relax_dir = Path(sdata['relax_dir'])
+            
+            # First try standard vasprun.xml check
             converged, energy_per_atom = check_relax_convergence(sdata['relax_dir'])
             
             if converged:
@@ -432,11 +460,82 @@ def update_job_status(db):
                 print(f"    {mp_id}: COMPLETED (E={energy_per_atom:.6f} eV/atom, SLURM lost)")
                 completed += 1
             else:
-                # Job terminated without proper completion - timeout or crash
-                sdata['state'] = 'FAILED'
-                sdata['update_time'] = datetime.now().isoformat()
-                print(f"    {mp_id}: FAILED (timeout or crash, no convergence)")
-                failed += 1
+                # vasprun.xml check failed - check if timed out
+                err_files = list(relax_dir.glob('vasp_*.err'))
+                is_timeout = False
+                
+                if err_files:
+                    err_file = max(err_files, key=lambda p: p.stat().st_mtime)
+                    try:
+                        with open(err_file, 'r') as f:
+                            if 'DUE TO TIME LIMIT' in f.read():
+                                is_timeout = True
+                    except Exception:
+                        pass
+                
+                if is_timeout:
+                    # Check if electronic converged (using OUTCAR) and CONTCAR exists
+                    outcar_path = relax_dir / 'OUTCAR'
+                    contcar_path = relax_dir / 'CONTCAR'
+                    
+                    if not outcar_path.exists():
+                        sdata['state'] = 'FAILED'
+                        sdata['update_time'] = datetime.now().isoformat()
+                        print(f"    {mp_id}: FAILED (timeout, OUTCAR missing)")
+                        failed += 1
+                    elif not contcar_path.exists() or contcar_path.stat().st_size == 0:
+                        sdata['state'] = 'FAILED'
+                        sdata['update_time'] = datetime.now().isoformat()
+                        print(f"    {mp_id}: FAILED (timeout, CONTCAR missing/empty)")
+                        failed += 1
+                    elif check_electronic_convergence_outcar(outcar_path):
+                        # Electronic converged, extract energy from OUTCAR
+                        try:
+                            # Parse final energy from OUTCAR
+                            with open(outcar_path, 'r') as f:
+                                outcar_lines = f.readlines()
+                            
+                            final_energy = None
+                            for line in reversed(outcar_lines):
+                                if 'free  energy   TOTEN' in line or 'energy  without entropy' in line:
+                                    try:
+                                        final_energy = float(line.split()[4])
+                                        break
+                                    except (IndexError, ValueError):
+                                        continue
+                            
+                            if final_energy is not None:
+                                # Get number of atoms from CONTCAR
+                                structure = Structure.from_file(str(contcar_path))
+                                n_atoms = len(structure)
+                                energy_per_atom = final_energy / n_atoms
+                                
+                                sdata['state'] = 'COMPLETED'
+                                sdata['vasp_energy_per_atom'] = energy_per_atom
+                                sdata['update_time'] = datetime.now().isoformat()
+                                print(f"    {mp_id}: COMPLETED (E={energy_per_atom:.6f} eV/atom, timed out but converged)")
+                                completed += 1
+                            else:
+                                sdata['state'] = 'FAILED'
+                                sdata['update_time'] = datetime.now().isoformat()
+                                print(f"    {mp_id}: FAILED (timeout, could not extract energy from OUTCAR)")
+                                failed += 1
+                        except Exception as e:
+                            sdata['state'] = 'FAILED'
+                            sdata['update_time'] = datetime.now().isoformat()
+                            print(f"    {mp_id}: FAILED (timeout, error parsing OUTCAR: {e})")
+                            failed += 1
+                    else:
+                        sdata['state'] = 'FAILED'
+                        sdata['update_time'] = datetime.now().isoformat()
+                        print(f"    {mp_id}: FAILED (timeout, electronic not converged)")
+                        failed += 1
+                else:
+                    # Not a timeout - likely crashed
+                    sdata['state'] = 'FAILED'
+                    sdata['update_time'] = datetime.now().isoformat()
+                    print(f"    {mp_id}: FAILED (crash or terminated without completion)")
+                    failed += 1
     
     return completed, failed
 

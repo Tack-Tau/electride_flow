@@ -10,7 +10,7 @@
 #SBATCH --error=compare_energies_%j.err
 
 # MP vs VASP Energy Comparison (SLURM Job)
-# Compares MP GGA-PBE energies with VASP PBE energies
+# Compares MP GGA-PBE energies (from JSON) with VASP PBE energies
 
 set -e
 
@@ -18,7 +18,7 @@ set -e
 SCRIPT_DIR=${SCRIPT_DIR:-"$(pwd)"}
 DB_FILE=${DB_FILE:-"./mp_relax_workflow.json"}
 OUTPUT_FILE=${OUTPUT_FILE:-"./mp_vasp_comparison.json"}
-DEBUG=${DEBUG:-""}
+MP_ENERGIES_FILE=${MP_ENERGIES_FILE:-""}
 
 echo "========================================================================"
 echo "MP vs VASP Energy Comparison (SLURM Job)"
@@ -30,10 +30,10 @@ echo ""
 
 # Load environment
 source ~/.bashrc
-conda activate mattersim
+conda activate vaspflow
 
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to activate conda environment 'mattersim'"
+    echo "ERROR: Failed to activate conda environment 'vaspflow'"
     exit 1
 fi
 
@@ -61,12 +61,6 @@ echo "  OMP_NUM_THREADS: $OMP_NUM_THREADS"
 echo "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
 echo ""
 
-# Check MP_API_KEY
-if [ -z "$MP_API_KEY" ]; then
-    echo "ERROR: MP_API_KEY environment variable is not set"
-    exit 1
-fi
-
 # Expand paths
 DB_FILE=$(eval echo "$DB_FILE")
 OUTPUT_FILE=$(eval echo "$OUTPUT_FILE")
@@ -87,9 +81,11 @@ CMD="python3 ${SCRIPT_DIR}/compare_mp_vasp_energies.py"
 CMD="$CMD --db $DB_FILE"
 CMD="$CMD --output $OUTPUT_FILE"
 
-if [ -n "$DEBUG" ]; then
-    CMD="$CMD $DEBUG"
-    echo "Debug mode: enabled"
+if [ -n "$MP_ENERGIES_FILE" ]; then
+    CMD="$CMD --mp-energies-file $MP_ENERGIES_FILE"
+    echo "MP energies file: $MP_ENERGIES_FILE"
+else
+    echo "MP energies file: Auto-detect"
 fi
 
 # Print configuration
