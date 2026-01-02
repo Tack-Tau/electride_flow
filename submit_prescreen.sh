@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#SBATCH --mem=64G
+#SBATCH --mem=128G
 #SBATCH --time=3-00:00:00
 #SBATCH --output=prescreen_%j.out
 #SBATCH --error=prescreen_%j.err
@@ -24,6 +24,7 @@ CONDA_ENV=${CONDA_ENV:-"mattersim"}
 MP_API_KEY=${MP_API_KEY:-""}
 HULL_THRESHOLD=${HULL_THRESHOLD:-0.1}
 DEVICE=${DEVICE:-"cuda"}
+PURE_PBE=${PURE_PBE:-""}
 
 echo "========================================================================"
 echo "VASPflow Pre-screening (MatterSim)"
@@ -32,7 +33,7 @@ echo "Job ID: $SLURM_JOB_ID"
 echo "Node: $(hostname)"
 echo "CPUs: $SLURM_CPUS_PER_TASK"
 echo "GPUs: ${SLURM_GPUS:-0} (${CUDA_VISIBLE_DEVICES:-none})"
-echo "Memory: 32 GB"
+echo "Memory: 128 GB"
 echo "Start time: $(date)"
 echo ""
 
@@ -140,6 +141,10 @@ if [ -n "$MP_API_KEY" ]; then
     CMD="$CMD --mp-api-key $MP_API_KEY"
 fi
 
+if [ -n "$PURE_PBE" ]; then
+    CMD="$CMD $PURE_PBE"
+fi
+
 # Print configuration
 echo "Configuration:"
 echo "  Results dir: $RESULTS_DIR"
@@ -148,6 +153,11 @@ echo "  Max structures: $MAX_STRUCTURES"
 echo "  Max compositions: ${MAX_COMPOSITIONS:-all}"
 echo "  Hull threshold: ${HULL_THRESHOLD} eV/atom"
 echo "  Device: $DEVICE"
+if [ -n "$PURE_PBE" ]; then
+    echo "  Functional filtering: Pure GGA-PBE only"
+else
+    echo "  Functional filtering: Mixed PBE/PBE+U"
+fi
 
 # Check MP API key
 if [ -z "$MP_API_KEY" ]; then

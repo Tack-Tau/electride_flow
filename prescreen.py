@@ -411,6 +411,43 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
                     mp_phases.append((mp_id, structure, has_U))
                     seen_entries[entry_id] = True
                 
+                # Check if we have all elemental (terminal) phases
+                elements_found = set()
+                for mp_id, structure, has_U in mp_phases:
+                    if len(structure.composition.elements) == 1:  # Pure elemental phase
+                        elements_found.add(str(structure.composition.elements[0]))
+                
+                expected_elements = set(elements)
+                missing_elements = expected_elements - elements_found
+                
+                # FALLBACK: If missing any elemental phases, use modern API through legacy wrapper
+                if missing_elements and hasattr(mpr, 'materials'):
+                    print(f"    WARNING: Missing terminal phases for {sorted(missing_elements)}, trying modern API fallback...")
+                    try:
+                        # Query each missing element individually via modern API
+                        for elem in sorted(missing_elements):
+                            elem_docs = mpr.materials.summary.search(
+                                elements=[elem],
+                                num_elements=(1, 1),  # Only elemental phases
+                                fields=["material_id", "formula_pretty", "structure", "energy_per_atom"]
+                            )
+                            
+                            if elem_docs:
+                                print(f"      Fallback: Found {len(elem_docs)} {elem} elemental phases")
+                                for doc in elem_docs:
+                                    mp_id = doc.material_id
+                                    structure = doc.structure
+                                    
+                                    if mp_id not in seen_entries and structure is not None:
+                                        mp_phases.append((mp_id, structure, False))  # Assume no +U for fallback
+                                        seen_entries[mp_id] = True
+                            else:
+                                print(f"      Fallback WARNING: No {elem} elemental phases found even in modern API!")
+                        
+                        print(f"    Modern API fallback: Now have {len(mp_phases)} total phases")
+                    except Exception as e:
+                        print(f"    Modern API fallback failed: {e}")
+                
                 if skipped_structure_retrieval:
                     print(f"    WARNING: Could not retrieve structures for {len(skipped_structure_retrieval)} phases")
                 
