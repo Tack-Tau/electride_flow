@@ -45,6 +45,7 @@ echo ""
 # Get parameters from environment or use defaults
 VASP_JOBS="${VASP_JOBS:-./VASP_JOBS}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
+OUTLIER_THRESHOLD="${OUTLIER_THRESHOLD:-}"
 
 # Check if VASP_JOBS directory exists
 if [ ! -d "$VASP_JOBS" ]; then
@@ -60,6 +61,11 @@ if [ -n "$OUTPUT_DIR" ]; then
     echo "Output directory: $OUTPUT_DIR"
 else
     echo "Output directory: $VASP_JOBS (default)"
+fi
+if [ -n "$OUTLIER_THRESHOLD" ]; then
+    echo "Outlier threshold: $OUTLIER_THRESHOLD eV/atom"
+else
+    echo "Outlier threshold: 0.5 eV/atom (default)"
 fi
 echo ""
 
@@ -99,6 +105,9 @@ echo ""
 CMD="python3 compare_energy_methods.py --vasp-jobs \"$VASP_JOBS\""
 if [ -n "$OUTPUT_DIR" ]; then
     CMD="$CMD --output-dir \"$OUTPUT_DIR\""
+fi
+if [ -n "$OUTLIER_THRESHOLD" ]; then
+    CMD="$CMD --outlier-threshold $OUTLIER_THRESHOLD"
 fi
 
 # Run the comparison

@@ -6,6 +6,7 @@
 # Parse arguments
 VASP_JOBS="./VASP_JOBS"
 OUTPUT_DIR=""
+OUTLIER_THRESHOLD=""
 CONDA_ENV="vaspflow"
 
 print_usage() {
@@ -14,11 +15,13 @@ print_usage() {
     echo "Options:"
     echo "  --vasp-jobs DIR         VASP jobs directory (default: ./VASP_JOBS)"
     echo "  --output-dir DIR        Output directory for plots (default: same as vasp-jobs)"
+    echo "  --outlier-threshold VAL E_hull outlier threshold in eV/atom (default: 0.5)"
     echo "  --conda-env ENV         Conda environment name (default: vaspflow)"
     echo "  -h, --help              Show this help message"
     echo ""
     echo "Example:"
     echo "  $0 --vasp-jobs ./VASP_JOBS --output-dir ./analysis_plots"
+    echo "  $0 --outlier-threshold 0.5"
     echo ""
 }
 
@@ -30,6 +33,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --output-dir)
             OUTPUT_DIR="$2"
+            shift 2
+            ;;
+        --outlier-threshold)
+            OUTLIER_THRESHOLD="$2"
             shift 2
             ;;
         --conda-env)
@@ -80,12 +87,20 @@ EXPORT_VARS="VASP_JOBS=$VASP_JOBS,CONDA_ENV=$CONDA_ENV"
 if [ -n "$OUTPUT_DIR" ]; then
     EXPORT_VARS="$EXPORT_VARS,OUTPUT_DIR=$OUTPUT_DIR"
 fi
+if [ -n "$OUTLIER_THRESHOLD" ]; then
+    EXPORT_VARS="$EXPORT_VARS,OUTLIER_THRESHOLD=$OUTLIER_THRESHOLD"
+fi
 
 echo "======================================================================"
 echo "Submitting Energy Method Comparison Job"
 echo "======================================================================"
 echo "VASP jobs directory: $VASP_JOBS"
 echo "Output directory: ${OUTPUT_DIR:-$VASP_JOBS (default)}"
+if [ -n "$OUTLIER_THRESHOLD" ]; then
+    echo "Outlier threshold: $OUTLIER_THRESHOLD eV/atom"
+else
+    echo "Outlier threshold: 0.2 eV/atom (default)"
+fi
 echo "Conda environment: $CONDA_ENV"
 echo "======================================================================"
 echo ""

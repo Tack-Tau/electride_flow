@@ -8,31 +8,30 @@ Compare energies from different calculation methods:
 
 2. Generated Structures:
    - MatterSim relaxed (prescreening_stability.json)
-   - VASP-DFT relaxed (workflow.json + Relax/vasprun.xml)
+   - VASP-DFT relaxed (dft_stability_results.json)
 
 Purpose: Diagnose non-linear behavior in energy_above_hull calculations
+
+Note: For accurate matching, generated structures comparison now uses
+      dft_stability_results.json as the source of truth for VASP energies.
+      This ensures exact consistency with hull_comparison plots.
 """
 
 import os
 import sys
 import json
 import argparse
-import warnings
 import numpy as np
 from pathlib import Path
 from collections import defaultdict
 
 from pymatgen.core import Composition
-from pymatgen.io.vasp.outputs import Vasprun, UnconvergedVASPWarning
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.stats import gaussian_kde
 
 mpl.use('Agg')
-
-# Suppress unconverged VASP warnings (already handled by checking vr.converged)
-warnings.filterwarnings('ignore', category=UnconvergedVASPWarning)
 
 
 def load_json_file(filepath):
@@ -211,13 +210,13 @@ def compare_mp_phases(mattersim_cache, dft_cache):
 
 def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, dft_results_json=None, outlier_threshold=0.5):
     """
-    Compare generated structures: MatterSim (prescreening) vs VASP-DFT (workflow).
+    Compare generated structures: MatterSim (prescreening) vs VASP-DFT (from dft_stability_results).
     
     Args:
         prescreen_json: Path to prescreening_stability.json
-        workflow_json: Path to workflow.json
+        workflow_json: Path to workflow.json (for backward compatibility, can be None if dft_results_json provided)
         vasp_jobs_dir: Path to VASP jobs directory
-        dft_results_json: Optional path to dft_stability_results.json for E_hull-based outlier filtering
+        dft_results_json: Path to dft_stability_results.json (required for accurate matching)
         outlier_threshold: DFT E_hull threshold for outlier detection (eV/atom, default: 0.5)
     
     Returns:
@@ -232,12 +231,23 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
     if prescreen_data is None:
         return None
     
-    # Load workflow database
-    workflow_data = load_json_file(workflow_json)
-    if workflow_data is None:
+    # Check if dft_results_json is provided (required for accurate matching)
+    if not dft_results_json:
+        print("ERROR: dft_results_json is required for accurate structure matching")
+        print("This ensures we compare the exact same structures as hull_comparison")
         return None
     
-    # Extract MatterSim energies for passed structures
+    dft_results_path = Path(dft_results_json)
+    if not dft_results_path.exists():
+        print(f"ERROR: DFT results file not found: {dft_results_path}")
+        return None
+    
+    # Load DFT results (source of truth for VASP energies)
+    print(f"Loading DFT results from: {dft_results_path}")
+    with open(dft_results_path, 'r') as f:
+        dft_data = json.load(f)
+    
+    # Extract MatterSim energies for structures that passed prescreening
     ms_energies = {}
     for result in prescreen_data.get('results', []):
         if result.get('passed_prescreening', False) and result.get('mattersim_energy_per_atom') is not None:
@@ -248,137 +258,36 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
                 'chemsys': result['chemsys']
             }
     
-    print(f"MatterSim prescreening: {len(ms_energies)} structures passed threshold")
+    print(f"MatterSim prescreening: {len(ms_energies)} structures passed and have energies")
     
-    # Extract VASP energies from workflow
+    # Extract VASP energies and E_hull from DFT results
+    # This ensures we compare exactly the same structures as hull_comparison
     vasp_energies = {}
-    vasp_jobs_dir = Path(vasp_jobs_dir)
-    vasp_not_converged = []
-    vasp_no_data = []
+    dft_e_hull_lookup = {}
+    vasp_no_ehull = []
     
-    for struct_id, sdata in workflow_data['structures'].items():
-        # Check if VASP relaxation completed
-        if sdata['state'] not in ['RELAX_DONE', 'RELAX_TMOUT', 'SC_RUNNING', 'SC_DONE',
-                                   'PARCHG_RUNNING', 'PARCHG_DONE', 'PARCHG_FAILED',
-                                   'ELF_RUNNING', 'ELF_DONE', 'ELF_FAILED']:
-            continue
+    for result in dft_data.get('results', []):
+        struct_id = result['structure_id']
+        vasp_e = result.get('vasp_energy_per_atom')
+        dft_e_hull = result.get('energy_above_hull')
         
-        relax_dir = Path(sdata['relax_dir'])
-        vasprun_path = relax_dir / 'vasprun.xml'
-        outcar_path = relax_dir / 'OUTCAR'
-        contcar_path = relax_dir / 'CONTCAR'
-        
-        energy_per_atom = None
-        converged = False
-        
-        # Try vasprun.xml first
-        if vasprun_path.exists():
-            try:
-                vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-                
-                if vr.converged:
-                    final_energy = vr.final_energy
-                    structure = vr.final_structure
-                    
-                    # Check for float overflow (NaN or inf values)
-                    if not np.isfinite(final_energy):
-                        if struct_id in ms_energies:
-                            vasp_no_data.append(struct_id)
-                        continue
-                    
-                    energy_per_atom = final_energy / len(structure)
-                    
-                    # Double-check energy_per_atom is also finite
-                    if not np.isfinite(energy_per_atom):
-                        if struct_id in ms_energies:
-                            vasp_no_data.append(struct_id)
-                        continue
-                    
-                    converged = True
-                else:
-                    if struct_id in ms_energies:
-                        vasp_not_converged.append(struct_id)
-                    continue
-                
-            except Exception:
-                pass
-        
-        # Fallback to OUTCAR if vasprun.xml failed
-        if energy_per_atom is None and outcar_path.exists():
-            try:
-                # Check electronic convergence from OUTCAR
-                electronic_converged = False
-                with open(outcar_path, 'r') as f:
-                    outcar_content = f.read()
-                    if 'aborting loop because EDIFF is reached' in outcar_content:
-                        electronic_converged = True
-                
-                if not electronic_converged:
-                    if struct_id in ms_energies:
-                        vasp_not_converged.append(struct_id)
-                    continue
-                
-                # Extract final energy from OUTCAR (last TOTEN)
-                final_energy = None
-                with open(outcar_path, 'r') as f:
-                    for line in f:
-                        if 'free energy    TOTEN' in line:
-                            try:
-                                parts = line.split('=')
-                                if len(parts) >= 2:
-                                    energy_str = parts[1].split()[0]
-                                    # Handle overflow markers like '*******'
-                                    if '*' in energy_str:
-                                        continue
-                                    final_energy = float(energy_str)
-                                    # Check for float overflow
-                                    if not np.isfinite(final_energy):
-                                        final_energy = None
-                            except (ValueError, IndexError):
-                                continue
-                
-                if final_energy is None:
-                    if struct_id in ms_energies:
-                        vasp_no_data.append(struct_id)
-                    continue
-                
-                # Get structure from CONTCAR
-                if not contcar_path.exists():
-                    if struct_id in ms_energies:
-                        vasp_no_data.append(struct_id)
-                    continue
-                
-                from pymatgen.core import Structure
-                structure = Structure.from_file(str(contcar_path))
-                n_atoms = len(structure)
-                energy_per_atom = final_energy / n_atoms
-                
-                # Check for float overflow in energy_per_atom
-                if not np.isfinite(energy_per_atom):
-                    if struct_id in ms_energies:
-                        vasp_no_data.append(struct_id)
-                    continue
-                
-                converged = True
-                
-            except Exception:
-                if struct_id in ms_energies:
-                    vasp_no_data.append(struct_id)
-                continue
-        
-        # Store if we got valid data
-        if energy_per_atom is not None and converged:
+        # Only include if VASP energy was successfully extracted
+        if vasp_e is not None:
             vasp_energies[struct_id] = {
-                'energy_per_atom': energy_per_atom,
-                'composition': sdata['composition'],
-                'chemsys': sdata.get('chemsys', ''),
-                'converged': True
+                'energy_per_atom': vasp_e,
+                'composition': result['composition'],
+                'chemsys': result['chemsys']
             }
-        else:
-            if struct_id in ms_energies:
-                vasp_no_data.append(struct_id)
+            
+            # Track E_hull for outlier filtering
+            if dft_e_hull is not None:
+                dft_e_hull_lookup[struct_id] = dft_e_hull
+            elif struct_id in ms_energies:
+                vasp_no_ehull.append(struct_id)
     
-    print(f"VASP-DFT: {len(vasp_energies)} converged relaxations")
+    print(f"VASP-DFT: {len(vasp_energies)} structures with energies from dft_stability_results.json")
+    if vasp_no_ehull:
+        print(f"  {len(vasp_no_ehull)} structures without E_hull (phase diagram calculation failed)")
     
     # Match structures
     common_ids = set(ms_energies.keys()) & set(vasp_energies.keys())
@@ -386,23 +295,18 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
     
     print(f"\nStructure Overlap:")
     print(f"  Passed prescreening: {len(ms_energies)}")
-    print(f"  Completed VASP-DFT: {len(vasp_energies)}")
+    print(f"  VASP-DFT completed: {len(vasp_energies)}")
     print(f"  Common (for comparison): {len(common_ids)}")
     
     if len(ms_only) > 0:
-        print(f"  Prescreened but no VASP-DFT: {len(ms_only)}")
-        if len(vasp_not_converged) > 0:
-            print(f"    - Not converged: {len(vasp_not_converged)}")
-        if len(vasp_no_data) > 0:
-            print(f"    - No data (vasprun.xml/OUTCAR missing): {len(vasp_no_data)}")
-        
+        print(f"  Passed but no VASP-DFT: {len(ms_only)}")
         coverage = len(common_ids) / len(ms_energies) * 100
-        print(f"  Coverage: {coverage:.1f}% of prescreened structures have VASP-DFT energies")
+        print(f"  Coverage: {coverage:.1f}% of passed structures have VASP-DFT energies")
         
         if coverage < 30:
             print(f"    Note: Low coverage - VASP calculations may still be in progress")
         elif coverage < 70:
-            print(f"  ℹ Note: Partial coverage - workflow still running")
+            print(f"    Note: Partial coverage - workflow still running")
     print()
     
     if not common_ids:
@@ -414,10 +318,14 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
         print("\nSuggestion: Wait for more VASP relaxations to complete\n")
         return None
     
-    # Compare energies
+    # Compare energies (only for structures with valid E_hull)
     matched = []
     
     for struct_id in sorted(common_ids):
+        # Skip if no E_hull (ensures exact match with hull_comparison)
+        if struct_id not in dft_e_hull_lookup:
+            continue
+            
         ms_data = ms_energies[struct_id]
         vasp_data = vasp_energies[struct_id]
         
@@ -433,24 +341,9 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
             'energy_diff': ms_e - vasp_e
         })
     
-    # Load DFT E_hull data for outlier filtering (same as hull_comparison)
-    dft_e_hull_lookup = {}
-    if dft_results_json:
-        dft_results_path = Path(dft_results_json)
-        if dft_results_path.exists():
-            try:
-                with open(dft_results_path, 'r') as f:
-                    dft_data = json.load(f)
-                for result in dft_data.get('results', []):
-                    if result.get('energy_above_hull') is not None:
-                        dft_e_hull_lookup[result['structure_id']] = result['energy_above_hull']
-                print(f"\n  Loaded DFT E_hull data for {len(dft_e_hull_lookup)} structures")
-            except Exception as e:
-                print(f"\n  Warning: Could not load DFT results: {e}")
-        else:
-            print(f"\n  Warning: DFT results file not found: {dft_results_path}")
+    print(f"  Structures with both energies and E_hull: {len(matched)}")
     
-    # Filter outliers based on DFT E_hull threshold (same as hull_comparison)
+    # Filter outliers based on DFT E_hull threshold
     matched_filtered = []
     skipped_outliers = []
     
@@ -496,7 +389,7 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
         'skipped_outliers': skipped_outliers,
         'statistics': stats,
         'coverage': coverage,
-        'n_prescreened': len(ms_energies),
+        'n_passed_prescreening': len(ms_energies),
         'n_vasp': len(vasp_energies),
         'n_common': len(common_ids)
     }
@@ -531,10 +424,9 @@ def plot_mp_phase_comparison(mp_results, output_prefix='mp_phases_comparison'):
             linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
     
     # Labels
-    ax.set_xlabel('MP Raw DFT Energy per Atom (eV)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('MatterSim Energy per Atom (eV)', fontsize=12, fontweight='bold')
-    ax.set_title(f'MP On-Hull Phases: MatterSim vs MP Raw DFT\n(N={stats["n_structures"]})',
-                fontsize=14, fontweight='bold')
+    ax.set_xlabel('MP Raw DFT Energy per Atom (eV)', fontsize=16, fontweight='bold')
+    ax.set_ylabel('MatterSim Energy per Atom (eV)', fontsize=16, fontweight='bold')
+    ax.set_title('MP On-Hull Phases: MatterSim vs MP Raw DFT', fontsize=18, fontweight='bold')
     
     # Statistics text
     per_atom_stats = stats['per_atom_energy']
@@ -545,15 +437,18 @@ def plot_mp_phase_comparison(mp_results, output_prefix='mp_phases_comparison'):
         f"RMSE = {per_atom_stats['rmse']:.4f} eV/atom\n"
         f"Mean Diff = {per_atom_stats['mean_diff']:+.4f} eV/atom"
     )
-    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=10,
+    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=13,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
     # Grid and legend
     ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='lower right')
+    ax.legend(loc='lower right', fontsize=12)
     ax.set_aspect('equal', adjustable='box')
     ax.set_xlim(plot_min, plot_max)
     ax.set_ylim(plot_min, plot_max)
+    
+    # Increase tick label font sizes
+    ax.tick_params(axis='both', which='major', labelsize=12)
     
     plt.tight_layout()
     scatter_file = f"{output_prefix}_scatter.png"
@@ -575,13 +470,15 @@ def plot_mp_phase_comparison(mp_results, output_prefix='mp_phases_comparison'):
               linewidth=2, alpha=0.7, 
               label=f'Mean = {per_atom_stats["mean_diff"]:+.4f} eV/atom')
     
-    ax.set_xlabel('MP Raw DFT Energy per Atom (eV)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Residual (MatterSim - MP DFT) (eV/atom)', fontsize=12, fontweight='bold')
-    ax.set_title(f'MP On-Hull Phases: Energy Residuals\n(N={stats["n_structures"]})',
-                fontsize=14, fontweight='bold')
+    ax.set_xlabel('MP Raw DFT Energy per Atom (eV)', fontsize=16, fontweight='bold')
+    ax.set_ylabel('Residual (MatterSim - MP DFT) (eV/atom)', fontsize=16, fontweight='bold')
+    ax.set_title('MP On-Hull Phases: Energy Residuals', fontsize=18, fontweight='bold')
+    
+    # Increase tick label font sizes
+    ax.tick_params(axis='both', which='major', labelsize=12)
     
     ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='best')
+    ax.legend(loc='best', fontsize=12)
     
     plt.tight_layout()
     residual_file = f"{output_prefix}_residuals.png"
@@ -636,25 +533,19 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
                         edgecolors='none')
     
     # Add colorbar
-    cbar = plt.colorbar(scatter, ax=ax, label='Point Density')
+    cbar = plt.colorbar(scatter, ax=ax)
     
     # Perfect agreement line
     ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--',
             linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
     
     # Labels
-    ax.set_xlabel('VASP-DFT Energy per Atom (eV)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('MatterSim Energy per Atom (eV)', fontsize=12, fontweight='bold')
-    
-    n_outliers = stats.get('n_outliers_filtered', 0)
-    title_text = f'Generated Structures: MatterSim vs VASP-DFT\n'
-    title_text += f'(N={stats["n_structures"]}'
-    if n_outliers > 0:
-        title_text += f', {n_outliers} outliers excluded'
-    title_text += ')'
-    ax.set_title(title_text, fontsize=14, fontweight='bold')
+    ax.set_xlabel('VASP-DFT Energy per Atom (eV)', fontsize=16, fontweight='bold')
+    ax.set_ylabel('MatterSim Energy per Atom (eV)', fontsize=16, fontweight='bold')
+    ax.set_title('Generated Structures: MatterSim vs VASP-DFT', fontsize=18, fontweight='bold')
     
     # Statistics text
+    n_outliers = stats.get('n_outliers_filtered', 0)
     stats_text = (
         f"N = {stats['n_structures']}\n"
         f"R = {stats['correlation']:.4f}\n"
@@ -663,16 +554,19 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
         f"Mean Diff = {stats['mean_diff']:+.4f} eV/atom"
     )
     if n_outliers > 0:
-        stats_text += f"\n(Outliers: {n_outliers})"
-    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=10,
+        stats_text += f"\nOutliers excluded: {n_outliers}"
+    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=13,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
     # Grid and legend
     ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='lower right')
+    ax.legend(loc='lower right', fontsize=12)
     ax.set_aspect('equal', adjustable='box')
     ax.set_xlim(plot_min, plot_max)
     ax.set_ylim(plot_min, plot_max)
+    
+    # Increase tick label font sizes
+    ax.tick_params(axis='both', which='major', labelsize=12)
     
     plt.tight_layout()
     scatter_file = f"{output_prefix}_scatter.png"
@@ -706,7 +600,7 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
                             edgecolors='none')
     
     # Add colorbar
-    cbar_res = plt.colorbar(scatter_res, ax=ax, label='Point Density')
+    cbar_res = plt.colorbar(scatter_res, ax=ax)
     
     ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
               label='Zero residual')
@@ -715,18 +609,15 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
               label=f'Mean = {stats["mean_diff"]:+.4f} eV/atom')
     
     # Labels and title
-    ax.set_xlabel('VASP-DFT Energy per Atom (eV)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=12, fontweight='bold')
+    ax.set_xlabel('VASP-DFT Energy per Atom (eV)', fontsize=16, fontweight='bold')
+    ax.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=16, fontweight='bold')
+    ax.set_title('Generated Structures: Energy Residuals', fontsize=18, fontweight='bold')
     
-    n_outliers = stats.get('n_outliers_filtered', 0)
-    title_text = f'Generated Structures: Energy Residuals\n(N={stats["n_structures"]}'
-    if n_outliers > 0:
-        title_text += f', {n_outliers} outliers excluded'
-    title_text += ')'
-    ax.set_title(title_text, fontsize=14, fontweight='bold')
+    # Increase tick label font sizes
+    ax.tick_params(axis='both', which='major', labelsize=12)
     
     ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='best')
+    ax.legend(loc='best', fontsize=12)
     
     plt.tight_layout()
     residual_file = f"{output_prefix}_residuals.png"
@@ -856,6 +747,14 @@ def main():
         default=None,
         help="Output directory for plots (default: same as vasp-jobs)"
     )
+    parser.add_argument(
+        '--outlier-threshold',
+        type=float,
+        default=0.5,
+        help="DFT E_hull outlier threshold for plot filtering (eV/atom, default: 0.5). "
+             "Structures with E_hull above this are excluded from comparison plots. "
+             "Should match the value used in compute_dft_e_hull.py."
+    )
     
     args = parser.parse_args()
     
@@ -875,6 +774,7 @@ def main():
     print("="*70)
     print(f"VASP jobs directory: {vasp_jobs}")
     print(f"Output directory: {output_dir}")
+    print(f"Outlier threshold: {args.outlier_threshold} eV/atom")
     print("\nCache files:")
     print(f"  MatterSim MP cache: {mp_mattersim_cache}")
     print(f"  DFT MP cache: {mp_dft_cache}")
@@ -895,12 +795,18 @@ def main():
     else:
         print("\nWARNING: Could not load MP cache files - skipping MP phase comparison")
     
-    # Compare generated structures
-    gen_results = compare_generated_structures(
-        prescreen_json, workflow_json, vasp_jobs, 
-        dft_results_json=dft_results_json,
-        outlier_threshold=0.5
-    )
+    # Compare generated structures (requires dft_stability_results.json for accurate matching)
+    if dft_results_json.exists():
+        gen_results = compare_generated_structures(
+            prescreen_json, workflow_json, vasp_jobs, 
+            dft_results_json=dft_results_json,
+            outlier_threshold=args.outlier_threshold
+        )
+    else:
+        print(f"\nWARNING: DFT results file not found: {dft_results_json}")
+        print("Skipping generated structures comparison")
+        print("Run compute_dft_e_hull.py first to generate dft_stability_results.json")
+        gen_results = None
     
     # Generate plots
     print("\n" + "="*70)
