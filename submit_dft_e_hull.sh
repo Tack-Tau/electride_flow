@@ -67,13 +67,34 @@ if [ -n "$PURE_PBE" ]; then
 else
     echo "  Functional filtering: Mixed PBE/PBE+U"
 fi
+if [ -n "$HULL_THRESHOLD" ]; then
+    echo "  Hull threshold: $HULL_THRESHOLD eV/atom"
+else
+    echo "  Hull threshold: 0.1 eV/atom (default)"
+fi
+if [ -n "$OUTLIER_THRESHOLD" ]; then
+    echo "  Outlier threshold: $OUTLIER_THRESHOLD eV/atom"
+else
+    echo "  Outlier threshold: 0.5 eV/atom (default)"
+fi
 echo ""
 
-python3 compute_dft_e_hull.py \
-    --vasp-jobs "$VASP_JOBS" \
-    --output "$OUTPUT" \
-    --prescreen-results "$PRESCREEN_RESULTS" \
-    $PURE_PBE
+# Build command with optional arguments
+CMD="python3 compute_dft_e_hull.py --vasp-jobs \"$VASP_JOBS\" --output \"$OUTPUT\" --prescreen-results \"$PRESCREEN_RESULTS\""
+
+if [ -n "$PURE_PBE" ]; then
+    CMD="$CMD $PURE_PBE"
+fi
+
+if [ -n "$HULL_THRESHOLD" ]; then
+    CMD="$CMD --hull-threshold $HULL_THRESHOLD"
+fi
+
+if [ -n "$OUTLIER_THRESHOLD" ]; then
+    CMD="$CMD --outlier-threshold $OUTLIER_THRESHOLD"
+fi
+
+eval $CMD
 
 EXIT_CODE=$?
 

@@ -927,6 +927,36 @@ After VASP relaxations complete, compute **DFT-level thermodynamic stability** u
 
 **Key advantage**: VASP and MP both use GGA-PBE functional with PAW pseudopotentials → energies are directly comparable!
 
+### Energy Method Comparison
+
+Compare energies between different calculation methods to validate pre-screening accuracy and diagnose any systematic biases:
+
+```bash
+# Run comparison (requires dft_stability_results.json)
+bash run_compare_energy_method.sh \
+  --vasp-jobs ./VASP_JOBS \
+  --outlier-threshold 0.5
+
+# Monitor job
+squeue -u $USER | grep compare_energy
+tail -f compare_energy_method_*.out
+
+# Results will be in: VASP_JOBS/energy_method_comparison.json
+# Plots: mp_phases_comparison_*.png, generated_structures_comparison_*.png
+```
+
+**What it compares**:
+1. **MP On-Hull Phases**: MatterSim energies vs MP raw DFT energies
+2. **Generated Structures**: MatterSim energies vs VASP-DFT energies
+
+**Important**: The generated structures comparison now uses `dft_stability_results.json` as the single source of truth for VASP energies. This ensures **exact consistency** with hull_comparison plots (same structures, same outlier filtering).
+
+**Key metrics**:
+- Pearson correlation between methods
+- Mean Absolute Error (MAE)
+- Systematic bias detection
+- Helps diagnose non-linear hull behavior
+
 ### Usage
 
 ```bash
@@ -1671,6 +1701,9 @@ tail -f workflow_manager_*.out
 | `compute_dft_e_hull.py` | Compute DFT energy_above_hull + MatterSim comparison |
 | `run_dft_e_hull.sh` | Submit DFT hull wrapper (user-facing) |
 | `submit_dft_e_hull.sh` | SLURM script for DFT hull calculation |
+| `compare_energy_methods.py` | Compare MatterSim vs DFT energies (uses dft_stability_results.json) |
+| `run_compare_energy_method.sh` | Submit energy method comparison wrapper |
+| `submit_compare_energy_method.sh` | SLURM script for energy method comparison |
 | `analyze.py` | Orchestrates electride analysis (calls Electride.py) |
 | `analyze.sh` | SLURM script for analysis job |
 | `Electride.py` | Bader analysis on ELFCAR + PARCHG files |
@@ -1701,6 +1734,7 @@ tail -f workflow_manager_*.out
 - **PDEntry for hulls**: Uses `PDEntry` instead of `ComputedEntry` for accurate phase diagram analysis
 - `reset_failed_jobs.py` resets failed VASP jobs to retry them without data loss
 - **Integrated hull validation**: `compute_dft_e_hull.py` automatically validates pre-screening accuracy with plots and statistics
+- **Energy method comparison**: `compare_energy_methods.py` uses `dft_stability_results.json` as single source of truth for exact consistency
 - User-friendly wrapper scripts provide consistent interface across all stages
 
 ---

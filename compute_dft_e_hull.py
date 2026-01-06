@@ -645,7 +645,7 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
                         edgecolors='none')
     
     # Add colorbar
-    cbar = plt.colorbar(scatter, ax=ax, label='Point Density')
+    cbar = plt.colorbar(scatter, ax=ax)
     
     # Perfect agreement line
     ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--', 
@@ -658,18 +658,12 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
     ax.axvline(x=threshold, color='green', linestyle=':', linewidth=2, alpha=0.6)
     
     # Labels and title
-    ax.set_xlabel('VASP DFT E_above_hull (eV/atom)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('MatterSim E_above_hull (eV/atom)', fontsize=12, fontweight='bold')
-    
-    n_outliers = stats.get('n_outliers_filtered', 0)
-    title_text = 'MatterSim vs VASP DFT Hull Energy Comparison\n'
-    title_text += f'(N={stats["total_analyzed"]}'
-    if n_outliers > 0:
-        title_text += f', {n_outliers} outliers excluded'
-    title_text += ')'
-    ax.set_title(title_text, fontsize=14, fontweight='bold')
+    ax.set_xlabel('VASP DFT E_above_hull (eV/atom)', fontsize=16, fontweight='bold')
+    ax.set_ylabel('MatterSim E_above_hull (eV/atom)', fontsize=16, fontweight='bold')
+    ax.set_title('MatterSim vs VASP DFT Hull Energy Comparison', fontsize=18, fontweight='bold')
     
     # Statistics text box
+    n_outliers = stats.get('n_outliers_filtered', 0)
     stats_text = (
         f"N = {stats['total_analyzed']}\n"
         f"R = {stats['correlation']:.4f}\n"
@@ -679,20 +673,23 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
         f"Recall = {stats['recall']:.2%}"
     )
     if n_outliers > 0:
-        stats_text += f"\n(Outliers: {n_outliers})"
-    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=10,
+        stats_text += f"\nOutliers excluded: {n_outliers}"
+    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=13,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
     # Grid and legend
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.minorticks_on()
     ax.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax.legend(loc='lower right', fontsize=9)
+    ax.legend(loc='lower right', fontsize=12)
     
     # Equal aspect
     ax.set_aspect('equal', adjustable='box')
     ax.set_xlim(plot_min, plot_max)
     ax.set_ylim(plot_min, plot_max)
+    
+    # Increase tick label font sizes
+    ax.tick_params(axis='both', which='major', labelsize=12)
     
     plt.tight_layout()
     scatter_file = f"{output_prefix}_scatter.png"
@@ -726,7 +723,7 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
                             edgecolors='none')
     
     # Add colorbar
-    cbar_res = plt.colorbar(scatter_res, ax=ax, label='Point Density')
+    cbar_res = plt.colorbar(scatter_res, ax=ax)
     
     # Reference lines
     ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7, 
@@ -743,26 +740,23 @@ def plot_hull_comparison(hull_data, output_prefix='hull_comparison'):
     ax.axhline(y=-0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6)
     
     # Labels and title
-    ax.set_xlabel('VASP DFT E_above_hull (eV/atom)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=12, fontweight='bold')
-    
-    n_outliers = stats.get('n_outliers_filtered', 0)
-    title_text = f'Hull Energy Residuals vs VASP DFT\n(N={stats["total_analyzed"]}'
-    if n_outliers > 0:
-        title_text += f', {n_outliers} outliers excluded'
-    title_text += ')'
-    ax.set_title(title_text, fontsize=14, fontweight='bold')
+    ax.set_xlabel('VASP DFT E_above_hull (eV/atom)', fontsize=16, fontweight='bold')
+    ax.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=16, fontweight='bold')
+    ax.set_title('Hull Energy Residuals vs VASP DFT', fontsize=18, fontweight='bold')
     
     # Set Y-axis range
     residual_range = max(abs(residuals.min()), abs(residuals.max()))
     y_limit = max(0.2, residual_range * 1.5)
     ax.set_ylim(-y_limit, y_limit)
     
+    # Increase tick label font sizes
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    
     # Grid and legend
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.minorticks_on()
     ax.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax.legend(loc='best', fontsize=9)
+    ax.legend(loc='best', fontsize=12)
     
     plt.tight_layout()
     residual_file = f"{output_prefix}_residuals.png"

@@ -8,6 +8,8 @@ VASP_JOBS="./VASP_JOBS"
 OUTPUT="dft_stability_results.json"
 PRESCREEN_RESULTS="./VASP_JOBS/prescreening_stability.json"
 PURE_PBE=""
+HULL_THRESHOLD=""
+OUTLIER_THRESHOLD=""
 SUBMIT_SCRIPT="submit_dft_e_hull.sh"
 
 # Parse command-line arguments
@@ -29,6 +31,14 @@ while [[ $# -gt 0 ]]; do
             PURE_PBE="--pure-pbe"
             shift 1
             ;;
+        --hull-threshold)
+            HULL_THRESHOLD="$2"
+            shift 2
+            ;;
+        --outlier-threshold)
+            OUTLIER_THRESHOLD="$2"
+            shift 2
+            ;;
         -h|--help)
             cat << EOF
 Usage: $0 [OPTIONS]
@@ -40,6 +50,8 @@ Options:
     --output FILE              Output JSON file (default: dft_stability_results.json)
     --prescreen-results FILE   Pre-screening filter (default: ./VASP_JOBS/prescreening_stability.json)
     --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)
+    --hull-threshold VALUE     E_hull threshold for stability analysis in eV/atom (default: 0.1)
+    --outlier-threshold VALUE  E_hull outlier threshold for plot filtering in eV/atom (default: 0.5)
     -h, --help                 Show this help message
 
 Example:
@@ -48,6 +60,9 @@ Example:
 
     # Pure PBE filtering (strict functional consistency)
     bash run_dft_e_hull.sh --pure-pbe
+
+    # Custom thresholds
+    bash run_dft_e_hull.sh --hull-threshold 0.15 --outlier-threshold 1.0
 
     # Custom paths
     bash run_dft_e_hull.sh \\
@@ -86,6 +101,8 @@ export VASP_JOBS
 export OUTPUT
 export PRESCREEN_RESULTS
 export PURE_PBE
+export HULL_THRESHOLD
+export OUTLIER_THRESHOLD
 
 echo "======================================================================"
 echo "Submitting DFT Energy Above Hull Calculation"
@@ -97,6 +114,16 @@ if [ -n "$PURE_PBE" ]; then
     echo "Functional filtering: Pure GGA-PBE only (PBE+U excluded)"
 else
     echo "Functional filtering: Mixed PBE/PBE+U (recommended)"
+fi
+if [ -n "$HULL_THRESHOLD" ]; then
+    echo "Hull threshold: $HULL_THRESHOLD eV/atom"
+else
+    echo "Hull threshold: 0.1 eV/atom (default)"
+fi
+if [ -n "$OUTLIER_THRESHOLD" ]; then
+    echo "Outlier threshold: $OUTLIER_THRESHOLD eV/atom"
+else
+    echo "Outlier threshold: 0.5 eV/atom (default)"
 fi
 echo "======================================================================"
 
