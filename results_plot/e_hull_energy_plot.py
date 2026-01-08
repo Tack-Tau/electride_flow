@@ -61,193 +61,46 @@ def extract_mp_id(entry_id):
     return mp_id
 
 
-def plot_hull_comparison(hull_comparison_data, output_dir):
+def save_figure(fig, output_dir, filename_base):
+    """Save figure in both PNG and PDF formats."""
+    png_file = output_dir / f"{filename_base}.png"
+    pdf_file = output_dir / f"{filename_base}.pdf"
+    
+    fig.savefig(png_file, dpi=300, bbox_inches='tight')
+    fig.savefig(pdf_file, bbox_inches='tight')
+    
+    print(f"    {png_file.name}")
+    print(f"    {pdf_file.name}")
+
+
+def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_results_data, output_dir, outlier_threshold=0.5):
     """
-    Generate hull comparison plots from hull_comparison.json.
+    Generate combined hull energy comparison plots.
     
     Creates:
-        - hull_comparison_scatter.png
-        - hull_comparison_residuals.png
+        - hull_energy_comparison_scatter.png/.pdf (hull comparison + generated structures scatter)
+        - hull_energy_comparison_residuals.png/.pdf (hull comparison + generated structures residuals)
     """
-    print("\nGenerating hull comparison plots...")
+    print("\nGenerating combined hull energy comparison plots...")
     
-    matched = hull_comparison_data.get('matched_structures', [])
-    stats = hull_comparison_data.get('summary', {})
+    # ===== PREPARE DATA FOR HULL COMPARISON =====
+    matched_hull = hull_comparison_data.get('matched_structures', [])
+    stats_hull = hull_comparison_data.get('summary', {})
     
-    if not matched:
+    if not matched_hull:
         print("  ERROR: No matched structures found in hull_comparison.json")
         return
     
-    mattersim_vals = np.array([d['mattersim_e_hull'] for d in matched])
-    dft_vals = np.array([d['dft_e_hull'] for d in matched])
+    mattersim_vals_hull = np.array([d['mattersim_e_hull'] for d in matched_hull])
+    dft_vals_hull = np.array([d['dft_e_hull'] for d in matched_hull])
     
-    # ===== Scatter Plot =====
-    fig, ax = plt.subplots(figsize=(18, 12))
-    
-    # Calculate point density for color mapping
-    x = dft_vals
-    y = mattersim_vals
-    xy = np.vstack([x, y])
-    z = gaussian_kde(xy)(xy)
-    z = z * len(x)
-    
-    # Create custom colormap
-    colors_list = ['cyan', 'dodgerblue', 'black']
-    n_bins = 100
-    cmap = LinearSegmentedColormap.from_list("density", colors_list, N=n_bins)
-    
-    # Sort points by density so densest are plotted last
-    idx = z.argsort()
-    x_sorted, y_sorted, z_sorted = x[idx], y[idx], z[idx]
-    
-    # Determine plot range
-    all_vals = np.concatenate([mattersim_vals, dft_vals])
-    val_min, val_max = all_vals.min(), all_vals.max()
-    margin = (val_max - val_min) * 0.05
-    plot_min, plot_max = val_min - margin, val_max + margin
-    
-    # Create scatter plot with density-based coloring
-    scatter = ax.scatter(x_sorted, y_sorted, c=z_sorted, cmap=cmap, 
-                        norm=mpl.colors.LogNorm(), s=20, marker='s', 
-                        edgecolors='none')
-    
-    # Add colorbar
-    # cbar = plt.colorbar(scatter, ax=ax)
-    
-    # Perfect agreement line
-    ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--', 
-            linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
-    
-    # Stability threshold line
-    threshold = stats.get('threshold', 0.1)
-    ax.axhline(y=threshold, color='green', linestyle=':', linewidth=2, 
-               alpha=0.6, label=f'Stability threshold ({threshold} eV/atom)')
-    ax.axvline(x=threshold, color='green', linestyle=':', linewidth=2, alpha=0.6)
-    
-    # Labels and title
-    ax.set_xlabel('VASP DFT E_hull (eV/atom)', fontsize=18, fontweight='bold')
-    ax.set_ylabel('MatterSim E_hull (eV/atom)', fontsize=18, fontweight='bold')
-    ax.set_title('MatterSim vs VASP E_Hull Comparison', fontsize=20, fontweight='bold')
-    
-    # Recalculate statistics from actual plotted data
-    correlation = np.corrcoef(mattersim_vals, dft_vals)[0, 1]
-    mae = np.mean(np.abs(mattersim_vals - dft_vals))
-    
-    # Statistics text box (simplified)
-    stats_text = (
-        f"N = {len(matched)}\n"
-        f"R = {correlation:.4f}\n"
-        f"MAE = {mae:.4f} eV/atom"
-    )
-    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=14,
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    
-    # Grid and legend
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.minorticks_on()
-    ax.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax.legend(loc='lower right', fontsize=14)
-    
-    # Equal aspect
-    ax.set_aspect('equal', adjustable='box')
-    ax.set_xlim(plot_min, plot_max)
-    ax.set_ylim(plot_min, threshold)
-    
-    # Increase tick label font sizes
-    ax.tick_params(axis='both', which='major', labelsize=14)
-    
-    plt.tight_layout()
-    scatter_file = output_dir / "hull_comparison_scatter.png"
-    plt.savefig(scatter_file, dpi=300, bbox_inches='tight')
-    print(f"    {scatter_file.name}")
-    plt.close()
-    
-    # ===== Residual Plot =====
-    fig, ax = plt.subplots(figsize=(12, 12))
-    
-    residuals = mattersim_vals - dft_vals
-    
-    # Calculate point density for color mapping
-    x_res = dft_vals
-    y_res = residuals
-    xy_res = np.vstack([x_res, y_res])
-    z_res = gaussian_kde(xy_res)(xy_res)
-    z_res = z_res * len(x_res)
-    
-    # Create custom colormap
-    colors_list_res = ['lime', 'forestgreen', 'black']
-    cmap_res = LinearSegmentedColormap.from_list("density_residual", colors_list_res, N=100)
-    
-    # Sort points by density
-    idx_res = z_res.argsort()
-    x_res_sorted, y_res_sorted, z_res_sorted = x_res[idx_res], y_res[idx_res], z_res[idx_res]
-    
-    # Create scatter plot with density-based coloring
-    scatter_res = ax.scatter(x_res_sorted, y_res_sorted, c=z_res_sorted, cmap=cmap_res, 
-                            norm=mpl.colors.LogNorm(), s=20, marker='s', 
-                            edgecolors='none')
-    
-    # Add colorbar
-    # cbar_res = plt.colorbar(scatter_res, ax=ax)
-    
-    # Reference lines
-    ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7, 
-               label='Zero residual (perfect agreement)')
-    
-    # Mean residual
-    mean_residual = np.mean(residuals)
-    ax.axhline(y=mean_residual, color='orange', linestyle='-', linewidth=2, 
-               alpha=0.7, label=f'Mean residual = {mean_residual:+.4f} eV/atom')
-    
-    # ±0.05 eV/atom bands
-    ax.axhline(y=0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6, 
-               label='±0.05 eV/atom')
-    ax.axhline(y=-0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6)
-    
-    # Labels and title
-    ax.set_xlabel('VASP DFT E_hull (eV/atom)', fontsize=18, fontweight='bold')
-    ax.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=18, fontweight='bold')
-    ax.set_title('Hull Energy Residuals vs VASP DFT', fontsize=20, fontweight='bold')
-    
-    # Set Y-axis range
-    residual_range = max(abs(residuals.min()), abs(residuals.max()))
-    y_limit = max(0.2, residual_range * 1.5)
-    ax.set_ylim(-y_limit, y_limit)
-    
-    # Increase tick label font sizes
-    ax.tick_params(axis='both', which='major', labelsize=14)
-    
-    # Grid and legend
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.minorticks_on()
-    ax.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax.legend(loc='best', fontsize=14)
-    
-    plt.tight_layout()
-    residual_file = output_dir / "hull_comparison_residuals.png"
-    plt.savefig(residual_file, dpi=300, bbox_inches='tight')
-    print(f"    {residual_file.name}")
-    plt.close()
-
-
-def plot_generated_structures(prescreen_data, dft_results_data, output_dir, outlier_threshold=0.5):
-    """
-    Generate generated structures comparison plots.
-    
-    Creates:
-        - generated_structures_comparison_scatter.png
-        - generated_structures_comparison_residuals.png
-    """
-    print("\nGenerating generated structures comparison plots...")
-    
-    # Extract MatterSim energies for structures that passed prescreening
+    # ===== PREPARE DATA FOR GENERATED STRUCTURES =====
     ms_energies = {}
     for result in prescreen_data.get('results', []):
         if result.get('passed_prescreening', False) and result.get('mattersim_energy_per_atom') is not None:
             struct_id = result['structure_id']
             ms_energies[struct_id] = result['mattersim_energy_per_atom']
     
-    # Extract VASP energies and E_hull from DFT results
     vasp_energies = {}
     dft_e_hull_lookup = {}
     
@@ -261,17 +114,15 @@ def plot_generated_structures(prescreen_data, dft_results_data, output_dir, outl
             if dft_e_hull is not None:
                 dft_e_hull_lookup[struct_id] = dft_e_hull
     
-    # Match structures
-    matched = []
+    matched_gen = []
     for struct_id in ms_energies.keys():
-        # Skip if no E_hull (ensures exact match with hull_comparison)
         if struct_id not in dft_e_hull_lookup or struct_id not in vasp_energies:
             continue
         
         ms_e = ms_energies[struct_id]
         vasp_e = vasp_energies[struct_id]
         
-        matched.append({
+        matched_gen.append({
             'structure_id': struct_id,
             'mattersim_energy_per_atom': ms_e,
             'vasp_energy_per_atom': vasp_e,
@@ -279,167 +130,242 @@ def plot_generated_structures(prescreen_data, dft_results_data, output_dir, outl
             'dft_e_hull': dft_e_hull_lookup[struct_id]
         })
     
-    # Filter outliers based on DFT E_hull threshold
-    matched_filtered = []
-    skipped_outliers = []
+    matched_gen_filtered = [entry for entry in matched_gen if entry['dft_e_hull'] <= outlier_threshold]
     
-    for entry in matched:
-        dft_e_hull = entry['dft_e_hull']
-        if dft_e_hull > outlier_threshold:
-            skipped_outliers.append(entry)
-            continue
-        matched_filtered.append(entry)
+    ms_vals_gen = np.array([m['mattersim_energy_per_atom'] for m in matched_gen_filtered])
+    vasp_vals_gen = np.array([m['vasp_energy_per_atom'] for m in matched_gen_filtered])
     
-    print(f"  Total matched: {len(matched)}")
-    print(f"  After outlier filtering: {len(matched_filtered)} (excluded {len(skipped_outliers)})")
+    # ===========================================================================================
+    # COMBINED SCATTER PLOT: Hull E_hull (left) + Generated Structures (right)
+    # ===========================================================================================
+    fig = plt.figure(figsize=(24, 12))
     
-    if not matched_filtered:
-        print("  ERROR: No structures after filtering")
-        return
+    # Calculate data ranges first to determine subplot widths
+    # LEFT plot data
+    x1 = dft_vals_hull
+    y1 = mattersim_vals_hull
+    all_vals1 = np.concatenate([mattersim_vals_hull, dft_vals_hull])
+    val_min1, val_max1 = all_vals1.min(), all_vals1.max()
+    margin1 = (val_max1 - val_min1) * 0.05
+    plot_min1, plot_max1 = val_min1 - margin1, val_max1 + margin1
+    threshold = stats_hull.get('threshold', 0.1)
+    x_range1 = plot_max1 - plot_min1
+    y_range1 = threshold - plot_min1
     
-    # Calculate statistics
-    diffs = np.array([m['energy_diff'] for m in matched_filtered])
-    ms_vals = np.array([m['mattersim_energy_per_atom'] for m in matched_filtered])
-    vasp_vals = np.array([m['vasp_energy_per_atom'] for m in matched_filtered])
+    # RIGHT plot data
+    x2 = vasp_vals_gen
+    y2 = ms_vals_gen
+    all_vals2 = np.concatenate([ms_vals_gen, vasp_vals_gen])
+    val_min2, val_max2 = all_vals2.min(), all_vals2.max()
+    margin2 = (val_max2 - val_min2) * 0.05
+    plot_min2, plot_max2 = val_min2 - margin2, val_max2 + margin2
+    x_range2 = plot_max2 - plot_min2
+    y_range2 = plot_max2 - plot_min2
     
-    stats = {
-        'n_structures': len(matched_filtered),
-        'n_outliers_filtered': len(skipped_outliers),
-        'mae': np.mean(np.abs(diffs)),
-        'rmse': np.sqrt(np.mean(diffs**2)),
-        'mean_diff': np.mean(diffs),
-        'std_diff': np.std(diffs),
-        'correlation': np.corrcoef(ms_vals, vasp_vals)[0, 1]
-    }
+    # Calculate subplot widths based on aspect ratios
+    # We want both to have the same physical y-axis height
+    # Width is proportional to x_range / y_range
+    aspect1 = x_range1 / y_range1
+    aspect2 = x_range2 / y_range2  # This should be ~1.0
     
-    # ===== Scatter Plot =====
-    fig, ax = plt.subplots(figsize=(12, 12))
+    # Normalize widths so they fit in the figure
+    total_aspect = aspect1 + aspect2
+    width1 = aspect1 / total_aspect * 0.85  # 0.85 to leave margins
+    width2 = aspect2 / total_aspect * 0.85
     
-    # Calculate point density for color mapping
-    x = vasp_vals
-    y = ms_vals
-    xy = np.vstack([x, y])
-    z = gaussian_kde(xy)(xy)
-    z = z * len(x)
+    # Define axes positions [left, bottom, width, height]
+    ax1 = fig.add_axes([0.06, 0.12, width1, 0.75])
+    ax2 = fig.add_axes([0.06 + width1 + 0.04, 0.12, width2, 0.75])
     
-    # Create custom colormap
+    # ===== LEFT: Hull Comparison Scatter =====
+    xy1 = np.vstack([x1, y1])
+    z1 = gaussian_kde(xy1)(xy1)
+    z1 = z1 * len(x1)
+    
     colors_list = ['cyan', 'dodgerblue', 'black']
-    n_bins = 100
-    cmap = LinearSegmentedColormap.from_list("density", colors_list, N=n_bins)
+    cmap = LinearSegmentedColormap.from_list("density", colors_list, N=100)
     
-    # Sort points by density so densest are plotted last
-    idx = z.argsort()
-    x_sorted, y_sorted, z_sorted = x[idx], y[idx], z[idx]
+    idx1 = z1.argsort()
+    x1_sorted, y1_sorted, z1_sorted = x1[idx1], y1[idx1], z1[idx1]
     
-    # Determine plot range
-    all_vals = np.concatenate([ms_vals, vasp_vals])
-    val_min, val_max = all_vals.min(), all_vals.max()
-    margin = (val_max - val_min) * 0.05
-    plot_min, plot_max = val_min - margin, val_max + margin
+    scatter1 = ax1.scatter(x1_sorted, y1_sorted, c=z1_sorted, cmap=cmap, 
+                          norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                          edgecolors='none')
     
-    # Create scatter plot with density-based coloring
-    scatter = ax.scatter(x_sorted, y_sorted, c=z_sorted, cmap=cmap, 
-                        norm=mpl.colors.LogNorm(), s=20, marker='s', 
-                        edgecolors='none')
-    
-    # Add colorbar
-    # cbar = plt.colorbar(scatter, ax=ax)
-    
-    # Perfect agreement line
-    ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--',
+    ax1.plot([plot_min1, plot_max1], [plot_min1, plot_max1], 'r--', 
             linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
+    ax1.axhline(y=threshold, color='green', linestyle=':', linewidth=2, 
+               alpha=0.6, label=f'Stability threshold ({threshold} eV/atom)')
+    ax1.axvline(x=threshold, color='green', linestyle=':', linewidth=2, alpha=0.6)
     
-    # Labels
-    ax.set_xlabel('VASP-DFT Energy per Atom (eV)', fontsize=18, fontweight='bold')
-    ax.set_ylabel('MatterSim Energy per Atom (eV)', fontsize=18, fontweight='bold')
-    ax.set_title('Generated Structures: MatterSim vs VASP-DFT', fontsize=20, fontweight='bold')
+    ax1.set_xlabel('VASP E_hull (eV/atom)', fontsize=22, fontweight='bold')
+    ax1.set_ylabel('MatterSim E_hull (eV/atom)', fontsize=22, fontweight='bold')
+    ax1.set_title('DFT E_hull Comparison', fontsize=24, fontweight='bold')
     
-    # Statistics text (simplified, recalculated from plotted data)
-    stats_text = (
-        f"N = {stats['n_structures']}\n"
-        f"R = {stats['correlation']:.4f}\n"
-        f"MAE = {stats['mae']:.4f} eV/atom"
+    correlation1 = np.corrcoef(mattersim_vals_hull, dft_vals_hull)[0, 1]
+    mae1 = np.mean(np.abs(mattersim_vals_hull - dft_vals_hull))
+    
+    stats_text1 = (
+        f"N = {len(matched_hull)}\n"
+        f"R = {correlation1:.4f}\n"
+        f"MAE = {mae1:.4f} eV/atom"
     )
-    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=14,
+    ax1.text(0.02, 0.98, stats_text1, transform=ax1.transAxes, fontsize=18,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
-    # Grid and legend
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='lower right', fontsize=14)
-    ax.set_aspect('equal', adjustable='box')
-    ax.set_xlim(plot_min, plot_max)
-    ax.set_ylim(plot_min, plot_max)
+    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.minorticks_on()
+    ax1.grid(True, which='minor', alpha=0.15, linestyle=':')
+    ax1.legend(loc='lower right', fontsize=18)
     
-    # Increase tick label font sizes
-    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax1.set_xlim(plot_min1, plot_max1)
+    ax1.set_ylim(plot_min1, threshold)
+    ax1.tick_params(axis='both', which='major', labelsize=18)
     
-    plt.tight_layout()
-    scatter_file = output_dir / "generated_structures_comparison_scatter.png"
-    plt.savefig(scatter_file, dpi=300, bbox_inches='tight')
-    print(f"    {scatter_file.name}")
+    # ===== RIGHT: Generated Structures Scatter =====
+    xy2 = np.vstack([x2, y2])
+    z2 = gaussian_kde(xy2)(xy2)
+    z2 = z2 * len(x2)
+    
+    idx2 = z2.argsort()
+    x2_sorted, y2_sorted, z2_sorted = x2[idx2], y2[idx2], z2[idx2]
+    
+    scatter2 = ax2.scatter(x2_sorted, y2_sorted, c=z2_sorted, cmap=cmap, 
+                          norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                          edgecolors='none')
+    
+    ax2.plot([plot_min2, plot_max2], [plot_min2, plot_max2], 'r--',
+            linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
+    
+    ax2.set_xlabel('VASP Energy (eV/atom)', fontsize=22, fontweight='bold')
+    ax2.set_ylabel('MatterSim Energy (eV/atom)', fontsize=22, fontweight='bold')
+    ax2.set_title('DFT Energy Comparison', fontsize=24, fontweight='bold')
+    
+    correlation2 = np.corrcoef(ms_vals_gen, vasp_vals_gen)[0, 1]
+    mae2 = np.mean(np.abs(ms_vals_gen - vasp_vals_gen))
+    
+    stats_text2 = (
+        f"N = {len(matched_gen_filtered)}\n"
+        f"R = {correlation2:.4f}\n"
+        f"MAE = {mae2:.4f} eV/atom"
+    )
+    ax2.text(0.02, 0.98, stats_text2, transform=ax2.transAxes, fontsize=18,
+            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    
+    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.legend(loc='lower right', fontsize=18)
+    ax2.set_xlim(plot_min2, plot_max2)
+    ax2.set_ylim(plot_min2, plot_max2)
+    ax2.tick_params(axis='both', which='major', labelsize=18)
+    
+    save_figure(fig, output_dir, "hull_energy_comparison_scatter")
     plt.close()
     
-    # ===== Residual Plot =====
-    fig, ax = plt.subplots(figsize=(12, 12))
+    # ===========================================================================================
+    # COMBINED RESIDUAL PLOT: Hull Residuals (left) + Generated Structures Residuals (right)
+    # ===========================================================================================
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 12))
     
-    residuals = ms_vals - vasp_vals
+    # ===== LEFT: Hull Comparison Residuals =====
+    residuals1 = mattersim_vals_hull - dft_vals_hull
     
-    # Calculate point density for color mapping
-    x_res = vasp_vals
-    y_res = residuals
-    xy_res = np.vstack([x_res, y_res])
-    z_res = gaussian_kde(xy_res)(xy_res)
-    z_res = z_res * len(x_res)
+    x_res1 = dft_vals_hull
+    y_res1 = residuals1
+    xy_res1 = np.vstack([x_res1, y_res1])
+    z_res1 = gaussian_kde(xy_res1)(xy_res1)
+    z_res1 = z_res1 * len(x_res1)
     
-    # Create custom colormap
     colors_list_res = ['lime', 'forestgreen', 'black']
     cmap_res = LinearSegmentedColormap.from_list("density_residual", colors_list_res, N=100)
     
-    # Sort points by density
-    idx_res = z_res.argsort()
-    x_res_sorted, y_res_sorted, z_res_sorted = x_res[idx_res], y_res[idx_res], z_res[idx_res]
+    idx_res1 = z_res1.argsort()
+    x_res1_sorted, y_res1_sorted, z_res1_sorted = x_res1[idx_res1], y_res1[idx_res1], z_res1[idx_res1]
     
-    # Create scatter plot with density-based coloring
-    scatter_res = ax.scatter(x_res_sorted, y_res_sorted, c=z_res_sorted, cmap=cmap_res, 
-                            norm=mpl.colors.LogNorm(), s=20, marker='s', 
-                            edgecolors='none')
+    scatter_res1 = ax1.scatter(x_res1_sorted, y_res1_sorted, c=z_res1_sorted, cmap=cmap_res, 
+                              norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                              edgecolors='none')
     
-    # Add colorbar
-    # cbar_res = plt.colorbar(scatter_res, ax=ax)
+    ax1.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7, 
+               label='Zero residual')
     
-    ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
+    mean_residual1 = np.mean(residuals1)
+    ax1.axhline(y=mean_residual1, color='orange', linestyle='-', linewidth=2, 
+               alpha=0.7, label=f'Mean = {mean_residual1:+.4f} eV/atom')
+    
+    ax1.axhline(y=0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6, 
+               label='±0.05 eV/atom')
+    ax1.axhline(y=-0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6)
+    
+    ax1.set_xlabel('VASP E_hull (eV/atom)', fontsize=22, fontweight='bold')
+    ax1.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=22, fontweight='bold')
+    ax1.set_title('DFT E_hull Residuals', fontsize=24, fontweight='bold')
+    
+    residual_range1 = max(abs(residuals1.min()), abs(residuals1.max()))
+    y_limit1 = max(0.2, residual_range1 * 1.5)
+    
+    ax1.set_xlim(plot_min1, plot_max1)
+    
+    ax1.tick_params(axis='both', which='major', labelsize=18)
+    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.minorticks_on()
+    ax1.grid(True, which='minor', alpha=0.15, linestyle=':')
+    ax1.legend(loc='lower right', fontsize=18)
+    
+    # ===== RIGHT: Generated Structures Residuals =====
+    residuals2 = ms_vals_gen - vasp_vals_gen
+    
+    x_res2 = vasp_vals_gen
+    y_res2 = residuals2
+    xy_res2 = np.vstack([x_res2, y_res2])
+    z_res2 = gaussian_kde(xy_res2)(xy_res2)
+    z_res2 = z_res2 * len(x_res2)
+    
+    idx_res2 = z_res2.argsort()
+    x_res2_sorted, y_res2_sorted, z_res2_sorted = x_res2[idx_res2], y_res2[idx_res2], z_res2[idx_res2]
+    
+    scatter_res2 = ax2.scatter(x_res2_sorted, y_res2_sorted, c=z_res2_sorted, cmap=cmap_res, 
+                              norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                              edgecolors='none')
+    
+    ax2.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
               label='Zero residual')
-    ax.axhline(y=stats['mean_diff'], color='orange', linestyle='-',
+    
+    mean_residual2 = np.mean(residuals2)
+    ax2.axhline(y=mean_residual2, color='orange', linestyle='-',
               linewidth=2, alpha=0.7,
-              label=f'Mean = {stats["mean_diff"]:+.4f} eV/atom')
+              label=f'Mean = {mean_residual2:+.4f} eV/atom')
     
-    # Labels and title
-    ax.set_xlabel('VASP-DFT Energy per Atom (eV)', fontsize=18, fontweight='bold')
-    ax.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=18, fontweight='bold')
-    ax.set_title('Generated Structures: Energy Residuals', fontsize=20, fontweight='bold')
+    ax2.set_xlabel('VASP Energy (eV/atom)', fontsize=22, fontweight='bold')
+    ax2.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=22, fontweight='bold')
+    ax2.set_title('DFT Energy Residuals', fontsize=24, fontweight='bold')
     
-    # Increase tick label font sizes
-    ax.tick_params(axis='both', which='major', labelsize=14)
+    residual_range2 = max(abs(residuals2.min()), abs(residuals2.max()))
+    y_limit2 = max(0.2, residual_range2 * 1.5)
     
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='best', fontsize=14)
+    # Use the same y-limit for both plots for consistent height
+    y_limit_combined = max(y_limit1, y_limit2)
+    ax1.set_ylim(-y_limit_combined, y_limit_combined)
+    ax2.set_ylim(-y_limit_combined, y_limit_combined)
+    
+    ax2.set_xlim(plot_min2, plot_max2)
+    
+    ax2.tick_params(axis='both', which='major', labelsize=18)
+    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.legend(loc='lower right', fontsize=18)
     
     plt.tight_layout()
-    residual_file = output_dir / "generated_structures_comparison_residuals.png"
-    plt.savefig(residual_file, dpi=300, bbox_inches='tight')
-    print(f"    {residual_file.name}")
+    save_figure(fig, output_dir, "hull_energy_comparison_residuals")
     plt.close()
 
 
-def plot_mp_phases(mp_mattersim_cache, mp_dft_cache, output_dir):
+def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir):
     """
-    Generate MP phases comparison plots.
+    Generate combined MP phases comparison plot.
     
     Creates:
-        - mp_phases_comparison_scatter.png
-        - mp_phases_comparison_residuals.png
+        - mp_phases_comparison.png/.pdf (scatter + residuals)
     """
-    print("\nGenerating MP phases comparison plots...")
+    print("\nGenerating combined MP phases comparison plot...")
     
     # Parse MatterSim cache
     ms_by_mpid = {}
@@ -477,11 +403,9 @@ def plot_mp_phases(mp_mattersim_cache, mp_dft_cache, output_dir):
         ms_data = ms_by_mpid[mp_id]
         dft_data = dft_by_mpid[mp_id]
         
-        # Total energies
         ms_energy = ms_data['energy']
         dft_energy = dft_data['energy']
         
-        # Compute per-atom energies
         ms_comp = ms_data['composition']
         dft_comp = dft_data['composition']
         
@@ -503,88 +427,68 @@ def plot_mp_phases(mp_mattersim_cache, mp_dft_cache, output_dir):
     ms_per_atom = np.array([m['mattersim_energy_per_atom'] for m in matched])
     dft_per_atom = np.array([m['dft_energy_per_atom'] for m in matched])
     
-    stats = {
-        'n_structures': len(matched),
-        'mae': np.mean(np.abs(diffs)),
-        'rmse': np.sqrt(np.mean(diffs**2)),
-        'mean_diff': np.mean(diffs),
-        'std_diff': np.std(diffs),
-        'correlation': np.corrcoef(ms_per_atom, dft_per_atom)[0, 1]
-    }
+    correlation = np.corrcoef(ms_per_atom, dft_per_atom)[0, 1]
+    mae = np.mean(np.abs(diffs))
     
-    # ===== Scatter Plot =====
-    fig, ax = plt.subplots(figsize=(12, 12))
+    # ===========================================================================================
+    # COMBINED PLOT: MP Phases Scatter (left) + Residuals (right)
+    # ===========================================================================================
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 12))
     
-    ax.scatter(dft_per_atom, ms_per_atom, alpha=0.6, s=50, 
+    # ===== LEFT: Scatter Plot =====
+    ax1.scatter(dft_per_atom, ms_per_atom, alpha=0.6, s=50, 
               c='forestgreen', edgecolors='none')
     
-    # Perfect agreement line
     all_vals = np.concatenate([ms_per_atom, dft_per_atom])
     val_min, val_max = all_vals.min(), all_vals.max()
     margin = (val_max - val_min) * 0.05
     plot_min, plot_max = val_min - margin, val_max + margin
     
-    ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--', 
+    ax1.plot([plot_min, plot_max], [plot_min, plot_max], 'r--', 
             linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
     
-    # Labels
-    ax.set_xlabel('MP Raw DFT Energy per Atom (eV)', fontsize=18, fontweight='bold')
-    ax.set_ylabel('MatterSim Energy per Atom (eV)', fontsize=18, fontweight='bold')
-    ax.set_title('MP On-Hull Phases: MatterSim vs MP Raw DFT', fontsize=20, fontweight='bold')
+    ax1.set_xlabel('MP Raw DFT Energy (eV/atom)', fontsize=22, fontweight='bold')
+    ax1.set_ylabel('MatterSim Energy (eV/atom)', fontsize=22, fontweight='bold')
+    ax1.set_title('Energy Comparison', fontsize=24, fontweight='bold')
     
-    # Statistics text (simplified, recalculated from plotted data)
     stats_text = (
-        f"N = {stats['n_structures']}\n"
-        f"R = {stats['correlation']:.4f}\n"
-        f"MAE = {stats['mae']:.4f} eV/atom"
+        f"N = {len(matched)}\n"
+        f"R = {correlation:.4f}\n"
+        f"MAE = {mae:.4f} eV/atom"
     )
-    ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=14,
+    ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes, fontsize=18,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
-    # Grid and legend
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='lower right', fontsize=14)
-    ax.set_aspect('equal', adjustable='box')
-    ax.set_xlim(plot_min, plot_max)
-    ax.set_ylim(plot_min, plot_max)
+    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.legend(loc='lower right', fontsize=18)
+    ax1.set_xlim(plot_min, plot_max)
+    ax1.set_ylim(plot_min, plot_max)
+    ax1.set_aspect('equal', adjustable='box')
+    ax1.tick_params(axis='both', which='major', labelsize=18)
     
-    # Increase tick label font sizes
-    ax.tick_params(axis='both', which='major', labelsize=14)
-    
-    plt.tight_layout()
-    scatter_file = output_dir / "mp_phases_comparison_scatter.png"
-    plt.savefig(scatter_file, dpi=300, bbox_inches='tight')
-    print(f"    {scatter_file.name}")
-    plt.close()
-    
-    # ===== Residual Plot =====
-    fig, ax = plt.subplots(figsize=(12, 12))
-    
+    # ===== RIGHT: Residual Plot =====
     residuals = ms_per_atom - dft_per_atom
+    mean_diff = np.mean(residuals)
     
-    ax.scatter(dft_per_atom, residuals, alpha=0.6, s=50,
+    ax2.scatter(dft_per_atom, residuals, alpha=0.6, s=50,
               c='forestgreen', edgecolors='none')
     
-    ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
+    ax2.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
               label='Zero residual')
-    ax.axhline(y=stats['mean_diff'], color='orange', linestyle='-',
+    ax2.axhline(y=mean_diff, color='orange', linestyle='-',
               linewidth=2, alpha=0.7, 
-              label=f'Mean = {stats["mean_diff"]:+.4f} eV/atom')
+              label=f'Mean = {mean_diff:+.4f} eV/atom')
     
-    ax.set_xlabel('MP Raw DFT Energy per Atom (eV)', fontsize=18, fontweight='bold')
-    ax.set_ylabel('Residual (MatterSim - MP DFT) (eV/atom)', fontsize=18, fontweight='bold')
-    ax.set_title('MP On-Hull Phases: Energy Residuals', fontsize=20, fontweight='bold')
+    ax2.set_xlabel('MP Raw DFT Energy (eV/atom)', fontsize=22, fontweight='bold')
+    ax2.set_ylabel('Residual (MatterSim - MP DFT) (eV/atom)', fontsize=22, fontweight='bold')
+    ax2.set_title('Energy Residuals', fontsize=24, fontweight='bold')
     
-    # Increase tick label font sizes
-    ax.tick_params(axis='both', which='major', labelsize=14)
-    
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='best', fontsize=14)
+    ax2.tick_params(axis='both', which='major', labelsize=18)
+    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.legend(loc='lower right', fontsize=18)
     
     plt.tight_layout()
-    residual_file = output_dir / "mp_phases_comparison_residuals.png"
-    plt.savefig(residual_file, dpi=300, bbox_inches='tight')
-    print(f"    {residual_file.name}")
+    save_figure(fig, output_dir, "mp_phases_comparison")
     plt.close()
 
 
@@ -673,31 +577,25 @@ Examples:
     print("="*70)
     
     # Use outlier threshold from hull_comparison.json if available (for consistency)
-    # Otherwise use command-line argument
     hull_outlier_threshold = hull_comparison_data.get('summary', {}).get('outlier_threshold')
     if hull_outlier_threshold is not None and args.outlier_threshold == 0.2:
-        # User didn't specify custom threshold, use the one from hull_comparison
         outlier_threshold_to_use = hull_outlier_threshold
         print(f"\nUsing outlier threshold from hull_comparison.json: {outlier_threshold_to_use} eV/atom")
     else:
-        # User specified custom threshold, use it
         outlier_threshold_to_use = args.outlier_threshold
         if hull_outlier_threshold is not None and hull_outlier_threshold != args.outlier_threshold:
             print(f"\nUsing custom outlier threshold {args.outlier_threshold} eV/atom")
             print(f"         Original hull_comparison used {hull_outlier_threshold} eV/atom")
             print(f"         This may cause structure counts to differ from original plots")
     
-    # Generate all plots
+    # Generate all combined plots
     try:
-        # 1. Hull comparison plots (scatter + residuals)
-        plot_hull_comparison(hull_comparison_data, output_dir)
+        # 1. Combined hull energy comparison plots (scatter + residuals)
+        plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_results_data, 
+                                    output_dir, outlier_threshold=outlier_threshold_to_use)
         
-        # 2. Generated structures comparison plots (scatter + residuals)
-        plot_generated_structures(prescreen_data, dft_results_data, output_dir, 
-                                 outlier_threshold=outlier_threshold_to_use)
-        
-        # 3. MP phases comparison plots (scatter + residuals)
-        plot_mp_phases(mp_mattersim_cache, mp_dft_cache, output_dir)
+        # 2. Combined MP phases comparison plot (scatter + residuals)
+        plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir)
         
     except Exception as e:
         print(f"\nERROR during plot generation: {e}")
@@ -713,20 +611,19 @@ Examples:
     print("\nGenerated plots:")
     
     plot_files = [
-        "hull_comparison_scatter.png",
-        "hull_comparison_residuals.png",
-        "generated_structures_comparison_scatter.png",
-        "generated_structures_comparison_residuals.png",
-        "mp_phases_comparison_scatter.png",
-        "mp_phases_comparison_residuals.png"
+        "hull_energy_comparison_scatter",
+        "hull_energy_comparison_residuals",
+        "mp_phases_comparison"
     ]
     
-    for plot_file in plot_files:
-        plot_path = output_dir / plot_file
-        if plot_path.exists():
-            print(f"    {plot_file}")
+    for plot_base in plot_files:
+        png_path = output_dir / f"{plot_base}.png"
+        pdf_path = output_dir / f"{plot_base}.pdf"
+        if png_path.exists() and pdf_path.exists():
+            print(f"    {plot_base}.png")
+            print(f"    {plot_base}.pdf")
         else:
-            print(f"  ✗ {plot_file} (not generated)")
+            print(f"  ✗ {plot_base} (not generated)")
     
     print("\n" + "="*70)
     print(f"\nTo view plots:")
