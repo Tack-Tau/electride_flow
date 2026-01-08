@@ -461,17 +461,26 @@ def select_ground_state_phases(
     return ground_state_1, ground_state_2, x1, x2
 
 
-def plot_binary_hull(
+def is_metal(element_symbol: str) -> bool:
+    """Check if an element is a metal."""
+    from pymatgen.core import Element
+    try:
+        elem = Element(element_symbol)
+        return elem.is_metal or elem.is_alkali or elem.is_alkaline or elem.is_transition_metal or elem.is_post_transition_metal or elem.is_rare_earth_metal or elem.is_actinoid
+    except:
+        return False
+
+
+def plot_binary_hull_combined(
     system: str,
     entries: List[ComputedEntry],
     entry_metadata: Dict[str, Dict],
     elements: List[str],
     output_dir: Path,
     e_hull_max: float = 0.05,
-    plot_full_hull: bool = False,
     confirmed_ids: List[str] = None
 ):
-    """Plot binary convex hull with formation energy vs composition.
+    """Plot combined binary convex hull with zoomed and full views.
     
     Args:
         system: Chemical system (e.g., 'Ca-P')
@@ -480,7 +489,220 @@ def plot_binary_hull(
         elements: [elem1, elem2] sorted alphabetically
         output_dir: Output directory
         e_hull_max: Maximum energy above hull to display (eV/atom)
-        plot_full_hull: If True, plot full hull using elemental decomposition (zoomed plot)
+        confirmed_ids: List of confirmed electride structure IDs
+    """
+    
+    # Ensure metal is on the left (x=0)
+    if is_metal(elements[1]) and not is_metal(elements[0]):
+        elements = [elements[1], elements[0]]
+    
+    if confirmed_ids is None:
+        confirmed_ids = []
+    
+    # Prepare phase data for both full and zoomed plots
+    # We need to identify which phases will be plotted in each view
+    full_mp_stable, _, _ = _prepare_phase_data(
+        entries, entry_metadata, elements, e_hull_max, plot_full_hull=True
+    )
+    zoom_mp_stable, zoom_new_stable, zoom_new_meta = _prepare_phase_data(
+        entries, entry_metadata, elements, e_hull_max, plot_full_hull=False
+    )
+    
+    # Prompt for all label positions upfront in the correct order
+    print("\n" + "="*70)
+    print("LABEL POSITION SETUP")
+    print("="*70)
+    print("You will be prompted for label positions in the following order:")
+    print("  1. MP stable phases (full hull plot)")
+    print("  2. MP stable phases (zoomed-in hull plot)")
+    print("  3. New stable structures (zoomed-in hull plot)")
+    print("  4. Metastable structures (zoomed-in hull plot)")
+    print("")
+    print("Note: Full hull plot only shows MP stable phase labels.")
+    print("      New stable/metastable structures are labeled only in zoomed plot.")
+    print("="*70)
+    
+    # 1. Full hull - MP stable
+    full_mp_positions = []
+    if full_mp_stable:
+        full_mp_positions = prompt_for_label_positions(full_mp_stable, "FULL HULL - MP stable phases")
+    
+    # Full hull does not show labels for new stable/metastable structures
+    full_new_stable_positions = []
+    full_new_meta_positions = []
+    
+    # 2. Zoomed hull - MP stable
+    zoom_mp_positions = []
+    if zoom_mp_stable:
+        zoom_mp_positions = prompt_for_label_positions(zoom_mp_stable, "ZOOMED HULL - MP stable phases")
+    
+    # 3. Zoomed hull - New stable
+    zoom_new_stable_positions = []
+    if zoom_new_stable:
+        zoom_new_stable_positions = prompt_for_label_positions(zoom_new_stable, "ZOOMED HULL - New stable structures")
+    
+    # 4. Zoomed hull - Metastable
+    zoom_new_meta_positions = []
+    if zoom_new_meta:
+        zoom_new_meta_positions = prompt_for_label_positions(zoom_new_meta, "ZOOMED HULL - Metastable structures")
+    
+    # Create figure with 2 subplots (top: full, bottom: zoomed)
+    fig, (ax_full, ax_zoom) = plt.subplots(2, 1, figsize=(12, 16), 
+                                            gridspec_kw={'height_ratios': [1, 1], 'hspace': 0.15, 'top': 0.96})
+    
+    # Plot full hull on top axis
+    _plot_single_hull(ax_full, entries, entry_metadata, elements, e_hull_max, 
+                     confirmed_ids, plot_full_hull=True, y_max=0.1,
+                     mp_label_positions=full_mp_positions,
+                     new_stable_positions=full_new_stable_positions,
+                     new_meta_positions=full_new_meta_positions)
+    
+    # Plot zoomed hull on bottom axis  
+    _plot_single_hull(ax_zoom, entries, entry_metadata, elements, e_hull_max,
+                     confirmed_ids, plot_full_hull=False, y_max=0.005,
+                     mp_label_positions=zoom_mp_positions,
+                     new_stable_positions=zoom_new_stable_positions,
+                     new_meta_positions=zoom_new_meta_positions)
+    
+    # Set single title at top
+    fig.suptitle(f'{system} Binary Phase Diagram', fontsize=22, fontweight='bold', y=0.98)
+    
+    # Remove individual subplot titles
+    ax_full.set_title('')
+    ax_zoom.set_title('')
+    
+    # Save figure
+    output_path = output_dir / f'{system.replace("-", "")}_hull.png'
+    fig.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"Saved: {output_path}")
+    
+    # Also save as PDF
+    output_pdf = output_dir / f'{system.replace("-", "")}_hull.pdf'
+    fig.savefig(output_pdf, bbox_inches='tight')
+    print(f"Saved: {output_pdf}")
+    
+    plt.close(fig)
+
+
+def _prepare_phase_data(
+    entries: List[ComputedEntry],
+    entry_metadata: Dict[str, Dict],
+    elements: List[str],
+    e_hull_max: float,
+    plot_full_hull: bool
+) -> Tuple[List[Dict], List[Dict], List[Dict]]:
+    """Prepare phase data for plotting to identify which phases need labels.
+    
+    Returns:
+        (mp_stable, new_stable, new_meta) - Lists of phase data dicts
+    """
+    # Separate MP entries from electride entries
+    mp_entries = [e for e in entries if not entry_metadata.get(e.entry_id, {}).get('is_electride', False)]
+    
+    # Create phase diagrams
+    pd_mp_only = PhaseDiagram(mp_entries)
+    pd_all = PhaseDiagram(entries)
+    
+    # Determine ground states based on plot type
+    if plot_full_hull:
+        # Use elemental phases for full hull plot
+        elem1_entry = None
+        elem2_entry = None
+        for entry in mp_entries:
+            if len(entry.composition.elements) == 1:
+                if str(entry.composition.elements[0]) == elements[0]:
+                    elem1_entry = entry
+                elif str(entry.composition.elements[0]) == elements[1]:
+                    elem2_entry = entry
+        gs1, gs2, x1, x2 = elem1_entry, elem2_entry, 0.0, 1.0
+    else:
+        # Smart zoom to electride region
+        gs1, gs2, x1, x2 = select_ground_state_phases(entries, entry_metadata, elements, e_hull_max)
+    
+    # Get energies of ground states
+    gs1_energy = gs1.energy / gs1.composition.num_atoms
+    gs2_energy = gs2.energy / gs2.composition.num_atoms
+    
+    # Prepare data
+    all_data = []
+    for entry in entries:
+        comp = entry.composition
+        comp_elems = sorted([str(e) for e in comp.elements])
+        if len(comp_elems) > 2:
+            continue
+        
+        x_original = comp.get_atomic_fraction(elements[1])
+        if x_original < x1 - 0.01 or x_original > x2 + 0.01:
+            continue
+        
+        if abs(x2 - x1) < 1e-6:
+            x_norm = 0.5
+        else:
+            x_norm = (x_original - x1) / (x2 - x1)
+        
+        if plot_full_hull:
+            formation_energy = pd_all.get_form_energy_per_atom(entry)
+        else:
+            energy_per_atom = entry.energy / comp.num_atoms
+            formation_energy = energy_per_atom - (x_norm * gs2_energy + (1 - x_norm) * gs1_energy)
+        
+        e_above_hull = pd_all.get_e_above_hull(entry)
+        metadata = entry_metadata.get(entry.entry_id, {})
+        is_electride = metadata.get('is_electride', False)
+        on_hull = entry in pd_all.stable_entries
+        on_mp_hull = entry in pd_mp_only.stable_entries
+        
+        all_data.append({
+            'x': x_norm,
+            'y': formation_energy,
+            'e_above_hull': e_above_hull,
+            'on_hull': on_hull,
+            'on_mp_hull': on_mp_hull,
+            'is_electride': is_electride,
+            'formula': comp.reduced_formula,
+            'entry_id': entry.entry_id,
+            'metadata': metadata
+        })
+    
+    all_data = sorted(all_data, key=lambda d: d['x'])
+    
+    # Identify phases
+    hull_phases = [d for d in all_data if d['on_hull']]
+    metastable_phases = [d for d in all_data if not d['on_hull'] and d['e_above_hull'] <= e_hull_max]
+    mp_stable = [d for d in hull_phases if not d['is_electride']]
+    new_stable = [d for d in hull_phases if d['is_electride']]
+    new_meta = [d for d in metastable_phases if d['is_electride']]
+    
+    return mp_stable, new_stable, new_meta
+
+
+def _plot_single_hull(
+    ax,
+    entries: List[ComputedEntry],
+    entry_metadata: Dict[str, Dict],
+    elements: List[str],
+    e_hull_max: float,
+    confirmed_ids: List[str],
+    plot_full_hull: bool,
+    y_max: float,
+    mp_label_positions: List[Tuple[float, float]] = None,
+    new_stable_positions: List[Tuple[float, float]] = None,
+    new_meta_positions: List[Tuple[float, float]] = None
+):
+    """Plot a single binary hull (either full or zoomed).
+    
+    Args:
+        ax: Matplotlib axes
+        entries: All ComputedEntry objects
+        entry_metadata: Metadata dict
+        elements: [elem1, elem2] with metal on left
+        e_hull_max: Max energy above hull to display
+        confirmed_ids: List of confirmed electride IDs
+        plot_full_hull: If True, plot full hull; if False, plot zoomed
+        y_max: Maximum y-axis limit
+        mp_label_positions: Pre-collected label positions for MP stable phases
+        new_stable_positions: Pre-collected label positions for new stable structures
+        new_meta_positions: Pre-collected label positions for metastable structures
     """
     
     # Separate MP entries from electride entries
@@ -489,6 +711,9 @@ def plot_binary_hull(
     # Create two phase diagrams: MP-only and all entries
     pd_mp_only = PhaseDiagram(mp_entries)
     pd_all = PhaseDiagram(entries)
+    
+    if confirmed_ids is None:
+        confirmed_ids = []
     
     # Determine ground states and composition range
     if plot_full_hull:
@@ -613,36 +838,30 @@ def plot_binary_hull(
     new_stable = [d for d in hull_phases if d['is_electride']]
     new_meta = [d for d in metastable_phases if d['is_electride']]
     
-    # Use provided confirmed_ids or empty list
-    if confirmed_ids is None:
-        confirmed_ids = []
-    
-    # Create figure
-    fig, ax = plt.subplots(figsize=(12, 8))
-    
     # Plot MP-only convex hull (gray dashed line)
     mp_hull_data = [d for d in all_data if d['on_mp_hull']]
     mp_hull_x = [d['x'] for d in mp_hull_data]
     mp_hull_y = [d['y'] for d in mp_hull_data]
     if len(mp_hull_x) >= 2:
-        ax.plot(mp_hull_x, mp_hull_y, 'gray', linestyle='--', linewidth=2, 
+        ax.plot(mp_hull_x, mp_hull_y, 'gray', linestyle='--', linewidth=2.5, 
                alpha=0.6, zorder=1, label='MP-only hull')
     
     # Plot full convex hull line (black solid)
     hull_x = [d['x'] for d in hull_phases]
     hull_y = [d['y'] for d in hull_phases]
-    ax.plot(hull_x, hull_y, 'black', linestyle='-', linewidth=2.5, zorder=2, label='Convex hull')
+    ax.plot(hull_x, hull_y, 'black', linestyle='-', linewidth=3, zorder=2, label='Convex hull')
     
-    # Get MP stable phases and prompt for label positions
+    # Get MP stable phases (positions should be pre-collected)
     mp_stable = [d for d in hull_phases if not d['is_electride']]
     if mp_stable:
-        # Prompt for label positions
-        mp_label_positions = prompt_for_label_positions(mp_stable, "MP stable phases")
+        # Use pre-collected label positions
+        if mp_label_positions is None:
+            mp_label_positions = [(0.0, 30.0)] * len(mp_stable)
         
         # Plot MP stable phases (black fill, no edge)
         mp_x = [d['x'] for d in mp_stable]
         mp_y = [d['y'] for d in mp_stable]
-        ax.scatter(mp_x, mp_y, c='black', s=120, marker='o', 
+        ax.scatter(mp_x, mp_y, c='black', s=150, marker='o', 
                   edgecolors='none', linewidth=0, zorder=3, label='MP stable')
         
         # Label MP stable phases with LaTeX formula (no MP ID)
@@ -652,10 +871,10 @@ def plot_binary_hull(
             
             ax.annotate(formula_latex, xy=(d['x'], d['y']), 
                        xytext=(x_offset, y_offset), textcoords='offset points',
-                       fontsize=10, ha='center', color='black', fontweight='bold',
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgray', 
-                               alpha=0.8, edgecolor='black', linewidth=1),
-                       arrowprops=dict(arrowstyle='-', color='black', lw=1, alpha=0.7))
+                       fontsize=13, ha='center', color='black', fontweight='bold',
+                       bbox=dict(boxstyle='round,pad=0.4', facecolor='lightgray', 
+                               alpha=0.8, edgecolor='black', linewidth=1.2),
+                       arrowprops=dict(arrowstyle='-', color='black', lw=1.2, alpha=0.7))
     
     # Separate new stable structures by electride vs non-electride
     new_stable = [d for d in hull_phases if d['is_electride']]
@@ -663,21 +882,21 @@ def plot_binary_hull(
     
     # Plot stable new structures (electride and non-electride)
     if new_stable:
-        # Only prompt for label positions if not full hull plot
-        if not plot_full_hull:
-            new_stable_positions = prompt_for_label_positions(new_stable, "New stable structures")
+        # Use pre-collected label positions
+        if new_stable_positions is None:
+            new_stable_positions = [(0.0, 30.0)] * len(new_stable)
         
         # Plot markers (triangle for confirmed electride, square for candidate/non-electride, blue fill, red edge)
         for d in new_stable:
             is_confirmed = d['entry_id'] in confirmed_ids
             marker = '^' if is_confirmed else 's'  # Triangle for confirmed electride, square for candidate
             facecolor = 'blue'  # Always blue fill for stable structures
-            marker_size = 150 if is_confirmed else 120
+            marker_size = 180 if is_confirmed else 150
             ax.scatter(d['x'], d['y'], c=facecolor, s=marker_size, marker=marker, 
-                      edgecolors='red', linewidth=2, zorder=5)
+                      edgecolors='red', linewidth=2.5, zorder=5)
         
-        # Label new stable structures (only in smart-zoom plot, not full hull)
-        if not plot_full_hull:
+        # Label new stable structures (only in zoomed plot, not full hull)
+        if not plot_full_hull and new_stable_positions:
             for i, d in enumerate(new_stable):
                 pearson = d['metadata'].get('pearson_symbol', '')
                 structure_id = d['entry_id']
@@ -692,128 +911,70 @@ def plot_binary_hull(
                 
                 ax.annotate(label_text, xy=(d['x'], d['y']), 
                            xytext=(x_offset, y_offset), textcoords='offset points',
-                           fontsize=9, ha='center', color='blue', fontweight='bold',
-                           bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', 
+                           fontsize=12, ha='center', color='blue', fontweight='bold',
+                           bbox=dict(boxstyle='round,pad=0.4', facecolor='lightblue', 
                                    alpha=0.9, edgecolor='blue', linewidth=2),
-                           arrowprops=dict(arrowstyle='-', color='blue', lw=1.2, alpha=0.7))
+                           arrowprops=dict(arrowstyle='-', color='blue', lw=1.5, alpha=0.7))
     
     # Plot metastable new structures (electride and non-electride)
     if new_meta:
-        # Only prompt for label positions if not full hull plot
-        if not plot_full_hull:
-            new_meta_positions = prompt_for_label_positions(new_meta, "Metastable structures")
+        # Use pre-collected label positions
+        if new_meta_positions is None:
+            new_meta_positions = [(0.0, 30.0)] * len(new_meta)
         
         # Plot markers (triangle for confirmed electride, square for candidate/non-electride, orange fill, red edge)
         for d in new_meta:
             is_confirmed = d['entry_id'] in confirmed_ids
             marker = '^' if is_confirmed else 's'  # Triangle for confirmed electride, square for candidate
             facecolor = 'orange'  # Always orange fill for metastable structures
-            marker_size = 100 if is_confirmed else 80
+            marker_size = 120 if is_confirmed else 100
             ax.scatter(d['x'], d['y'], c=facecolor, s=marker_size, marker=marker, 
-                      edgecolors='red', linewidth=1.5, zorder=4)
+                      edgecolors='red', linewidth=2, zorder=4)
         
-        # Label metastable structures (only in smart-zoom plot, not full hull)
-        if not plot_full_hull:
+        # Label metastable structures (only in zoomed plot, not full hull)
+        if not plot_full_hull and new_meta_positions:
             for i, d in enumerate(new_meta):
                 pearson = d['metadata'].get('pearson_symbol', '')
                 structure_id = d['entry_id']
                 formula_part = structure_id.split('_')[0] if '_' in structure_id else d['formula']
                 formula_latex = formula_to_latex(formula_part)
+                e_hull_val = d['e_above_hull']
                 if pearson:
                     label_text = f"{pearson}-{formula_latex}_{structure_id.split('_')[-1]}"
                 else:
-                    label_text = structure_id
+                    label_text = f"{structure_id}"
                 
                 x_offset, y_offset = new_meta_positions[i]
                 
                 ax.annotate(label_text, xy=(d['x'], d['y']), 
                            xytext=(x_offset, y_offset), textcoords='offset points',
-                           fontsize=9, ha='left', color='darkorange',
-                           bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow', 
-                                   alpha=0.8, edgecolor='darkorange', linewidth=1),
-                           arrowprops=dict(arrowstyle='-', color='darkorange', lw=1, alpha=0.7))
+                           fontsize=11, ha='left', color='darkorange',
+                           bbox=dict(boxstyle='round,pad=0.4', facecolor='lightyellow', 
+                                   alpha=0.8, edgecolor='darkorange', linewidth=1.2),
+                           arrowprops=dict(arrowstyle='-', color='darkorange', lw=1.2, alpha=0.7))
     
     # Add legend entries
     if new_stable or new_meta:
-        ax.scatter([], [], facecolors='none', s=150, marker='^', 
-                  edgecolors='red', linewidth=2, label='Confirmed electride')
-        ax.scatter([], [], facecolors='none', s=120, marker='s', 
+        ax.scatter([], [], facecolors='none', s=180, marker='^', 
+                  edgecolors='red', linewidth=2.5, label='Confirmed electride')
+        ax.scatter([], [], facecolors='none', s=150, marker='s', 
                   edgecolors='red', linewidth=2, label='Candidate structure')
     
     # Configure axes
-    ax.set_xlabel(f'Composition: x in {gs1_formula}$_{{1-x}}${gs2_formula}$_x$', fontsize=16, fontweight='bold')
-    ax.set_ylabel('Formation Energy (eV/atom)', fontsize=16, fontweight='bold')
-    title_suffix = ' (Full Hull)' if plot_full_hull else ''
-    ax.set_title(f'{system} Binary Phase Diagram{title_suffix}', fontsize=18, fontweight='bold', pad=15)
+    ax.set_xlabel(f'Composition: x in {gs1_formula}$_{{1-x}}${gs2_formula}$_x$', fontsize=18, fontweight='bold')
+    ax.set_ylabel('Formation Energy (eV/atom)', fontsize=18, fontweight='bold')
     ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='best', fontsize=11, framealpha=0.95, edgecolor='black')
+    ax.legend(loc='lower left', fontsize=13, framealpha=0.95, edgecolor='black')
+    ax.tick_params(axis='both', which='major', labelsize=14)
     
     # Set x-axis limits with some padding
     ax.set_xlim(-0.05, 1.05)
     
-    # Adjust y-axis to accommodate labels
+    # Set y-axis limits with dynamic range
     y_min = min([d['y'] for d in all_data])
-    y_max = max([d['y'] for d in all_data if d['on_hull'] or d['e_above_hull'] <= e_hull_max])
-    y_range = y_max - y_min
-    ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.2 * y_range)
-    
-    # Save figure
-    suffix = '_full' if plot_full_hull else ''
-    output_path = output_dir / f'{system.replace("-", "")}_hull{suffix}.png'
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=300, bbox_inches='tight')
-    print(f"Saved: {output_path}")
-    
-    # Also save as PDF
-    output_pdf = output_dir / f'{system.replace("-", "")}_hull{suffix}.pdf'
-    fig.savefig(output_pdf, bbox_inches='tight')
-    print(f"Saved: {output_pdf}")
-    
-    plt.close(fig)
-    
-    # Print summary
-    electride_data = [d for d in all_data if d['is_electride']]
-    electrides_below_mp_hull = [d for d in electride_data if d['e_above_mp_hull'] < -1e-6]  # Negative means below MP hull
-    
-    print(f"\n{system} System Summary:")
-    print(f"  Total entries: {len(entries)}")
-    print(f"  MP phases: {len(mp_entries)}")
-    print(f"  Stable phases on MP-only hull: {len(pd_mp_only.stable_entries)}")
-    print(f"  Stable phases (on hull): {len(hull_phases)}")
-    print(f"  Electride candidates: {len(electride_data)}")
-    print(f"  New stable electrides: {len(new_stable)}")
-    print(f"  Electrides below original MP hull: {len(electrides_below_mp_hull)}")
-    print(f"  New metastable electrides (E_hull ≤ {e_hull_max}): {len(new_meta)}")
-    print(f"  Confirmed electrides: {len(confirmed_ids)}")
-    
-    if new_stable:
-        print(f"\n  Stable electrides:")
-        for d in new_stable:
-            pearson = d['metadata'].get('pearson_symbol', 'N/A')
-            confirmed = " [CONFIRMED]" if d['entry_id'] in confirmed_ids else ""
-            print(f"    - {pearson}-{d['formula']} ({d['entry_id']}): "
-                  f"E_form = {d['y']:.4f} eV/atom, "
-                  f"E_MP-hull = {d['e_above_mp_hull']:.4f} eV/atom{confirmed}")
-    
-    if electrides_below_mp_hull and not new_stable:
-        print(f"\n  Electrides below original MP hull (but not on final hull):")
-        for d in electrides_below_mp_hull:
-            if not d['on_hull']:
-                pearson = d['metadata'].get('pearson_symbol', 'N/A')
-                print(f"    - {pearson}-{d['formula']} ({d['entry_id']}): "
-                      f"E_form = {d['y']:.4f} eV/atom, "
-                      f"E_MP-hull = {d['e_above_mp_hull']:.4f} eV/atom, "
-                      f"E_full-hull = {d['e_above_hull']:.4f} eV/atom")
-    
-    if new_meta:
-        print(f"\n  Metastable electrides (top 10 by stability):")
-        sorted_meta = sorted(new_meta, key=lambda d: d['e_above_hull'])[:10]
-        for d in sorted_meta:
-            pearson = d['metadata'].get('pearson_symbol', 'N/A')
-            confirmed = " [CONFIRMED]" if d['entry_id'] in confirmed_ids else ""
-            print(f"    - {pearson}-{d['formula']} ({d['entry_id']}): "
-                  f"E_form = {d['y']:.4f} eV/atom, "
-                  f"E_hull = {d['e_above_hull']:.4f} eV/atom{confirmed}")
+    y_max_data = max([d['y'] for d in all_data if d['on_hull'] or d['e_above_hull'] <= e_hull_max])
+    y_range = y_max_data - y_min
+    ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
 
 
 def main():
@@ -933,15 +1094,35 @@ def main():
         # Prompt user for confirmed electrides (only once)
         confirmed_ids = prompt_for_confirmed_electrides(new_stable, new_meta)
         
-        # Plot smart-zoom hull
-        print("\n--- Plotting smart-zoom hull ---")
-        plot_binary_hull(system, entries, entry_metadata, elements, args.output_dir, 
-                        args.e_above_hull_max, plot_full_hull=False, confirmed_ids=confirmed_ids)
+        # Plot combined hull (full on top, zoomed on bottom)
+        print("\n--- Plotting combined hull ---")
+        plot_binary_hull_combined(system, entries, entry_metadata, elements, args.output_dir, 
+                                  args.e_above_hull_max, confirmed_ids=confirmed_ids)
         
-        # Plot full hull
-        print("\n--- Plotting full hull ---")
-        plot_binary_hull(system, entries, entry_metadata, elements, args.output_dir, 
-                        args.e_above_hull_max, plot_full_hull=True, confirmed_ids=confirmed_ids)
+        # Print summary
+        electride_data = [m for m in entry_metadata.values() if m.get('is_electride', False)]
+        print(f"\n{system} System Summary:")
+        print(f"  Total entries: {len(entries)}")
+        print(f"  MP phases: {len(mp_entries)}")
+        print(f"  Electride candidates: {len(electride_data)}")
+        print(f"  New stable electrides: {len(new_stable)}")
+        print(f"  New metastable electrides (E_hull ≤ {args.e_above_hull_max}): {len(new_meta)}")
+        print(f"  Confirmed electrides: {len(confirmed_ids)}")
+        
+        if new_stable:
+            print(f"\n  Stable electrides:")
+            for d in new_stable:
+                pearson = d['metadata'].get('pearson_symbol', 'N/A')
+                confirmed = " [CONFIRMED]" if d['entry_id'] in confirmed_ids else ""
+                print(f"    - {pearson} ({d['entry_id']}): E_hull = {d['e_above_hull']:.4f} eV/atom{confirmed}")
+        
+        if new_meta:
+            print(f"\n  Metastable electrides (top 10 by stability):")
+            sorted_meta = sorted(new_meta, key=lambda d: d['e_above_hull'])[:10]
+            for d in sorted_meta:
+                pearson = d['metadata'].get('pearson_symbol', 'N/A')
+                confirmed = " [CONFIRMED]" if d['entry_id'] in confirmed_ids else ""
+                print(f"    - {pearson} ({d['entry_id']}): E_hull = {d['e_above_hull']:.4f} eV/atom{confirmed}")
     
     print("\n" + "="*70)
     print("All plots completed!")

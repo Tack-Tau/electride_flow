@@ -522,35 +522,41 @@ def plot_ternary_hull(
     
     # Draw full hull facets first (purple solid lines, lower zorder)
     draw_hull_facets(ax, pd_all, all_data, elements, linestyle='-', color=stable_purple, 
-                    linewidth=2, alpha=0.8, label='Convex hull', zorder=2)
+                    linewidth=2.5, alpha=0.8, label='Convex hull', zorder=2)
     
     # Draw MP-only hull facets on top (black dashed lines, higher zorder)
     draw_hull_facets(ax, pd_mp_only, all_data, elements, linestyle='--', color='black', 
-                    linewidth=2, alpha=0.8, label='MP-only hull', zorder=3)
+                    linewidth=2.5, alpha=0.8, label='MP-only hull', zorder=3)
     
-    # Get MP stable phases and prompt for label positions
+    # Get MP stable phases
     mp_stable = [d for d in hull_phases if not d['is_electride']]
+    
+    # Separate elemental and compound MP phases
+    mp_elemental = [d for d in mp_stable if len(d['entry'].composition.elements) == 1]
+    mp_compounds = [d for d in mp_stable if len(d['entry'].composition.elements) > 1]
+    
+    # Plot all MP stable phases (markers only)
     if mp_stable:
-        # Prompt for label positions
-        mp_label_positions = prompt_for_label_positions(mp_stable, "MP stable phases")
-        
-        # Plot MP stable phases (black fill, no edge)
         mp_x = [d['cart_x'] for d in mp_stable]
         mp_y = [d['cart_y'] for d in mp_stable]
-        ax.scatter(mp_x, mp_y, color='black', s=150, marker='o', edgecolors='none', 
+        ax.scatter(mp_x, mp_y, color='black', s=180, marker='o', edgecolors='none', 
                   linewidth=0, zorder=4, label='MP stable')
+    
+    # Only prompt for and label compound MP phases
+    if mp_compounds:
+        mp_label_positions = prompt_for_label_positions(mp_compounds, "MP stable compound phases")
         
-        # Label key MP phases with LaTeX (no MP ID)
-        for i, d in enumerate(mp_stable):
+        # Label compound MP phases
+        for i, d in enumerate(mp_compounds):
             formula_latex = formula_to_latex(d['formula'])
             x_offset, y_offset = mp_label_positions[i]
             
             ax.annotate(formula_latex, xy=(d['cart_x'], d['cart_y']),
                        xytext=(x_offset, y_offset), textcoords='offset points',
-                       fontsize=10, ha='left', color='black', fontweight='bold',
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgray',
-                               alpha=0.8, edgecolor='black', linewidth=1),
-                       arrowprops=dict(arrowstyle='-', color='black', lw=1, alpha=0.7))
+                       fontsize=13, ha='left', color='black', fontweight='bold',
+                       bbox=dict(boxstyle='round,pad=0.4', facecolor='lightgray',
+                               alpha=0.8, edgecolor='black', linewidth=1.2),
+                       arrowprops=dict(arrowstyle='-', color='black', lw=1.2, alpha=0.7))
     
     # Separate new structures by stable/metastable and electride/non-electride
     new_stable = [d for d in hull_phases if d['is_electride']]
@@ -566,9 +572,9 @@ def plot_ternary_hull(
             is_confirmed = d['entry_id'] in confirmed_ids
             marker = '^' if is_confirmed else 's'  # Triangle for confirmed electride, square for candidate
             facecolor = stable_purple  # Always purple fill for stable structures
-            marker_size = 180 if is_confirmed else 150
+            marker_size = 220 if is_confirmed else 180
             ax.scatter(d['cart_x'], d['cart_y'], color=facecolor, s=marker_size, marker=marker, 
-                      edgecolors='red', linewidth=2, zorder=6)
+                      edgecolors='red', linewidth=2.5, zorder=6)
         
         # Label new stable structures
         for i, d in enumerate(new_stable):
@@ -585,10 +591,10 @@ def plot_ternary_hull(
             
             ax.annotate(label_text, xy=(d['cart_x'], d['cart_y']),
                        xytext=(x_offset, y_offset), textcoords='offset points',
-                       fontsize=9, ha='left', color=stable_purple, fontweight='bold',
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='lavender',
-                               alpha=0.9, edgecolor=stable_purple, linewidth=1.5),
-                       arrowprops=dict(arrowstyle='-', color=stable_purple, lw=1.2, alpha=0.7))
+                       fontsize=13, ha='left', color=stable_purple, fontweight='bold',
+                       bbox=dict(boxstyle='round,pad=0.4', facecolor='lavender',
+                               alpha=0.9, edgecolor=stable_purple, linewidth=2),
+                       arrowprops=dict(arrowstyle='-', color=stable_purple, lw=1.5, alpha=0.7))
     
     # Plot metastable new structures
     if new_meta:
@@ -600,9 +606,9 @@ def plot_ternary_hull(
             is_confirmed = d['entry_id'] in confirmed_ids
             marker = '^' if is_confirmed else 's'  # Triangle for confirmed electride, square for candidate
             facecolor = cmap(norm(d['e_above_hull']))  # Always filled with colormap color
-            marker_size = 120 if is_confirmed else 100
+            marker_size = 150 if is_confirmed else 120
             ax.scatter(d['cart_x'], d['cart_y'], c=[facecolor], s=marker_size, marker=marker, 
-                      edgecolors='red', linewidth=1.5, zorder=5)
+                      edgecolors='red', linewidth=2, zorder=5)
         
         # Label metastable structures
         for i, d in enumerate(new_meta):
@@ -620,23 +626,23 @@ def plot_ternary_hull(
             
             ax.annotate(label_text, xy=(d['cart_x'], d['cart_y']),
                        xytext=(x_offset, y_offset), textcoords='offset points',
-                       fontsize=9, ha='left', color='darkorange',
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow',
-                               alpha=0.8, edgecolor='darkorange', linewidth=0.8),
-                       arrowprops=dict(arrowstyle='-', color='darkorange', lw=0.8, alpha=0.7))
+                       fontsize=12, ha='left', color='darkorange',
+                       bbox=dict(boxstyle='round,pad=0.4', facecolor='lightyellow',
+                               alpha=0.8, edgecolor='darkorange', linewidth=1.2),
+                       arrowprops=dict(arrowstyle='-', color='darkorange', lw=1.2, alpha=0.7))
     
     # Add legend entries
     if new_stable or new_meta:
-        ax.scatter([], [], facecolors='none', s=150, marker='^', 
-                  edgecolors='red', linewidth=2, label='Confirmed electride')
-        ax.scatter([], [], facecolors='none', s=120, marker='s', 
+        ax.scatter([], [], facecolors='none', s=220, marker='^', 
+                  edgecolors='red', linewidth=2.5, label='Confirmed electride')
+        ax.scatter([], [], facecolors='none', s=180, marker='s', 
                   edgecolors='red', linewidth=2, label='Candidate structure')
     
     # Configure plot
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title(f'{system} Ternary Phase Diagram', fontsize=18, fontweight='bold', pad=20)
-    ax.legend(loc='upper left', fontsize=12, framealpha=0.9, edgecolor='black')
+    ax.set_title(f'{system} Ternary Phase Diagram', fontsize=22, fontweight='bold', pad=25)
+    ax.legend(loc='upper left', fontsize=14, framealpha=0.9, edgecolor='black')
     
     # Save figure
     output_path = output_dir / f'{system.replace("-", "")}_ternary_hull.png'
@@ -761,17 +767,17 @@ def draw_ternary_axes(ax, elements, color='purple'):
     ])
     
     # Draw triangle
-    triangle = Polygon(vertices, fill=False, edgecolor=color, linewidth=2)
+    triangle = Polygon(vertices, fill=False, edgecolor=color, linewidth=2.5)
     ax.add_patch(triangle)
     
-    # Label vertices with element names
-    offset = 0.05
+    # Label vertices with element names (larger font)
+    offset = 0.06
     ax.text(vertices[0,0], vertices[0,1] + offset, elements[0], 
-           ha='center', va='bottom', fontsize=16, fontweight='bold')
+           ha='center', va='bottom', fontsize=20, fontweight='bold')
     ax.text(vertices[1,0] - offset, vertices[1,1], elements[1], 
-           ha='right', va='center', fontsize=16, fontweight='bold')
+           ha='right', va='center', fontsize=20, fontweight='bold')
     ax.text(vertices[2,0] + offset, vertices[2,1], elements[2], 
-           ha='left', va='center', fontsize=16, fontweight='bold')
+           ha='left', va='center', fontsize=20, fontweight='bold')
     
     # Set limits with padding
     ax.set_xlim(-0.1, 1.1)
