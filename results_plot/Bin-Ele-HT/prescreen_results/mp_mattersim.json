@@ -1,0 +1,9304 @@
+[
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 1.0
+    },
+    "energy": -1.741066813468933,
+    "entry_id": "mp_mattersim_mp-1977763",
+    "mp_id": "mp-1977763"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 8.0
+    },
+    "energy": -14.68878173828125,
+    "entry_id": "mp_mattersim_mp-570384",
+    "mp_id": "mp-570384"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 2.0
+    },
+    "energy": -3.3820064067840576,
+    "entry_id": "mp_mattersim_mp-1008283",
+    "mp_id": "mp-1008283"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 1.0
+    },
+    "energy": -1.8143898248672485,
+    "entry_id": "mp_mattersim_mp-605790",
+    "mp_id": "mp-605790"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 2.0
+    },
+    "energy": -3.8045589923858643,
+    "entry_id": "mp_mattersim_mp-56",
+    "mp_id": "mp-56"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 1.0
+    },
+    "energy": -1.7410720586776733,
+    "entry_id": "mp_mattersim_mp-639747",
+    "mp_id": "mp-639747"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 4.0
+    },
+    "energy": -7.609128475189209,
+    "entry_id": "mp_mattersim_mp-10679",
+    "mp_id": "mp-10679"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 4.0
+    },
+    "energy": -7.257521152496338,
+    "entry_id": "mp_mattersim_mp-122",
+    "mp_id": "mp-122"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 4.0
+    },
+    "energy": -7.589221954345703,
+    "entry_id": "mp_mattersim_mp-1058581",
+    "mp_id": "mp-1058581"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 8.0
+    },
+    "energy": -14.515168190002441,
+    "entry_id": "mp_mattersim_mp-1096835",
+    "mp_id": "mp-1096835"
+  },
+  {
+    "chemsys": "Ba",
+    "composition": {
+      "Ba": 4.0
+    },
+    "energy": -7.4258270263671875,
+    "entry_id": "mp_mattersim_mp-1096840",
+    "mp_id": "mp-1096840"
+  },
+  {
+    "chemsys": "Br",
+    "composition": {
+      "Br": 2.0
+    },
+    "energy": -3.093322277069092,
+    "entry_id": "mp_mattersim_mp-1010048",
+    "mp_id": "mp-1010048"
+  },
+  {
+    "chemsys": "Br",
+    "composition": {
+      "Br": 3.0
+    },
+    "energy": -3.287519693374634,
+    "entry_id": "mp_mattersim_mp-1062055",
+    "mp_id": "mp-1062055"
+  },
+  {
+    "chemsys": "Br",
+    "composition": {
+      "Br": 4.0
+    },
+    "energy": -3.865126609802246,
+    "entry_id": "mp_mattersim_mp-998861",
+    "mp_id": "mp-998861"
+  },
+  {
+    "chemsys": "Br",
+    "composition": {
+      "Br": 2.0
+    },
+    "energy": -2.018326759338379,
+    "entry_id": "mp_mattersim_mp-673171",
+    "mp_id": "mp-673171"
+  },
+  {
+    "chemsys": "Br",
+    "composition": {
+      "Br": 8.0
+    },
+    "energy": -13.430535316467285,
+    "entry_id": "mp_mattersim_mp-23154",
+    "mp_id": "mp-23154"
+  },
+  {
+    "chemsys": "Br",
+    "composition": {
+      "Br": 128.0
+    },
+    "energy": -211.0692901611328,
+    "entry_id": "mp_mattersim_mp-1120813",
+    "mp_id": "mp-1120813"
+  },
+  {
+    "chemsys": "Br",
+    "composition": {
+      "Br": 2.0
+    },
+    "energy": -3.084949493408203,
+    "entry_id": "mp_mattersim_mp-998864",
+    "mp_id": "mp-998864"
+  },
+  {
+    "chemsys": "Ba-Br",
+    "composition": {
+      "Br": 6.0,
+      "Ba": 2.0
+    },
+    "energy": -25.076114654541016,
+    "entry_id": "mp_mattersim_mp-1183339",
+    "mp_id": "mp-1183339"
+  },
+  {
+    "chemsys": "Ba-Br",
+    "composition": {
+      "Br": 8.0,
+      "Ba": 4.0
+    },
+    "energy": -47.42022705078125,
+    "entry_id": "mp_mattersim_mp-27456",
+    "mp_id": "mp-27456"
+  },
+  {
+    "chemsys": "Ba-Cl",
+    "composition": {
+      "Cl": 6.0,
+      "Ba": 3.0
+    },
+    "energy": -39.59789276123047,
+    "entry_id": "mp_mattersim_mp-567680",
+    "mp_id": "mp-567680"
+  },
+  {
+    "chemsys": "Ba-Cl",
+    "composition": {
+      "Cl": 8.0,
+      "Ba": 4.0
+    },
+    "energy": -53.03758239746094,
+    "entry_id": "mp_mattersim_mp-568662",
+    "mp_id": "mp-568662"
+  },
+  {
+    "chemsys": "Ba-Cl",
+    "composition": {
+      "Cl": 8.0,
+      "Ba": 4.0
+    },
+    "energy": -52.87448501586914,
+    "entry_id": "mp_mattersim_mp-23199",
+    "mp_id": "mp-23199"
+  },
+  {
+    "chemsys": "Cl",
+    "composition": {
+      "Cl": 16.0
+    },
+    "energy": -28.9685001373291,
+    "entry_id": "mp_mattersim_mp-570778",
+    "mp_id": "mp-570778"
+  },
+  {
+    "chemsys": "Cl",
+    "composition": {
+      "Cl": 8.0
+    },
+    "energy": -14.737251281738281,
+    "entry_id": "mp_mattersim_mp-1008394",
+    "mp_id": "mp-1008394"
+  },
+  {
+    "chemsys": "Cl",
+    "composition": {
+      "Cl": 8.0
+    },
+    "energy": -14.737259864807129,
+    "entry_id": "mp_mattersim_mp-22848",
+    "mp_id": "mp-22848"
+  },
+  {
+    "chemsys": "Ba-F",
+    "composition": {
+      "F": 6.0,
+      "Ba": 2.0
+    },
+    "energy": -38.12059783935547,
+    "entry_id": "mp_mattersim_mp-1080821",
+    "mp_id": "mp-1080821"
+  },
+  {
+    "chemsys": "Ba-F",
+    "composition": {
+      "F": 6.0,
+      "Ba": 2.0
+    },
+    "energy": -37.661861419677734,
+    "entry_id": "mp_mattersim_mp-1183303",
+    "mp_id": "mp-1183303"
+  },
+  {
+    "chemsys": "Ba-F",
+    "composition": {
+      "F": 4.0,
+      "Ba": 2.0
+    },
+    "energy": -33.810482025146484,
+    "entry_id": "mp_mattersim_mp-8644",
+    "mp_id": "mp-8644"
+  },
+  {
+    "chemsys": "Ba-F",
+    "composition": {
+      "F": 8.0,
+      "Ba": 4.0
+    },
+    "energy": -69.24656677246094,
+    "entry_id": "mp_mattersim_mp-1029",
+    "mp_id": "mp-1029"
+  },
+  {
+    "chemsys": "Ba-F",
+    "composition": {
+      "F": 8.0,
+      "Ba": 4.0
+    },
+    "energy": -68.73540496826172,
+    "entry_id": "mp_mattersim_mp-555585",
+    "mp_id": "mp-555585"
+  },
+  {
+    "chemsys": "F",
+    "composition": {
+      "F": 8.0
+    },
+    "energy": -15.161514282226562,
+    "entry_id": "mp_mattersim_mp-561367",
+    "mp_id": "mp-561367"
+  },
+  {
+    "chemsys": "F",
+    "composition": {
+      "F": 8.0
+    },
+    "energy": -15.20816421508789,
+    "entry_id": "mp_mattersim_mp-1067793",
+    "mp_id": "mp-1067793"
+  },
+  {
+    "chemsys": "F",
+    "composition": {
+      "F": 8.0
+    },
+    "energy": -15.201488494873047,
+    "entry_id": "mp_mattersim_mp-561203",
+    "mp_id": "mp-561203"
+  },
+  {
+    "chemsys": "F",
+    "composition": {
+      "F": 8.0
+    },
+    "energy": -8.831101417541504,
+    "entry_id": "mp_mattersim_mp-21848",
+    "mp_id": "mp-21848"
+  },
+  {
+    "chemsys": "F",
+    "composition": {
+      "F": 8.0
+    },
+    "energy": -15.237615585327148,
+    "entry_id": "mp_mattersim_mp-760482",
+    "mp_id": "mp-760482"
+  },
+  {
+    "chemsys": "Ba-I",
+    "composition": {
+      "I": 6.0,
+      "Ba": 3.0
+    },
+    "energy": -30.924156188964844,
+    "entry_id": "mp_mattersim_mp-568536",
+    "mp_id": "mp-568536"
+  },
+  {
+    "chemsys": "Ba-I",
+    "composition": {
+      "I": 8.0,
+      "Ba": 4.0
+    },
+    "energy": -41.25654220581055,
+    "entry_id": "mp_mattersim_mp-23260",
+    "mp_id": "mp-23260"
+  },
+  {
+    "chemsys": "I",
+    "composition": {
+      "I": 2.0
+    },
+    "energy": -2.802891731262207,
+    "entry_id": "mp_mattersim_mp-601148",
+    "mp_id": "mp-601148"
+  },
+  {
+    "chemsys": "I",
+    "composition": {
+      "I": 2.0
+    },
+    "energy": -2.1288647651672363,
+    "entry_id": "mp_mattersim_mp-684663",
+    "mp_id": "mp-684663"
+  },
+  {
+    "chemsys": "I",
+    "composition": {
+      "I": 8.0
+    },
+    "energy": -12.357553482055664,
+    "entry_id": "mp_mattersim_mp-23153",
+    "mp_id": "mp-23153"
+  },
+  {
+    "chemsys": "I",
+    "composition": {
+      "I": 4.0
+    },
+    "energy": -5.605690002441406,
+    "entry_id": "mp_mattersim_mp-1180981",
+    "mp_id": "mp-1180981"
+  },
+  {
+    "chemsys": "I",
+    "composition": {
+      "I": 2.0
+    },
+    "energy": -2.927311420440674,
+    "entry_id": "mp_mattersim_mp-639751",
+    "mp_id": "mp-639751"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 4.0
+    },
+    "energy": -33.27117156982422,
+    "entry_id": "mp_mattersim_mp-570747",
+    "mp_id": "mp-570747"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 48.0
+    },
+    "energy": -399.1947937011719,
+    "entry_id": "mp_mattersim_mp-568584",
+    "mp_id": "mp-568584"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 2.0
+    },
+    "energy": -9.40890121459961,
+    "entry_id": "mp_mattersim_mp-1061298",
+    "mp_id": "mp-1061298"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 2.0
+    },
+    "energy": -6.265974998474121,
+    "entry_id": "mp_mattersim_mp-12103",
+    "mp_id": "mp-12103"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 4.0
+    },
+    "energy": -33.28303909301758,
+    "entry_id": "mp_mattersim_mp-672233",
+    "mp_id": "mp-672233"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 8.0
+    },
+    "energy": -66.5469970703125,
+    "entry_id": "mp_mattersim_mp-154",
+    "mp_id": "mp-154"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 4.0
+    },
+    "energy": -12.531068801879883,
+    "entry_id": "mp_mattersim_mp-672234",
+    "mp_id": "mp-672234"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 8.0
+    },
+    "energy": -54.71310806274414,
+    "entry_id": "mp_mattersim_mp-999498",
+    "mp_id": "mp-999498"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 8.0
+    },
+    "energy": -66.53308868408203,
+    "entry_id": "mp_mattersim_mp-25",
+    "mp_id": "mp-25"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 20.0
+    },
+    "energy": -128.03807067871094,
+    "entry_id": "mp_mattersim_mp-1080711",
+    "mp_id": "mp-1080711"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 4.0
+    },
+    "energy": -15.543939590454102,
+    "entry_id": "mp_mattersim_mp-721759",
+    "mp_id": "mp-721759"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 16.0
+    },
+    "energy": -114.58602142333984,
+    "entry_id": "mp_mattersim_mp-1189505",
+    "mp_id": "mp-1189505"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 4.0
+    },
+    "energy": -29.194387435913086,
+    "entry_id": "mp_mattersim_mp-1176403",
+    "mp_id": "mp-1176403"
+  },
+  {
+    "chemsys": "N",
+    "composition": {
+      "N": 4.0
+    },
+    "energy": -29.19465446472168,
+    "entry_id": "mp_mattersim_mp-754514",
+    "mp_id": "mp-754514"
+  },
+  {
+    "chemsys": "Ba-N",
+    "composition": {
+      "N": 12.0,
+      "Ba": 2.0
+    },
+    "energy": -106.29994201660156,
+    "entry_id": "mp_mattersim_mp-1707",
+    "mp_id": "mp-1707"
+  },
+  {
+    "chemsys": "Ba-N",
+    "composition": {
+      "N": 8.0,
+      "Ba": 4.0
+    },
+    "energy": -80.04539489746094,
+    "entry_id": "mp_mattersim_mp-1001",
+    "mp_id": "mp-1001"
+  },
+  {
+    "chemsys": "Ba-N",
+    "composition": {
+      "N": 3.0,
+      "Ba": 6.0
+    },
+    "energy": -39.96394348144531,
+    "entry_id": "mp_mattersim_mp-1892",
+    "mp_id": "mp-1892"
+  },
+  {
+    "chemsys": "Ba-N",
+    "composition": {
+      "N": 2.0,
+      "Ba": 6.0
+    },
+    "energy": -30.543594360351562,
+    "entry_id": "mp_mattersim_mp-10736",
+    "mp_id": "mp-10736"
+  },
+  {
+    "chemsys": "Ba-N",
+    "composition": {
+      "N": 32.0,
+      "Ba": 48.0
+    },
+    "energy": -385.7662353515625,
+    "entry_id": "mp_mattersim_mp-1214623",
+    "mp_id": "mp-1214623"
+  },
+  {
+    "chemsys": "Ba-N",
+    "composition": {
+      "N": 2.0,
+      "Ba": 3.0
+    },
+    "energy": -21.17613983154297,
+    "entry_id": "mp_mattersim_mp-1013528",
+    "mp_id": "mp-1013528"
+  },
+  {
+    "chemsys": "Ba-N",
+    "composition": {
+      "N": 4.0,
+      "Ba": 4.0
+    },
+    "energy": -40.434635162353516,
+    "entry_id": "mp_mattersim_mp-1057758",
+    "mp_id": "mp-1057758"
+  },
+  {
+    "chemsys": "Ba-N",
+    "composition": {
+      "N": 16.0,
+      "Ba": 8.0
+    },
+    "energy": -143.27142333984375,
+    "entry_id": "mp_mattersim_mp-1102371",
+    "mp_id": "mp-1102371"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 12.0
+    },
+    "energy": -54.32203674316406,
+    "entry_id": "mp_mattersim_mp-1180008",
+    "mp_id": "mp-1180008"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 10.0
+    },
+    "energy": -46.87947463989258,
+    "entry_id": "mp_mattersim_mp-1180064",
+    "mp_id": "mp-1180064"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 1.0
+    },
+    "energy": -3.5942420959472656,
+    "entry_id": "mp_mattersim_mp-1056831",
+    "mp_id": "mp-1056831"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 4.0
+    },
+    "energy": -19.792667388916016,
+    "entry_id": "mp_mattersim_mp-1009490",
+    "mp_id": "mp-1009490"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 16.0
+    },
+    "energy": -79.45405578613281,
+    "entry_id": "mp_mattersim_mp-12957",
+    "mp_id": "mp-12957"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 4.0
+    },
+    "energy": -19.802265167236328,
+    "entry_id": "mp_mattersim_mp-611836",
+    "mp_id": "mp-611836"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 1.0
+    },
+    "energy": -3.3655753135681152,
+    "entry_id": "mp_mattersim_mp-1056059",
+    "mp_id": "mp-1056059"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 1.0
+    },
+    "energy": -3.60892391204834,
+    "entry_id": "mp_mattersim_mp-1065697",
+    "mp_id": "mp-1065697"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 4.0
+    },
+    "energy": -19.813899993896484,
+    "entry_id": "mp_mattersim_mp-1180036",
+    "mp_id": "mp-1180036"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 16.0
+    },
+    "energy": -79.1202392578125,
+    "entry_id": "mp_mattersim_mp-1087546",
+    "mp_id": "mp-1087546"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 16.0
+    },
+    "energy": -78.9913330078125,
+    "entry_id": "mp_mattersim_mp-1180050",
+    "mp_id": "mp-1180050"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 18.0
+    },
+    "energy": -72.59066009521484,
+    "entry_id": "mp_mattersim_mp-1023923",
+    "mp_id": "mp-1023923"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 18.0
+    },
+    "energy": -72.7847900390625,
+    "entry_id": "mp_mattersim_mp-2421172",
+    "mp_id": "mp-2421172"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 6.0
+    },
+    "energy": -29.70322608947754,
+    "entry_id": "mp_mattersim_mp-610917",
+    "mp_id": "mp-610917"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 4.0
+    },
+    "energy": -19.501575469970703,
+    "entry_id": "mp_mattersim_mp-1066100",
+    "mp_id": "mp-1066100"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 8.0
+    },
+    "energy": -25.989002227783203,
+    "entry_id": "mp_mattersim_mp-1057818",
+    "mp_id": "mp-1057818"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 24.0
+    },
+    "energy": -108.67180633544922,
+    "entry_id": "mp_mattersim_mp-560602",
+    "mp_id": "mp-560602"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 4.0
+    },
+    "energy": -14.524215698242188,
+    "entry_id": "mp_mattersim_mp-1058623",
+    "mp_id": "mp-1058623"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 8.0
+    },
+    "energy": -38.686275482177734,
+    "entry_id": "mp_mattersim_mp-607540",
+    "mp_id": "mp-607540"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 12.0
+    },
+    "energy": -54.199424743652344,
+    "entry_id": "mp_mattersim_mp-1102442",
+    "mp_id": "mp-1102442"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 8.0
+    },
+    "energy": -39.56798553466797,
+    "entry_id": "mp_mattersim_mp-723285",
+    "mp_id": "mp-723285"
+  },
+  {
+    "chemsys": "O",
+    "composition": {
+      "O": 12.0
+    },
+    "energy": -54.288246154785156,
+    "entry_id": "mp_mattersim_mp-734188",
+    "mp_id": "mp-734188"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 50.0,
+      "Ba": 50.0
+    },
+    "energy": -575.8642578125,
+    "entry_id": "mp_mattersim_mp-1244871",
+    "mp_id": "mp-1244871"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 50.0,
+      "Ba": 50.0
+    },
+    "energy": -576.6635131835938,
+    "entry_id": "mp_mattersim_mp-1245192",
+    "mp_id": "mp-1245192"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 50.0,
+      "Ba": 50.0
+    },
+    "energy": -576.1998901367188,
+    "entry_id": "mp_mattersim_mp-1245276",
+    "mp_id": "mp-1245276"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 50.0,
+      "Ba": 50.0
+    },
+    "energy": -573.8036499023438,
+    "entry_id": "mp_mattersim_mp-1245298",
+    "mp_id": "mp-1245298"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 50.0,
+      "Ba": 50.0
+    },
+    "energy": -577.0762939453125,
+    "entry_id": "mp_mattersim_mp-1245311",
+    "mp_id": "mp-1245311"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 20.0,
+      "Ba": 2.0
+    },
+    "energy": -111.69136047363283,
+    "entry_id": "mp_mattersim_mp-1182404",
+    "mp_id": "mp-1182404"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 20.0,
+      "Ba": 2.0
+    },
+    "energy": -111.99481201171875,
+    "entry_id": "mp_mattersim_mp-1182511",
+    "mp_id": "mp-1182511"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 20.0,
+      "Ba": 2.0
+    },
+    "energy": -111.84750366210938,
+    "entry_id": "mp_mattersim_mp-1182576",
+    "mp_id": "mp-1182576"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 2.0,
+      "Ba": 2.0
+    },
+    "energy": -23.06162452697754,
+    "entry_id": "mp_mattersim_mp-7487",
+    "mp_id": "mp-7487"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 4.0,
+      "Ba": 2.0
+    },
+    "energy": -34.829898834228516,
+    "entry_id": "mp_mattersim_mp-1105",
+    "mp_id": "mp-1105"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 16.0,
+      "Ba": 8.0
+    },
+    "energy": -133.83815002441406,
+    "entry_id": "mp_mattersim_mp-1182141",
+    "mp_id": "mp-1182141"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 16.0,
+      "Ba": 8.0
+    },
+    "energy": -129.21571350097656,
+    "entry_id": "mp_mattersim_mp-1182259",
+    "mp_id": "mp-1182259"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 16.0,
+      "Ba": 4.0
+    },
+    "energy": -108.52378845214844,
+    "entry_id": "mp_mattersim_mp-1182327",
+    "mp_id": "mp-1182327"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 16.0,
+      "Ba": 4.0
+    },
+    "energy": -108.69783782958984,
+    "entry_id": "mp_mattersim_mp-1182433",
+    "mp_id": "mp-1182433"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 40.0,
+      "Ba": 4.0
+    },
+    "energy": -222.5846710205078,
+    "entry_id": "mp_mattersim_mp-1182720",
+    "mp_id": "mp-1182720"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 40.0,
+      "Ba": 4.0
+    },
+    "energy": -224.37831115722656,
+    "entry_id": "mp_mattersim_mp-1198148",
+    "mp_id": "mp-1198148"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 16.0,
+      "Ba": 8.0
+    },
+    "energy": -138.23388671875,
+    "entry_id": "mp_mattersim_mp-726415",
+    "mp_id": "mp-726415"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 24.0,
+      "Ba": 4.0
+    },
+    "energy": -147.14260864257812,
+    "entry_id": "mp_mattersim_mp-1182164",
+    "mp_id": "mp-1182164"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 24.0,
+      "Ba": 4.0
+    },
+    "energy": -146.99627685546875,
+    "entry_id": "mp_mattersim_mp-1182169",
+    "mp_id": "mp-1182169"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 2.0,
+      "Ba": 2.0
+    },
+    "energy": -23.717037200927734,
+    "entry_id": "mp_mattersim_mp-1178514",
+    "mp_id": "mp-1178514"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 2.0,
+      "Ba": 2.0
+    },
+    "energy": -23.518558502197266,
+    "entry_id": "mp_mattersim_mp-1008500",
+    "mp_id": "mp-1008500"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 4.0,
+      "Ba": 4.0
+    },
+    "energy": -47.3310546875,
+    "entry_id": "mp_mattersim_mp-1342",
+    "mp_id": "mp-1342"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 6.0,
+      "Ba": 2.0
+    },
+    "energy": -43.842864990234375,
+    "entry_id": "mp_mattersim_mp-1206655",
+    "mp_id": "mp-1206655"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 32.0,
+      "Ba": 32.0
+    },
+    "energy": -377.5492248535156,
+    "entry_id": "mp_mattersim_mp-1178531",
+    "mp_id": "mp-1178531"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 48.0,
+      "Ba": 8.0
+    },
+    "energy": -293.6802978515625,
+    "entry_id": "mp_mattersim_mp-1198787",
+    "mp_id": "mp-1198787"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 16.0,
+      "Ba": 8.0
+    },
+    "energy": -133.8381805419922,
+    "entry_id": "mp_mattersim_mp-1182238",
+    "mp_id": "mp-1182238"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 20.0,
+      "Ba": 4.0
+    },
+    "energy": -127.2366943359375,
+    "entry_id": "mp_mattersim_mp-1214539",
+    "mp_id": "mp-1214539"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 32.0,
+      "Ba": 32.0
+    },
+    "energy": -377.577392578125,
+    "entry_id": "mp_mattersim_mp-776658",
+    "mp_id": "mp-776658"
+  },
+  {
+    "chemsys": "Ba-O",
+    "composition": {
+      "O": 4.0,
+      "Ba": 2.0
+    },
+    "energy": -34.08489990234375,
+    "entry_id": "mp_mattersim_mp-1006878",
+    "mp_id": "mp-1006878"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 4.0
+    },
+    "energy": -18.359867095947266,
+    "entry_id": "mp_mattersim_mp-1179990",
+    "mp_id": "mp-1179990"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 16.0
+    },
+    "energy": -84.05682373046875,
+    "entry_id": "mp_mattersim_mp-12883",
+    "mp_id": "mp-12883"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 4.0
+    },
+    "energy": -10.517611503601074,
+    "entry_id": "mp_mattersim_mp-723897",
+    "mp_id": "mp-723897"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 84.0
+    },
+    "energy": -450.74395751953125,
+    "entry_id": "mp_mattersim_mp-568348",
+    "mp_id": "mp-568348"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 6.0
+    },
+    "energy": -32.00860595703125,
+    "entry_id": "mp_mattersim_mp-130",
+    "mp_id": "mp-130"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 24.0
+    },
+    "energy": -126.11056518554688,
+    "entry_id": "mp_mattersim_mp-118",
+    "mp_id": "mp-118"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 42.0
+    },
+    "energy": -225.5050811767578,
+    "entry_id": "mp_mattersim_mp-1198724",
+    "mp_id": "mp-1198724"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 1.0
+    },
+    "energy": -5.281781196594238,
+    "entry_id": "mp_mattersim_mp-53",
+    "mp_id": "mp-53"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 4.0
+    },
+    "energy": -10.517611503601074,
+    "entry_id": "mp_mattersim_mp-674158",
+    "mp_id": "mp-674158"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 4.0
+    },
+    "energy": -21.450891494750977,
+    "entry_id": "mp_mattersim_mp-1014013",
+    "mp_id": "mp-1014013"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 10.0
+    },
+    "energy": -52.87485885620117,
+    "entry_id": "mp_mattersim_mp-1094075",
+    "mp_id": "mp-1094075"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 8.0
+    },
+    "energy": -36.7196044921875,
+    "entry_id": "mp_mattersim_mp-1120743",
+    "mp_id": "mp-1120743"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 8.0
+    },
+    "energy": -43.034385681152344,
+    "entry_id": "mp_mattersim_mp-157",
+    "mp_id": "mp-157"
+  },
+  {
+    "chemsys": "P",
+    "composition": {
+      "P": 4.0
+    },
+    "energy": -21.271631240844727,
+    "entry_id": "mp_mattersim_mp-7245",
+    "mp_id": "mp-7245"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 12.0,
+      "Ba": 4.0
+    },
+    "energy": -82.22164916992188,
+    "entry_id": "mp_mattersim_mp-7808",
+    "mp_id": "mp-7808"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 32.0,
+      "Ba": 48.0
+    },
+    "energy": -345.8376159667969,
+    "entry_id": "mp_mattersim_mp-32606",
+    "mp_id": "mp-32606"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 12.0,
+      "Ba": 6.0
+    },
+    "energy": -90.427490234375,
+    "entry_id": "mp_mattersim_mp-1105095",
+    "mp_id": "mp-1105095"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 12.0,
+      "Ba": 4.0
+    },
+    "energy": -82.66148376464844,
+    "entry_id": "mp_mattersim_mp-1105406",
+    "mp_id": "mp-1105406"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 28.0,
+      "Ba": 6.0
+    },
+    "energy": -177.66717529296875,
+    "entry_id": "mp_mattersim_mp-1195",
+    "mp_id": "mp-1195"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 16.0,
+      "Ba": 2.0
+    },
+    "energy": -95.337890625,
+    "entry_id": "mp_mattersim_mp-30275",
+    "mp_id": "mp-30275"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 2.0,
+      "Ba": 3.0
+    },
+    "energy": -19.235658645629883,
+    "entry_id": "mp_mattersim_mp-1013551",
+    "mp_id": "mp-1013551"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 40.0,
+      "Ba": 4.0
+    },
+    "energy": -232.5237579345703,
+    "entry_id": "mp_mattersim_mp-28035",
+    "mp_id": "mp-28035"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 32.0,
+      "Ba": 24.0
+    },
+    "energy": -272.10260009765625,
+    "entry_id": "mp_mattersim_mp-14289",
+    "mp_id": "mp-14289"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 72.0,
+      "Ba": 40.0
+    },
+    "energy": -559.4769287109375,
+    "entry_id": "mp_mattersim_mp-567378",
+    "mp_id": "mp-567378"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 24.0,
+      "Ba": 32.0
+    },
+    "energy": -246.27859497070312,
+    "entry_id": "mp_mattersim_mp-28823",
+    "mp_id": "mp-28823"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 16.0,
+      "Ba": 20.0
+    },
+    "energy": -160.86451721191406,
+    "entry_id": "mp_mattersim_mp-17566",
+    "mp_id": "mp-17566"
+  },
+  {
+    "chemsys": "Ba-P",
+    "composition": {
+      "P": 16.0,
+      "Ba": 20.0
+    },
+    "energy": -160.7113800048828,
+    "entry_id": "mp_mattersim_mp-1105231",
+    "mp_id": "mp-1105231"
+  },
+  {
+    "chemsys": "Ba-S",
+    "composition": {
+      "S": 12.0,
+      "Ba": 8.0
+    },
+    "energy": -96.74222564697266,
+    "entry_id": "mp_mattersim_mp-28978",
+    "mp_id": "mp-28978"
+  },
+  {
+    "chemsys": "Ba-S",
+    "composition": {
+      "S": 6.0,
+      "Ba": 2.0
+    },
+    "energy": -36.565189361572266,
+    "entry_id": "mp_mattersim_mp-239",
+    "mp_id": "mp-239"
+  },
+  {
+    "chemsys": "Ba-S",
+    "composition": {
+      "S": 8.0,
+      "Ba": 4.0
+    },
+    "energy": -57.73491287231445,
+    "entry_id": "mp_mattersim_mp-684",
+    "mp_id": "mp-684"
+  },
+  {
+    "chemsys": "Ba-S",
+    "composition": {
+      "S": 12.0,
+      "Ba": 4.0
+    },
+    "energy": -73.7223892211914,
+    "entry_id": "mp_mattersim_mp-556296",
+    "mp_id": "mp-556296"
+  },
+  {
+    "chemsys": "Ba-S",
+    "composition": {
+      "S": 4.0,
+      "Ba": 4.0
+    },
+    "energy": -40.80186080932617,
+    "entry_id": "mp_mattersim_mp-1500",
+    "mp_id": "mp-1500"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 32.0
+    },
+    "energy": -130.42657470703125,
+    "entry_id": "mp_mattersim_mp-96",
+    "mp_id": "mp-96"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 4.0
+    },
+    "energy": -15.323057174682617,
+    "entry_id": "mp_mattersim_mp-1064933",
+    "mp_id": "mp-1064933"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 4.0
+    },
+    "energy": -15.464018821716309,
+    "entry_id": "mp_mattersim_mp-1065250",
+    "mp_id": "mp-1065250"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 4.0
+    },
+    "energy": -15.463533401489258,
+    "entry_id": "mp_mattersim_mp-1094073",
+    "mp_id": "mp-1094073"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 4.0
+    },
+    "energy": -15.342046737670898,
+    "entry_id": "mp_mattersim_mp-1179643",
+    "mp_id": "mp-1179643"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 72.0
+    },
+    "energy": -292.52838134765625,
+    "entry_id": "mp_mattersim_mp-556269",
+    "mp_id": "mp-556269"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 36.0
+    },
+    "energy": -146.607421875,
+    "entry_id": "mp_mattersim_mp-557488",
+    "mp_id": "mp-557488"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 28.0
+    },
+    "energy": -113.30188751220705,
+    "entry_id": "mp_mattersim_mp-557559",
+    "mp_id": "mp-557559"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 104.0
+    },
+    "energy": -422.1397705078125,
+    "entry_id": "mp_mattersim_mp-583072",
+    "mp_id": "mp-583072"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 56.0
+    },
+    "energy": -226.62852478027344,
+    "entry_id": "mp_mattersim_mp-83",
+    "mp_id": "mp-83"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 18.0
+    },
+    "energy": -69.84788513183594,
+    "entry_id": "mp_mattersim_mp-608100",
+    "mp_id": "mp-608100"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 18.0
+    },
+    "energy": -70.17699432373047,
+    "entry_id": "mp_mattersim_mp-655141",
+    "mp_id": "mp-655141"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 18.0
+    },
+    "energy": -73.20990753173828,
+    "entry_id": "mp_mattersim_mp-7",
+    "mp_id": "mp-7"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 64.0
+    },
+    "energy": -259.82659912109375,
+    "entry_id": "mp_mattersim_mp-557031",
+    "mp_id": "mp-557031"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 40.0
+    },
+    "energy": -162.23399353027344,
+    "entry_id": "mp_mattersim_mp-557376",
+    "mp_id": "mp-557376"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 9.0
+    },
+    "energy": -36.610557556152344,
+    "entry_id": "mp_mattersim_mp-555760",
+    "mp_id": "mp-555760"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 72.0
+    },
+    "energy": -293.3597412109375,
+    "entry_id": "mp_mattersim_mp-555915",
+    "mp_id": "mp-555915"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 28.0
+    },
+    "energy": -114.03292846679686,
+    "entry_id": "mp_mattersim_mp-561513",
+    "mp_id": "mp-561513"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 1.0
+    },
+    "energy": -3.5102925300598145,
+    "entry_id": "mp_mattersim_mp-10869",
+    "mp_id": "mp-10869"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 4.0
+    },
+    "energy": -11.336828231811523,
+    "entry_id": "mp_mattersim_mp-684673",
+    "mp_id": "mp-684673"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 2.0
+    },
+    "energy": -5.995734691619873,
+    "entry_id": "mp_mattersim_mp-1063988",
+    "mp_id": "mp-1063988"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 88.0
+    },
+    "energy": -356.99066162109375,
+    "entry_id": "mp_mattersim_mp-561370",
+    "mp_id": "mp-561370"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 80.0
+    },
+    "energy": -326.2143249511719,
+    "entry_id": "mp_mattersim_mp-1196831",
+    "mp_id": "mp-1196831"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 48.0
+    },
+    "energy": -195.60183715820312,
+    "entry_id": "mp_mattersim_mp-557869",
+    "mp_id": "mp-557869"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 32.0
+    },
+    "energy": -130.44313049316406,
+    "entry_id": "mp_mattersim_mp-666931",
+    "mp_id": "mp-666931"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 24.0
+    },
+    "energy": -97.85944366455078,
+    "entry_id": "mp_mattersim_mp-558014",
+    "mp_id": "mp-558014"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 80.0
+    },
+    "energy": -326.061767578125,
+    "entry_id": "mp_mattersim_mp-558964",
+    "mp_id": "mp-558964"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 4.0
+    },
+    "energy": -15.270092010498047,
+    "entry_id": "mp_mattersim_mp-1179639",
+    "mp_id": "mp-1179639"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 8.0
+    },
+    "energy": -32.33161544799805,
+    "entry_id": "mp_mattersim_mp-1179641",
+    "mp_id": "mp-1179641"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 128.0
+    },
+    "energy": -521.7387084960938,
+    "entry_id": "mp_mattersim_mp-77",
+    "mp_id": "mp-77"
+  },
+  {
+    "chemsys": "S",
+    "composition": {
+      "S": 8.0
+    },
+    "energy": -32.57126235961914,
+    "entry_id": "mp_mattersim_mp-994911",
+    "mp_id": "mp-994911"
+  },
+  {
+    "chemsys": "Be",
+    "composition": {
+      "Be": 4.0
+    },
+    "energy": -14.732873916625977,
+    "entry_id": "mp_mattersim_mp-1008501",
+    "mp_id": "mp-1008501"
+  },
+  {
+    "chemsys": "Be",
+    "composition": {
+      "Be": 2.0
+    },
+    "energy": -7.463388442993164,
+    "entry_id": "mp_mattersim_mp-87",
+    "mp_id": "mp-87"
+  },
+  {
+    "chemsys": "Be",
+    "composition": {
+      "Be": 2.0
+    },
+    "energy": -7.270000457763672,
+    "entry_id": "mp_mattersim_mp-20",
+    "mp_id": "mp-20"
+  },
+  {
+    "chemsys": "Be-Br",
+    "composition": {
+      "Be": 4.0,
+      "Br": 8.0
+    },
+    "energy": -40.5561408996582,
+    "entry_id": "mp_mattersim_mp-30139",
+    "mp_id": "mp-30139"
+  },
+  {
+    "chemsys": "Be-Cl",
+    "composition": {
+      "Be": 32.0,
+      "Cl": 64.0
+    },
+    "energy": -374.57305908203125,
+    "entry_id": "mp_mattersim_mp-570974",
+    "mp_id": "mp-570974"
+  },
+  {
+    "chemsys": "Be-Cl",
+    "composition": {
+      "Be": 9.0,
+      "Cl": 18.0
+    },
+    "energy": -105.01542663574219,
+    "entry_id": "mp_mattersim_mp-569030",
+    "mp_id": "mp-569030"
+  },
+  {
+    "chemsys": "Be-Cl",
+    "composition": {
+      "Be": 12.0,
+      "Cl": 24.0
+    },
+    "energy": -26.863895416259766,
+    "entry_id": "mp_mattersim_mp-1172909",
+    "mp_id": "mp-1172909"
+  },
+  {
+    "chemsys": "Be-Cl",
+    "composition": {
+      "Be": 12.0,
+      "Cl": 24.0
+    },
+    "energy": -139.695556640625,
+    "entry_id": "mp_mattersim_mp-1190080",
+    "mp_id": "mp-1190080"
+  },
+  {
+    "chemsys": "Be-Cl",
+    "composition": {
+      "Be": 48.0,
+      "Cl": 96.0
+    },
+    "energy": -561.7169189453125,
+    "entry_id": "mp_mattersim_mp-570227",
+    "mp_id": "mp-570227"
+  },
+  {
+    "chemsys": "Be-Cl",
+    "composition": {
+      "Be": 4.0,
+      "Cl": 8.0
+    },
+    "energy": -46.9106559753418,
+    "entry_id": "mp_mattersim_mp-23267",
+    "mp_id": "mp-23267"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 16.0,
+      "F": 32.0
+    },
+    "energy": -274.5043640136719,
+    "entry_id": "mp_mattersim_mp-1350597",
+    "mp_id": "mp-1350597"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 3.0,
+      "F": 6.0
+    },
+    "energy": -51.89078903198242,
+    "entry_id": "mp_mattersim_mp-15951",
+    "mp_id": "mp-15951"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 36.0,
+      "F": 72.0
+    },
+    "energy": -622.073486328125,
+    "entry_id": "mp_mattersim_mp-559400",
+    "mp_id": "mp-559400"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 3.0,
+      "F": 6.0
+    },
+    "energy": -51.87718200683594,
+    "entry_id": "mp_mattersim_mp-558118",
+    "mp_id": "mp-558118"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 1.0,
+      "F": 2.0
+    },
+    "energy": -9.712821960449219,
+    "entry_id": "mp_mattersim_mp-975644",
+    "mp_id": "mp-975644"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 12.0,
+      "F": 24.0
+    },
+    "energy": -207.4375762939453,
+    "entry_id": "mp_mattersim_mp-561543",
+    "mp_id": "mp-561543"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 16.0,
+      "F": 32.0
+    },
+    "energy": -273.89691162109375,
+    "entry_id": "mp_mattersim_mp-685168",
+    "mp_id": "mp-685168"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 6.0,
+      "F": 12.0
+    },
+    "energy": -99.74492645263672,
+    "entry_id": "mp_mattersim_mp-684652",
+    "mp_id": "mp-684652"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 4.0,
+      "F": 16.0
+    },
+    "energy": -78.8927001953125,
+    "entry_id": "mp_mattersim_mp-1214240",
+    "mp_id": "mp-1214240"
+  },
+  {
+    "chemsys": "Be-F",
+    "composition": {
+      "Be": 2.0,
+      "F": 4.0
+    },
+    "energy": -31.835186004638672,
+    "entry_id": "mp_mattersim_mp-1097884",
+    "mp_id": "mp-1097884"
+  },
+  {
+    "chemsys": "Be-I",
+    "composition": {
+      "Be": 32.0,
+      "I": 64.0
+    },
+    "energy": -269.8267822265625,
+    "entry_id": "mp_mattersim_mp-30140",
+    "mp_id": "mp-30140"
+  },
+  {
+    "chemsys": "Be-I",
+    "composition": {
+      "Be": 4.0,
+      "I": 8.0
+    },
+    "energy": -34.0438232421875,
+    "entry_id": "mp_mattersim_mp-570886",
+    "mp_id": "mp-570886"
+  },
+  {
+    "chemsys": "Be-N",
+    "composition": {
+      "Be": 9.0,
+      "N": 6.0
+    },
+    "energy": -99.08099365234375,
+    "entry_id": "mp_mattersim_mp-1070456",
+    "mp_id": "mp-1070456"
+  },
+  {
+    "chemsys": "Be-N",
+    "composition": {
+      "Be": 3.0,
+      "N": 2.0
+    },
+    "energy": -32.19644546508789,
+    "entry_id": "mp_mattersim_mp-1017550",
+    "mp_id": "mp-1017550"
+  },
+  {
+    "chemsys": "Be-N",
+    "composition": {
+      "Be": 6.0,
+      "N": 4.0
+    },
+    "energy": -66.2502670288086,
+    "entry_id": "mp_mattersim_mp-6977",
+    "mp_id": "mp-6977"
+  },
+  {
+    "chemsys": "Be-N",
+    "composition": {
+      "Be": 48.0,
+      "N": 32.0
+    },
+    "energy": -532.2503051757812,
+    "entry_id": "mp_mattersim_mp-18337",
+    "mp_id": "mp-18337"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 50.0,
+      "O": 50.0
+    },
+    "energy": -685.562255859375,
+    "entry_id": "mp_mattersim_mp-1244907",
+    "mp_id": "mp-1244907"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 50.0,
+      "O": 50.0
+    },
+    "energy": -684.5804443359375,
+    "entry_id": "mp_mattersim_mp-1244919",
+    "mp_id": "mp-1244919"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 50.0,
+      "O": 50.0
+    },
+    "energy": -681.3750610351562,
+    "entry_id": "mp_mattersim_mp-1244963",
+    "mp_id": "mp-1244963"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 50.0,
+      "O": 50.0
+    },
+    "energy": -681.8939819335938,
+    "entry_id": "mp_mattersim_mp-1245060",
+    "mp_id": "mp-1245060"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 50.0,
+      "O": 50.0
+    },
+    "energy": -680.4056396484375,
+    "entry_id": "mp_mattersim_mp-1245079",
+    "mp_id": "mp-1245079"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 4.0,
+      "O": 4.0
+    },
+    "energy": -56.73863220214844,
+    "entry_id": "mp_mattersim_mp-7599",
+    "mp_id": "mp-7599"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 2.0,
+      "O": 2.0
+    },
+    "energy": -28.428264617919922,
+    "entry_id": "mp_mattersim_mp-2542",
+    "mp_id": "mp-2542"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 4.0,
+      "O": 8.0
+    },
+    "energy": -72.04076385498047,
+    "entry_id": "mp_mattersim_mp-1182269",
+    "mp_id": "mp-1182269"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 4.0,
+      "O": 8.0
+    },
+    "energy": -69.62752532958984,
+    "entry_id": "mp_mattersim_mp-1214161",
+    "mp_id": "mp-1214161"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 4.0,
+      "O": 4.0
+    },
+    "energy": -56.813236236572266,
+    "entry_id": "mp_mattersim_mp-1778",
+    "mp_id": "mp-1778"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 4.0,
+      "O": 4.0
+    },
+    "energy": -52.922149658203125,
+    "entry_id": "mp_mattersim_mp-1794",
+    "mp_id": "mp-1794"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 4.0,
+      "O": 8.0
+    },
+    "energy": -70.35995483398438,
+    "entry_id": "mp_mattersim_mp-1182215",
+    "mp_id": "mp-1182215"
+  },
+  {
+    "chemsys": "Be-O",
+    "composition": {
+      "Be": 12.0,
+      "O": 24.0
+    },
+    "energy": -210.50096130371094,
+    "entry_id": "mp_mattersim_mp-1214291",
+    "mp_id": "mp-1214291"
+  },
+  {
+    "chemsys": "Be-P",
+    "composition": {
+      "Be": 96.0,
+      "P": 64.0
+    },
+    "energy": -729.8856811523438,
+    "entry_id": "mp_mattersim_mp-29629",
+    "mp_id": "mp-29629"
+  },
+  {
+    "chemsys": "Be-P",
+    "composition": {
+      "Be": 16.0,
+      "P": 32.0
+    },
+    "energy": -248.0811004638672,
+    "entry_id": "mp_mattersim_mp-27148",
+    "mp_id": "mp-27148"
+  },
+  {
+    "chemsys": "Be-P",
+    "composition": {
+      "Be": 48.0,
+      "P": 32.0
+    },
+    "energy": -370.9888000488281,
+    "entry_id": "mp_mattersim_mp-567841",
+    "mp_id": "mp-567841"
+  },
+  {
+    "chemsys": "Be-P",
+    "composition": {
+      "Be": 6.0,
+      "P": 4.0
+    },
+    "energy": -45.177696228027344,
+    "entry_id": "mp_mattersim_mp-1084771",
+    "mp_id": "mp-1084771"
+  },
+  {
+    "chemsys": "Be-P",
+    "composition": {
+      "Be": 4.0,
+      "P": 8.0
+    },
+    "energy": -54.285709381103516,
+    "entry_id": "mp_mattersim_mp-1227358",
+    "mp_id": "mp-1227358"
+  },
+  {
+    "chemsys": "Be-S",
+    "composition": {
+      "Be": 6.0,
+      "S": 2.0
+    },
+    "energy": -29.939010620117188,
+    "entry_id": "mp_mattersim_mp-1183434",
+    "mp_id": "mp-1183434"
+  },
+  {
+    "chemsys": "Be-S",
+    "composition": {
+      "Be": 4.0,
+      "S": 4.0
+    },
+    "energy": -39.95787048339844,
+    "entry_id": "mp_mattersim_mp-422",
+    "mp_id": "mp-422"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 1.0
+    },
+    "energy": -1.3335877656936646,
+    "entry_id": "mp_mattersim_mp-1227541",
+    "mp_id": "mp-1227541"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 2.0
+    },
+    "energy": -3.953244209289551,
+    "entry_id": "mp_mattersim_mp-1183455",
+    "mp_id": "mp-1183455"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 2.0
+    },
+    "energy": -3.9531774520874023,
+    "entry_id": "mp_mattersim_mp-166",
+    "mp_id": "mp-166"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 8.0
+    },
+    "energy": -15.194008827209473,
+    "entry_id": "mp_mattersim_mp-1008498",
+    "mp_id": "mp-1008498"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 4.0
+    },
+    "energy": -7.98337459564209,
+    "entry_id": "mp_mattersim_mp-1183484",
+    "mp_id": "mp-1183484"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 4.0
+    },
+    "energy": -7.9833197593688965,
+    "entry_id": "mp_mattersim_mp-132",
+    "mp_id": "mp-132"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 1.0
+    },
+    "energy": -1.571034550666809,
+    "entry_id": "mp_mattersim_mp-10683",
+    "mp_id": "mp-10683"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 4.0
+    },
+    "energy": -7.983407974243164,
+    "entry_id": "mp_mattersim_mp-45",
+    "mp_id": "mp-45"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 2.0
+    },
+    "energy": -3.953369140625,
+    "entry_id": "mp_mattersim_mp-21",
+    "mp_id": "mp-21"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 4.0
+    },
+    "energy": -7.983390808105469,
+    "entry_id": "mp_mattersim_mp-1064227",
+    "mp_id": "mp-1064227"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 8.0
+    },
+    "energy": -13.743447303771973,
+    "entry_id": "mp_mattersim_mp-1067285",
+    "mp_id": "mp-1067285"
+  },
+  {
+    "chemsys": "Ca",
+    "composition": {
+      "Ca": 8.0
+    },
+    "energy": -15.81243896484375,
+    "entry_id": "mp_mattersim_mp-1078638",
+    "mp_id": "mp-1078638"
+  },
+  {
+    "chemsys": "Br-Ca",
+    "composition": {
+      "Ca": 2.0,
+      "Br": 4.0
+    },
+    "energy": -22.790607452392578,
+    "entry_id": "mp_mattersim_mp-571166",
+    "mp_id": "mp-571166"
+  },
+  {
+    "chemsys": "Br-Ca",
+    "composition": {
+      "Ca": 2.0,
+      "Br": 2.0
+    },
+    "energy": -12.709196090698242,
+    "entry_id": "mp_mattersim_mp-1183475",
+    "mp_id": "mp-1183475"
+  },
+  {
+    "chemsys": "Br-Ca",
+    "composition": {
+      "Ca": 1.0,
+      "Br": 1.0
+    },
+    "energy": -6.211743354797363,
+    "entry_id": "mp_mattersim_mp-1183444",
+    "mp_id": "mp-1183444"
+  },
+  {
+    "chemsys": "Br-Ca",
+    "composition": {
+      "Ca": 2.0,
+      "Br": 4.0
+    },
+    "energy": -22.79697036743164,
+    "entry_id": "mp_mattersim_mp-22888",
+    "mp_id": "mp-22888"
+  },
+  {
+    "chemsys": "Br-Cs",
+    "composition": {
+      "Br": 1.0,
+      "Cs": 1.0
+    },
+    "energy": -6.021200180053711,
+    "entry_id": "mp_mattersim_mp-22906",
+    "mp_id": "mp-22906"
+  },
+  {
+    "chemsys": "Br-Cs",
+    "composition": {
+      "Br": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -24.388076782226562,
+    "entry_id": "mp_mattersim_mp-571222",
+    "mp_id": "mp-571222"
+  },
+  {
+    "chemsys": "Br-Cs",
+    "composition": {
+      "Br": 12.0,
+      "Cs": 4.0
+    },
+    "energy": -38.71815490722656,
+    "entry_id": "mp_mattersim_mp-27641",
+    "mp_id": "mp-27641"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 2.0
+    },
+    "energy": -1.683322548866272,
+    "entry_id": "mp_mattersim_mp-1096915",
+    "mp_id": "mp-1096915"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 8.0
+    },
+    "energy": -6.733290672302246,
+    "entry_id": "mp_mattersim_mp-672241",
+    "mp_id": "mp-672241"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 2.0
+    },
+    "energy": -1.683322548866272,
+    "entry_id": "mp_mattersim_mp-1183694",
+    "mp_id": "mp-1183694"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 4.0
+    },
+    "energy": -3.366645097732544,
+    "entry_id": "mp_mattersim_mp-3",
+    "mp_id": "mp-3"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 2.0
+    },
+    "energy": -1.683322548866272,
+    "entry_id": "mp_mattersim_mp-11832",
+    "mp_id": "mp-11832"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 4.0
+    },
+    "energy": -3.366645097732544,
+    "entry_id": "mp_mattersim_mp-639727",
+    "mp_id": "mp-639727"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 20.0
+    },
+    "energy": -16.833227157592773,
+    "entry_id": "mp_mattersim_mp-1183897",
+    "mp_id": "mp-1183897"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 58.0
+    },
+    "energy": -48.816322326660156,
+    "entry_id": "mp_mattersim_mp-1184151",
+    "mp_id": "mp-1184151"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 8.0
+    },
+    "energy": -6.733242034912109,
+    "entry_id": "mp_mattersim_mp-949029",
+    "mp_id": "mp-949029"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 4.0
+    },
+    "energy": -3.366645097732544,
+    "entry_id": "mp_mattersim_mp-1055940",
+    "mp_id": "mp-1055940"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 2.0
+    },
+    "energy": -1.683322548866272,
+    "entry_id": "mp_mattersim_mp-1",
+    "mp_id": "mp-1"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 4.0
+    },
+    "energy": -3.366645097732544,
+    "entry_id": "mp_mattersim_mp-1012110",
+    "mp_id": "mp-1012110"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 4.0
+    },
+    "energy": -3.366645097732544,
+    "entry_id": "mp_mattersim_mp-1182809",
+    "mp_id": "mp-1182809"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 4.0
+    },
+    "energy": -3.366645097732544,
+    "entry_id": "mp_mattersim_mp-1007976",
+    "mp_id": "mp-1007976"
+  },
+  {
+    "chemsys": "Cs",
+    "composition": {
+      "Cs": 16.0
+    },
+    "energy": -13.466582298278809,
+    "entry_id": "mp_mattersim_mp-573579",
+    "mp_id": "mp-573579"
+  },
+  {
+    "chemsys": "Br-K",
+    "composition": {
+      "K": 2.0,
+      "Br": 6.0
+    },
+    "energy": -16.689136505126953,
+    "entry_id": "mp_mattersim_mp-1185135",
+    "mp_id": "mp-1185135"
+  },
+  {
+    "chemsys": "Br-K",
+    "composition": {
+      "K": 1.0,
+      "Br": 1.0
+    },
+    "energy": -6.121027946472168,
+    "entry_id": "mp_mattersim_mp-570891",
+    "mp_id": "mp-570891"
+  },
+  {
+    "chemsys": "Br-K",
+    "composition": {
+      "K": 4.0,
+      "Br": 4.0
+    },
+    "energy": -25.08960723876953,
+    "entry_id": "mp_mattersim_mp-23251",
+    "mp_id": "mp-23251"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 1.0
+    },
+    "energy": -1.0430257320404053,
+    "entry_id": "mp_mattersim_mp-1056027",
+    "mp_id": "mp-1056027"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 5.0
+    },
+    "energy": -5.346396446228027,
+    "entry_id": "mp_mattersim_mp-1180991",
+    "mp_id": "mp-1180991"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 16.0
+    },
+    "energy": -17.099328994750977,
+    "entry_id": "mp_mattersim_mp-1078640",
+    "mp_id": "mp-1078640"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 4.0
+    },
+    "energy": -4.288090705871582,
+    "entry_id": "mp_mattersim_mp-1180961",
+    "mp_id": "mp-1180961"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 4.0
+    },
+    "energy": -4.288164138793945,
+    "entry_id": "mp_mattersim_mp-604325",
+    "mp_id": "mp-604325"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 9.0
+    },
+    "energy": -9.725381851196289,
+    "entry_id": "mp_mattersim_mp-1184764",
+    "mp_id": "mp-1184764"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 2.0
+    },
+    "energy": -2.1612212657928467,
+    "entry_id": "mp_mattersim_mp-1184755",
+    "mp_id": "mp-1184755"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 4.0
+    },
+    "energy": -4.32235050201416,
+    "entry_id": "mp_mattersim_mp-604318",
+    "mp_id": "mp-604318"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 162.0
+    },
+    "energy": -173.46365356445312,
+    "entry_id": "mp_mattersim_mp-1199937",
+    "mp_id": "mp-1199937"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 20.0
+    },
+    "energy": -21.433168411254883,
+    "entry_id": "mp_mattersim_mp-1184905",
+    "mp_id": "mp-1184905"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 58.0
+    },
+    "energy": -61.837440490722656,
+    "entry_id": "mp_mattersim_mp-1185201",
+    "mp_id": "mp-1185201"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 1.0
+    },
+    "energy": -1.0652635097503662,
+    "entry_id": "mp_mattersim_mp-998881",
+    "mp_id": "mp-998881"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 8.0
+    },
+    "energy": -8.472381591796875,
+    "entry_id": "mp_mattersim_mp-1184808",
+    "mp_id": "mp-1184808"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 4.0
+    },
+    "energy": -4.322460651397705,
+    "entry_id": "mp_mattersim_mp-10157",
+    "mp_id": "mp-10157"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 2.0
+    },
+    "energy": -2.1440956592559814,
+    "entry_id": "mp_mattersim_mp-58",
+    "mp_id": "mp-58"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 8.0
+    },
+    "energy": -8.575902938842773,
+    "entry_id": "mp_mattersim_mp-1080043",
+    "mp_id": "mp-1080043"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 4.0
+    },
+    "energy": -4.3221964836120605,
+    "entry_id": "mp_mattersim_mp-972981",
+    "mp_id": "mp-972981"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 16.0
+    },
+    "energy": -17.289901733398438,
+    "entry_id": "mp_mattersim_mp-1184804",
+    "mp_id": "mp-1184804"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 16.0
+    },
+    "energy": -17.2398624420166,
+    "entry_id": "mp_mattersim_mp-573691",
+    "mp_id": "mp-573691"
+  },
+  {
+    "chemsys": "K",
+    "composition": {
+      "K": 10.0
+    },
+    "energy": -10.666352272033691,
+    "entry_id": "mp_mattersim_mp-1068966",
+    "mp_id": "mp-1068966"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 9.0
+    },
+    "energy": -17.106582641601562,
+    "entry_id": "mp_mattersim_mp-1018134",
+    "mp_id": "mp-1018134"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 3.0
+    },
+    "energy": -5.684338092803955,
+    "entry_id": "mp_mattersim_mp-1063005",
+    "mp_id": "mp-1063005"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 2.0
+    },
+    "energy": -3.8012566566467285,
+    "entry_id": "mp_mattersim_mp-10173",
+    "mp_id": "mp-10173"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 4.0
+    },
+    "energy": -7.6031694412231445,
+    "entry_id": "mp_mattersim_mp-976411",
+    "mp_id": "mp-976411"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 4.0
+    },
+    "energy": -6.530540466308594,
+    "entry_id": "mp_mattersim_mp-604313",
+    "mp_id": "mp-604313"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 16.0
+    },
+    "energy": -30.481626510620117,
+    "entry_id": "mp_mattersim_mp-567337",
+    "mp_id": "mp-567337"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 4.0
+    },
+    "energy": -7.6039557456970215,
+    "entry_id": "mp_mattersim_mp-51",
+    "mp_id": "mp-51"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 2.0
+    },
+    "energy": -3.8105311393737793,
+    "entry_id": "mp_mattersim_mp-135",
+    "mp_id": "mp-135"
+  },
+  {
+    "chemsys": "Li",
+    "composition": {
+      "Li": 24.0
+    },
+    "energy": -44.67074966430664,
+    "entry_id": "mp_mattersim_mp-1103107",
+    "mp_id": "mp-1103107"
+  },
+  {
+    "chemsys": "Br-Li",
+    "composition": {
+      "Li": 2.0,
+      "Br": 2.0
+    },
+    "energy": -13.393850326538086,
+    "entry_id": "mp_mattersim_mp-976280",
+    "mp_id": "mp-976280"
+  },
+  {
+    "chemsys": "Br-Li",
+    "composition": {
+      "Li": 4.0,
+      "Br": 4.0
+    },
+    "energy": -26.49285316467285,
+    "entry_id": "mp_mattersim_mp-23259",
+    "mp_id": "mp-23259"
+  },
+  {
+    "chemsys": "Br-Mg",
+    "composition": {
+      "Mg": 6.0,
+      "Br": 2.0
+    },
+    "energy": -13.252239227294922,
+    "entry_id": "mp_mattersim_mp-978272",
+    "mp_id": "mp-978272"
+  },
+  {
+    "chemsys": "Br-Mg",
+    "composition": {
+      "Mg": 1.0,
+      "Br": 2.0
+    },
+    "energy": -9.33291244506836,
+    "entry_id": "mp_mattersim_mp-30034",
+    "mp_id": "mp-30034"
+  },
+  {
+    "chemsys": "Br-Mg",
+    "composition": {
+      "Mg": 149.0,
+      "Br": 1.0
+    },
+    "energy": -225.9445037841797,
+    "entry_id": "mp_mattersim_mp-1185549",
+    "mp_id": "mp-1185549"
+  },
+  {
+    "chemsys": "Br-Mg",
+    "composition": {
+      "Mg": 2.0,
+      "Br": 12.0
+    },
+    "energy": -30.12173080444336,
+    "entry_id": "mp_mattersim_mp-1207230",
+    "mp_id": "mp-1207230"
+  },
+  {
+    "chemsys": "Mg",
+    "composition": {
+      "Mg": 2.0
+    },
+    "energy": -2.9507992267608643,
+    "entry_id": "mp_mattersim_mp-1056351",
+    "mp_id": "mp-1056351"
+  },
+  {
+    "chemsys": "Mg",
+    "composition": {
+      "Mg": 9.0
+    },
+    "energy": -13.495025634765625,
+    "entry_id": "mp_mattersim_mp-1094122",
+    "mp_id": "mp-1094122"
+  },
+  {
+    "chemsys": "Mg",
+    "composition": {
+      "Mg": 1.0
+    },
+    "energy": -1.2751375436782837,
+    "entry_id": "mp_mattersim_mp-1055956",
+    "mp_id": "mp-1055956"
+  },
+  {
+    "chemsys": "Mg",
+    "composition": {
+      "Mg": 2.0
+    },
+    "energy": -3.000088691711426,
+    "entry_id": "mp_mattersim_mp-153",
+    "mp_id": "mp-153"
+  },
+  {
+    "chemsys": "Mg",
+    "composition": {
+      "Mg": 4.0
+    },
+    "energy": -5.9966020584106445,
+    "entry_id": "mp_mattersim_mp-973364",
+    "mp_id": "mp-973364"
+  },
+  {
+    "chemsys": "Mg",
+    "composition": {
+      "Mg": 4.0
+    },
+    "energy": -5.993093013763428,
+    "entry_id": "mp_mattersim_mp-1056702",
+    "mp_id": "mp-1056702"
+  },
+  {
+    "chemsys": "Mg",
+    "composition": {
+      "Mg": 2.0
+    },
+    "energy": -2.950894355773926,
+    "entry_id": "mp_mattersim_mp-110",
+    "mp_id": "mp-110"
+  },
+  {
+    "chemsys": "Mg",
+    "composition": {
+      "Mg": 10.0
+    },
+    "energy": -14.194106101989746,
+    "entry_id": "mp_mattersim_mp-1247180",
+    "mp_id": "mp-1247180"
+  },
+  {
+    "chemsys": "Br-Na",
+    "composition": {
+      "Na": 4.0,
+      "Br": 4.0
+    },
+    "energy": -24.440052032470703,
+    "entry_id": "mp_mattersim_mp-22916",
+    "mp_id": "mp-22916"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 2.0
+    },
+    "energy": -2.6185221672058105,
+    "entry_id": "mp_mattersim_mp-974920",
+    "mp_id": "mp-974920"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 9.0
+    },
+    "energy": -11.783526420593262,
+    "entry_id": "mp_mattersim_mp-973198",
+    "mp_id": "mp-973198"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 2.0
+    },
+    "energy": -2.6185946464538574,
+    "entry_id": "mp_mattersim_mp-10172",
+    "mp_id": "mp-10172"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 4.0
+    },
+    "energy": -5.237200736999512,
+    "entry_id": "mp_mattersim_mp-982370",
+    "mp_id": "mp-982370"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 4.0
+    },
+    "energy": -5.237216949462891,
+    "entry_id": "mp_mattersim_mp-999501",
+    "mp_id": "mp-999501"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 20.0
+    },
+    "energy": -26.04446792602539,
+    "entry_id": "mp_mattersim_mp-1186055",
+    "mp_id": "mp-1186055"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 24.0
+    },
+    "energy": -24.816179275512695,
+    "entry_id": "mp_mattersim_mp-1221597",
+    "mp_id": "mp-1221597"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 58.0
+    },
+    "energy": -75.42355346679688,
+    "entry_id": "mp_mattersim_mp-1186081",
+    "mp_id": "mp-1186081"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 16.0
+    },
+    "energy": -20.920452117919922,
+    "entry_id": "mp_mattersim_mp-567772",
+    "mp_id": "mp-567772"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 1.0
+    },
+    "energy": -0.9556563496589661,
+    "entry_id": "mp_mattersim_mp-689577",
+    "mp_id": "mp-689577"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 8.0
+    },
+    "energy": -10.397053718566895,
+    "entry_id": "mp_mattersim_mp-1186040",
+    "mp_id": "mp-1186040"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 2.0
+    },
+    "energy": -2.6186017990112305,
+    "entry_id": "mp_mattersim_mp-974558",
+    "mp_id": "mp-974558"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 2.0
+    },
+    "energy": -2.61507511138916,
+    "entry_id": "mp_mattersim_mp-127",
+    "mp_id": "mp-127"
+  },
+  {
+    "chemsys": "Na",
+    "composition": {
+      "Na": 8.0
+    },
+    "energy": -10.20875358581543,
+    "entry_id": "mp_mattersim_mp-1079952",
+    "mp_id": "mp-1079952"
+  },
+  {
+    "chemsys": "Br-Rb",
+    "composition": {
+      "Br": 6.0,
+      "Rb": 2.0
+    },
+    "energy": -16.769298553466797,
+    "entry_id": "mp_mattersim_mp-975411",
+    "mp_id": "mp-975411"
+  },
+  {
+    "chemsys": "Br-Rb",
+    "composition": {
+      "Br": 1.0,
+      "Rb": 1.0
+    },
+    "energy": -6.025511741638184,
+    "entry_id": "mp_mattersim_mp-23303",
+    "mp_id": "mp-23303"
+  },
+  {
+    "chemsys": "Br-Rb",
+    "composition": {
+      "Br": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -24.53554916381836,
+    "entry_id": "mp_mattersim_mp-22867",
+    "mp_id": "mp-22867"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 8.0
+    },
+    "energy": -7.486271381378174,
+    "entry_id": "mp_mattersim_mp-1179802",
+    "mp_id": "mp-1179802"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 8.0
+    },
+    "energy": -7.485860824584961,
+    "entry_id": "mp_mattersim_mp-640416",
+    "mp_id": "mp-640416"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 8.0
+    },
+    "energy": -7.486048698425293,
+    "entry_id": "mp_mattersim_mp-656615",
+    "mp_id": "mp-656615"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 16.0
+    },
+    "energy": -14.97169303894043,
+    "entry_id": "mp_mattersim_mp-1179832",
+    "mp_id": "mp-1179832"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 2.0
+    },
+    "energy": -1.8714346885681152,
+    "entry_id": "mp_mattersim_mp-639755",
+    "mp_id": "mp-639755"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 2.0
+    },
+    "energy": -1.871432900428772,
+    "entry_id": "mp_mattersim_mp-975519",
+    "mp_id": "mp-975519"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 4.0
+    },
+    "energy": -3.7449748516082764,
+    "entry_id": "mp_mattersim_mp-639736",
+    "mp_id": "mp-639736"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 16.0
+    },
+    "energy": -14.971866607666016,
+    "entry_id": "mp_mattersim_mp-1179656",
+    "mp_id": "mp-1179656"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 9.0
+    },
+    "energy": -8.421448707580566,
+    "entry_id": "mp_mattersim_mp-867126",
+    "mp_id": "mp-867126"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 4.0
+    },
+    "energy": -3.742865800857544,
+    "entry_id": "mp_mattersim_mp-604321",
+    "mp_id": "mp-604321"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 2.0
+    },
+    "energy": -1.871432900428772,
+    "entry_id": "mp_mattersim_mp-975129",
+    "mp_id": "mp-975129"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 52.0
+    },
+    "energy": -48.661800384521484,
+    "entry_id": "mp_mattersim_mp-569688",
+    "mp_id": "mp-569688"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 20.0
+    },
+    "energy": -18.69858741760254,
+    "entry_id": "mp_mattersim_mp-1186853",
+    "mp_id": "mp-1186853"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 58.0
+    },
+    "energy": -54.269500732421875,
+    "entry_id": "mp_mattersim_mp-1186899",
+    "mp_id": "mp-1186899"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 8.0
+    },
+    "energy": -7.4792351722717285,
+    "entry_id": "mp_mattersim_mp-974620",
+    "mp_id": "mp-974620"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 4.0
+    },
+    "energy": -3.742865800857544,
+    "entry_id": "mp_mattersim_mp-12628",
+    "mp_id": "mp-12628"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 16.0
+    },
+    "energy": -14.972829818725586,
+    "entry_id": "mp_mattersim_mp-70",
+    "mp_id": "mp-70"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 4.0
+    },
+    "energy": -3.742865800857544,
+    "entry_id": "mp_mattersim_mp-975204",
+    "mp_id": "mp-975204"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 16.0
+    },
+    "energy": -14.97596549987793,
+    "entry_id": "mp_mattersim_mp-1018045",
+    "mp_id": "mp-1018045"
+  },
+  {
+    "chemsys": "Rb",
+    "composition": {
+      "Rb": 16.0
+    },
+    "energy": -14.97610092163086,
+    "entry_id": "mp_mattersim_mp-1063817",
+    "mp_id": "mp-1063817"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 4.0
+    },
+    "energy": -24.91240692138672,
+    "entry_id": "mp_mattersim_mp-1064244",
+    "mp_id": "mp-1064244"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 2.0
+    },
+    "energy": -12.45620346069336,
+    "entry_id": "mp_mattersim_mp-1056366",
+    "mp_id": "mp-1056366"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 8.0
+    },
+    "energy": -48.72738265991211,
+    "entry_id": "mp_mattersim_mp-567308",
+    "mp_id": "mp-567308"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 3.0
+    },
+    "energy": -18.862773895263672,
+    "entry_id": "mp_mattersim_mp-1055932",
+    "mp_id": "mp-1055932"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 6.0
+    },
+    "energy": -37.26277160644531,
+    "entry_id": "mp_mattersim_mp-601273",
+    "mp_id": "mp-601273"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 6.0
+    },
+    "energy": -37.54357147216797,
+    "entry_id": "mp_mattersim_mp-1977495",
+    "mp_id": "mp-1977495"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 2.0
+    },
+    "energy": -12.576574325561523,
+    "entry_id": "mp_mattersim_mp-67",
+    "mp_id": "mp-67"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 1.0
+    },
+    "energy": -5.6115827560424805,
+    "entry_id": "mp_mattersim_mp-1008681",
+    "mp_id": "mp-1008681"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 4.0
+    },
+    "energy": -25.149391174316406,
+    "entry_id": "mp_mattersim_mp-36",
+    "mp_id": "mp-36"
+  },
+  {
+    "chemsys": "Sc",
+    "composition": {
+      "Sc": 2.0
+    },
+    "energy": -12.450918197631836,
+    "entry_id": "mp_mattersim_mp-10641",
+    "mp_id": "mp-10641"
+  },
+  {
+    "chemsys": "Br-Sc",
+    "composition": {
+      "Sc": 2.0,
+      "Br": 4.0
+    },
+    "energy": -27.845359802246094,
+    "entry_id": "mp_mattersim_mp-862565",
+    "mp_id": "mp-862565"
+  },
+  {
+    "chemsys": "Br-Sc",
+    "composition": {
+      "Sc": 2.0,
+      "Br": 6.0
+    },
+    "energy": -35.83244323730469,
+    "entry_id": "mp_mattersim_mp-1186984",
+    "mp_id": "mp-1186984"
+  },
+  {
+    "chemsys": "Br-Sr",
+    "composition": {
+      "Br": 4.0,
+      "Sr": 2.0
+    },
+    "energy": -22.704029083251953,
+    "entry_id": "mp_mattersim_mp-1187158",
+    "mp_id": "mp-1187158"
+  },
+  {
+    "chemsys": "Br-Sr",
+    "composition": {
+      "Br": 6.0,
+      "Sr": 2.0
+    },
+    "energy": -24.703266143798828,
+    "entry_id": "mp_mattersim_mp-980667",
+    "mp_id": "mp-980667"
+  },
+  {
+    "chemsys": "Br-Sr",
+    "composition": {
+      "Br": 8.0,
+      "Sr": 4.0
+    },
+    "energy": -45.66926574707031,
+    "entry_id": "mp_mattersim_mp-567744",
+    "mp_id": "mp-567744"
+  },
+  {
+    "chemsys": "Br-Sr",
+    "composition": {
+      "Br": 20.0,
+      "Sr": 10.0
+    },
+    "energy": -113.70915985107422,
+    "entry_id": "mp_mattersim_mp-32711",
+    "mp_id": "mp-32711"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 1.0
+    },
+    "energy": -1.4463996887207031,
+    "entry_id": "mp_mattersim_mp-1179325",
+    "mp_id": "mp-1179325"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 8.0
+    },
+    "energy": -13.015334129333496,
+    "entry_id": "mp_mattersim_mp-567826",
+    "mp_id": "mp-567826"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 4.0
+    },
+    "energy": -5.723943710327148,
+    "entry_id": "mp_mattersim_mp-10617",
+    "mp_id": "mp-10617"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 9.0
+    },
+    "energy": -15.110871315002441,
+    "entry_id": "mp_mattersim_mp-1187073",
+    "mp_id": "mp-1187073"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 1.0
+    },
+    "energy": -1.1657791137695312,
+    "entry_id": "mp_mattersim_mp-1056418",
+    "mp_id": "mp-1056418"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 1.0
+    },
+    "energy": -1.5601742267608643,
+    "entry_id": "mp_mattersim_mp-19858",
+    "mp_id": "mp-19858"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 2.0
+    },
+    "energy": -3.3579719066619873,
+    "entry_id": "mp_mattersim_mp-139",
+    "mp_id": "mp-139"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 4.0
+    },
+    "energy": -6.715837478637695,
+    "entry_id": "mp_mattersim_mp-867202",
+    "mp_id": "mp-867202"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 1.0
+    },
+    "energy": -1.4463975429534912,
+    "entry_id": "mp_mattersim_mp-639774",
+    "mp_id": "mp-639774"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 4.0
+    },
+    "energy": -6.715912818908691,
+    "entry_id": "mp_mattersim_mp-76",
+    "mp_id": "mp-76"
+  },
+  {
+    "chemsys": "Sr",
+    "composition": {
+      "Sr": 2.0
+    },
+    "energy": -3.3107757568359375,
+    "entry_id": "mp_mattersim_mp-95",
+    "mp_id": "mp-95"
+  },
+  {
+    "chemsys": "Y",
+    "composition": {
+      "Y": 9.0
+    },
+    "energy": -58.020782470703125,
+    "entry_id": "mp_mattersim_mp-1187739",
+    "mp_id": "mp-1187739"
+  },
+  {
+    "chemsys": "Y",
+    "composition": {
+      "Y": 2.0
+    },
+    "energy": -12.893423080444336,
+    "entry_id": "mp_mattersim_mp-112",
+    "mp_id": "mp-112"
+  },
+  {
+    "chemsys": "Y",
+    "composition": {
+      "Y": 4.0
+    },
+    "energy": -25.786808013916016,
+    "entry_id": "mp_mattersim_mp-1187717",
+    "mp_id": "mp-1187717"
+  },
+  {
+    "chemsys": "Y",
+    "composition": {
+      "Y": 4.0
+    },
+    "energy": -25.786787033081055,
+    "entry_id": "mp_mattersim_mp-9",
+    "mp_id": "mp-9"
+  },
+  {
+    "chemsys": "Br-Y",
+    "composition": {
+      "Br": 12.0,
+      "Y": 8.0
+    },
+    "energy": -100.61975860595703,
+    "entry_id": "mp_mattersim_mp-1205567",
+    "mp_id": "mp-1205567"
+  },
+  {
+    "chemsys": "Br-Y",
+    "composition": {
+      "Br": 12.0,
+      "Y": 4.0
+    },
+    "energy": -76.09909057617188,
+    "entry_id": "mp_mattersim_mp-754815",
+    "mp_id": "mp-754815"
+  },
+  {
+    "chemsys": "Br-Y",
+    "composition": {
+      "Br": 4.0,
+      "Y": 2.0
+    },
+    "energy": -28.74936294555664,
+    "entry_id": "mp_mattersim_mp-865534",
+    "mp_id": "mp-865534"
+  },
+  {
+    "chemsys": "Br-Y",
+    "composition": {
+      "Br": 6.0,
+      "Y": 2.0
+    },
+    "energy": -37.573150634765625,
+    "entry_id": "mp_mattersim_mp-865605",
+    "mp_id": "mp-865605"
+  },
+  {
+    "chemsys": "Ca-Cl",
+    "composition": {
+      "Cl": 4.0,
+      "Ca": 2.0
+    },
+    "energy": -25.732471466064453,
+    "entry_id": "mp_mattersim_mp-22904",
+    "mp_id": "mp-22904"
+  },
+  {
+    "chemsys": "Ca-Cl",
+    "composition": {
+      "Cl": 8.0,
+      "Ca": 4.0
+    },
+    "energy": -50.92604064941406,
+    "entry_id": "mp_mattersim_mp-1120739",
+    "mp_id": "mp-1120739"
+  },
+  {
+    "chemsys": "Ca-Cl",
+    "composition": {
+      "Cl": 4.0,
+      "Ca": 2.0
+    },
+    "energy": -25.731861114501953,
+    "entry_id": "mp_mattersim_mp-23214",
+    "mp_id": "mp-23214"
+  },
+  {
+    "chemsys": "Ca-Cl",
+    "composition": {
+      "Cl": 8.0,
+      "Ca": 4.0
+    },
+    "energy": -51.455596923828125,
+    "entry_id": "mp_mattersim_mp-571642",
+    "mp_id": "mp-571642"
+  },
+  {
+    "chemsys": "Ca-Cl",
+    "composition": {
+      "Cl": 8.0,
+      "Ca": 4.0
+    },
+    "energy": -50.35098648071289,
+    "entry_id": "mp_mattersim_mp-571627",
+    "mp_id": "mp-571627"
+  },
+  {
+    "chemsys": "Ca-F",
+    "composition": {
+      "F": 2.0,
+      "Ca": 1.0
+    },
+    "energy": -16.88321304321289,
+    "entry_id": "mp_mattersim_mp-554355",
+    "mp_id": "mp-554355"
+  },
+  {
+    "chemsys": "Ca-F",
+    "composition": {
+      "F": 6.0,
+      "Ca": 2.0
+    },
+    "energy": -37.27082443237305,
+    "entry_id": "mp_mattersim_mp-1183590",
+    "mp_id": "mp-1183590"
+  },
+  {
+    "chemsys": "Ca-F",
+    "composition": {
+      "F": 2.0,
+      "Ca": 2.0
+    },
+    "energy": -18.0233154296875,
+    "entry_id": "mp_mattersim_mp-1183545",
+    "mp_id": "mp-1183545"
+  },
+  {
+    "chemsys": "Ca-F",
+    "composition": {
+      "F": 6.0,
+      "Ca": 2.0
+    },
+    "energy": -36.81370544433594,
+    "entry_id": "mp_mattersim_mp-1183589",
+    "mp_id": "mp-1183589"
+  },
+  {
+    "chemsys": "Ca-F",
+    "composition": {
+      "F": 8.0,
+      "Ca": 4.0
+    },
+    "energy": -70.24235534667969,
+    "entry_id": "mp_mattersim_mp-2741",
+    "mp_id": "mp-2741"
+  },
+  {
+    "chemsys": "Ca-F",
+    "composition": {
+      "F": 4.0,
+      "Ca": 2.0
+    },
+    "energy": -34.04561233520508,
+    "entry_id": "mp_mattersim_mp-560030",
+    "mp_id": "mp-560030"
+  },
+  {
+    "chemsys": "Ca-F",
+    "composition": {
+      "F": 8.0,
+      "Ca": 4.0
+    },
+    "energy": -69.56887817382812,
+    "entry_id": "mp_mattersim_mp-10464",
+    "mp_id": "mp-10464"
+  },
+  {
+    "chemsys": "Ca-F",
+    "composition": {
+      "F": 10.0,
+      "Ca": 20.0
+    },
+    "energy": -113.9388427734375,
+    "entry_id": "mp_mattersim_mp-684949",
+    "mp_id": "mp-684949"
+  },
+  {
+    "chemsys": "Ca-I",
+    "composition": {
+      "Ca": 1.0,
+      "I": 2.0
+    },
+    "energy": -9.942411422729492,
+    "entry_id": "mp_mattersim_mp-30031",
+    "mp_id": "mp-30031"
+  },
+  {
+    "chemsys": "Ca-I",
+    "composition": {
+      "Ca": 1.0,
+      "I": 1.0
+    },
+    "energy": -5.514135360717773,
+    "entry_id": "mp_mattersim_mp-1183572",
+    "mp_id": "mp-1183572"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 12.0,
+      "Ca": 18.0
+    },
+    "energy": -158.4264678955078,
+    "entry_id": "mp_mattersim_mp-568172",
+    "mp_id": "mp-568172"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 16.0,
+      "Ca": 22.0
+    },
+    "energy": -199.25486755371094,
+    "entry_id": "mp_mattersim_mp-680640",
+    "mp_id": "mp-680640"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 4.0,
+      "Ca": 2.0
+    },
+    "energy": -40.32966613769531,
+    "entry_id": "mp_mattersim_mp-1009657",
+    "mp_id": "mp-1009657"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 2.0,
+      "Ca": 3.0
+    },
+    "energy": -26.202611923217773,
+    "entry_id": "mp_mattersim_mp-13146",
+    "mp_id": "mp-13146"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 3.0,
+      "Ca": 6.0
+    },
+    "energy": -43.764442443847656,
+    "entry_id": "mp_mattersim_mp-2686",
+    "mp_id": "mp-2686"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 12.0,
+      "Ca": 18.0
+    },
+    "energy": -159.1600799560547,
+    "entry_id": "mp_mattersim_mp-1047",
+    "mp_id": "mp-1047"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 4.0,
+      "Ca": 6.0
+    },
+    "energy": -51.32602310180664,
+    "entry_id": "mp_mattersim_mp-13148",
+    "mp_id": "mp-13148"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 32.0,
+      "Ca": 48.0
+    },
+    "energy": -426.6641540527344,
+    "entry_id": "mp_mattersim_mp-844",
+    "mp_id": "mp-844"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 2.0,
+      "Ca": 3.0
+    },
+    "energy": -24.081165313720703,
+    "entry_id": "mp_mattersim_mp-1013524",
+    "mp_id": "mp-1013524"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 4.0,
+      "Ca": 4.0
+    },
+    "energy": -43.63270568847656,
+    "entry_id": "mp_mattersim_mp-1058549",
+    "mp_id": "mp-1058549"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 12.0,
+      "Ca": 2.0
+    },
+    "energy": -106.13616943359375,
+    "entry_id": "mp_mattersim_mp-656097",
+    "mp_id": "mp-656097"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 8.0,
+      "Ca": 12.0
+    },
+    "energy": -105.85435485839844,
+    "entry_id": "mp_mattersim_mp-568293",
+    "mp_id": "mp-568293"
+  },
+  {
+    "chemsys": "Ca-N",
+    "composition": {
+      "N": 48.0,
+      "Ca": 8.0
+    },
+    "energy": -424.5296630859375,
+    "entry_id": "mp_mattersim_mp-676",
+    "mp_id": "mp-676"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 24.0,
+      "Ca": 16.0
+    },
+    "energy": -235.21673583984375,
+    "entry_id": "mp_mattersim_mp-1120811",
+    "mp_id": "mp-1120811"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 50.0,
+      "Ca": 50.0
+    },
+    "energy": -621.5130615234375,
+    "entry_id": "mp_mattersim_mp-1244902",
+    "mp_id": "mp-1244902"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 50.0,
+      "Ca": 50.0
+    },
+    "energy": -615.2683715820312,
+    "entry_id": "mp_mattersim_mp-1245200",
+    "mp_id": "mp-1245200"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 50.0,
+      "Ca": 50.0
+    },
+    "energy": -616.7486572265625,
+    "entry_id": "mp_mattersim_mp-1245305",
+    "mp_id": "mp-1245305"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 4.0,
+      "Ca": 2.0
+    },
+    "energy": -35.71162033081055,
+    "entry_id": "mp_mattersim_mp-1181909",
+    "mp_id": "mp-1181909"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 20.0,
+      "Ca": 2.0
+    },
+    "energy": -111.21185302734375,
+    "entry_id": "mp_mattersim_mp-1182183",
+    "mp_id": "mp-1182183"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 20.0,
+      "Ca": 2.0
+    },
+    "energy": -111.08847045898438,
+    "entry_id": "mp_mattersim_mp-1182382",
+    "mp_id": "mp-1182382"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 4.0,
+      "Ca": 4.0
+    },
+    "energy": -49.81073760986328,
+    "entry_id": "mp_mattersim_mp-1064492",
+    "mp_id": "mp-1064492"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 4.0,
+      "Ca": 2.0
+    },
+    "energy": -35.17240905761719,
+    "entry_id": "mp_mattersim_mp-634859",
+    "mp_id": "mp-634859"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 16.0,
+      "Ca": 8.0
+    },
+    "energy": -137.952392578125,
+    "entry_id": "mp_mattersim_mp-1095665",
+    "mp_id": "mp-1095665"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 2.0,
+      "Ca": 1.0
+    },
+    "energy": -15.911918640136719,
+    "entry_id": "mp_mattersim_mp-1062228",
+    "mp_id": "mp-1062228"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 2.0,
+      "Ca": 2.0
+    },
+    "energy": -25.482704162597656,
+    "entry_id": "mp_mattersim_mp-545512",
+    "mp_id": "mp-545512"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 4.0,
+      "Ca": 4.0
+    },
+    "energy": -51.50653076171875,
+    "entry_id": "mp_mattersim_mp-2605",
+    "mp_id": "mp-2605"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 16.0,
+      "Ca": 16.0
+    },
+    "energy": -114.0938491821289,
+    "entry_id": "mp_mattersim_mp-1181903",
+    "mp_id": "mp-1181903"
+  },
+  {
+    "chemsys": "Ca-O",
+    "composition": {
+      "O": 8.0,
+      "Ca": 8.0
+    },
+    "energy": -99.62144470214844,
+    "entry_id": "mp_mattersim_mp-1079707",
+    "mp_id": "mp-1079707"
+  },
+  {
+    "chemsys": "Ca-P",
+    "composition": {
+      "P": 16.0,
+      "Ca": 10.0
+    },
+    "energy": -129.76486206054688,
+    "entry_id": "mp_mattersim_mp-28879",
+    "mp_id": "mp-28879"
+  },
+  {
+    "chemsys": "Ca-P",
+    "composition": {
+      "P": 6.0,
+      "Ca": 6.0
+    },
+    "energy": -57.53536605834961,
+    "entry_id": "mp_mattersim_mp-1345",
+    "mp_id": "mp-1345"
+  },
+  {
+    "chemsys": "Ca-P",
+    "composition": {
+      "P": 6.0,
+      "Ca": 2.0
+    },
+    "energy": -41.26667022705078,
+    "entry_id": "mp_mattersim_mp-9122",
+    "mp_id": "mp-9122"
+  },
+  {
+    "chemsys": "Ca-P",
+    "composition": {
+      "P": 2.0,
+      "Ca": 3.0
+    },
+    "energy": -20.467769622802734,
+    "entry_id": "mp_mattersim_mp-1013547",
+    "mp_id": "mp-1013547"
+  },
+  {
+    "chemsys": "Ca-S",
+    "composition": {
+      "S": 4.0,
+      "Ca": 4.0
+    },
+    "energy": -41.75542449951172,
+    "entry_id": "mp_mattersim_mp-1672",
+    "mp_id": "mp-1672"
+  },
+  {
+    "chemsys": "Cl-Cs",
+    "composition": {
+      "Cl": 1.0,
+      "Cs": 1.0
+    },
+    "energy": -6.538344383239746,
+    "entry_id": "mp_mattersim_mp-22865",
+    "mp_id": "mp-22865"
+  },
+  {
+    "chemsys": "Cl-Cs",
+    "composition": {
+      "Cl": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -26.482582092285156,
+    "entry_id": "mp_mattersim_mp-573697",
+    "mp_id": "mp-573697"
+  },
+  {
+    "chemsys": "Cl-K",
+    "composition": {
+      "Cl": 6.0,
+      "K": 2.0
+    },
+    "energy": -18.287675857543945,
+    "entry_id": "mp_mattersim_mp-1185148",
+    "mp_id": "mp-1185148"
+  },
+  {
+    "chemsys": "Cl-K",
+    "composition": {
+      "Cl": 1.0,
+      "K": 1.0
+    },
+    "energy": -6.698570251464844,
+    "entry_id": "mp_mattersim_mp-23289",
+    "mp_id": "mp-23289"
+  },
+  {
+    "chemsys": "Cl-K",
+    "composition": {
+      "Cl": 4.0,
+      "K": 4.0
+    },
+    "energy": -27.445119857788086,
+    "entry_id": "mp_mattersim_mp-23193",
+    "mp_id": "mp-23193"
+  },
+  {
+    "chemsys": "Cl-Li",
+    "composition": {
+      "Li": 2.0,
+      "Cl": 2.0
+    },
+    "energy": -14.849085807800293,
+    "entry_id": "mp_mattersim_mp-1185319",
+    "mp_id": "mp-1185319"
+  },
+  {
+    "chemsys": "Cl-Li",
+    "composition": {
+      "Li": 4.0,
+      "Cl": 4.0
+    },
+    "energy": -29.503408432006836,
+    "entry_id": "mp_mattersim_mp-22905",
+    "mp_id": "mp-22905"
+  },
+  {
+    "chemsys": "Cl-Mg",
+    "composition": {
+      "Mg": 1.0,
+      "Cl": 2.0
+    },
+    "energy": -10.560480117797852,
+    "entry_id": "mp_mattersim_mp-570922",
+    "mp_id": "mp-570922"
+  },
+  {
+    "chemsys": "Cl-Mg",
+    "composition": {
+      "Mg": 1.0,
+      "Cl": 2.0
+    },
+    "energy": -10.778007507324219,
+    "entry_id": "mp_mattersim_mp-570259",
+    "mp_id": "mp-570259"
+  },
+  {
+    "chemsys": "Cl-Mg",
+    "composition": {
+      "Mg": 3.0,
+      "Cl": 6.0
+    },
+    "energy": -32.334327697753906,
+    "entry_id": "mp_mattersim_mp-23210",
+    "mp_id": "mp-23210"
+  },
+  {
+    "chemsys": "Cl-Mg",
+    "composition": {
+      "Mg": 149.0,
+      "Cl": 1.0
+    },
+    "energy": -226.60687255859375,
+    "entry_id": "mp_mattersim_mp-1185584",
+    "mp_id": "mp-1185584"
+  },
+  {
+    "chemsys": "Cl-Mg",
+    "composition": {
+      "Mg": 2.0,
+      "Cl": 4.0
+    },
+    "energy": -20.74314308166504,
+    "entry_id": "mp_mattersim_mp-570782",
+    "mp_id": "mp-570782"
+  },
+  {
+    "chemsys": "Cl-Mg",
+    "composition": {
+      "Mg": 4.0,
+      "Cl": 8.0
+    },
+    "energy": -40.88423538208008,
+    "entry_id": "mp_mattersim_mp-569626",
+    "mp_id": "mp-569626"
+  },
+  {
+    "chemsys": "Cl-Mg",
+    "composition": {
+      "Mg": 2.0,
+      "Cl": 4.0
+    },
+    "energy": -20.686656951904297,
+    "entry_id": "mp_mattersim_mp-571387",
+    "mp_id": "mp-571387"
+  },
+  {
+    "chemsys": "Cl-Mg",
+    "composition": {
+      "Mg": 2.0,
+      "Cl": 12.0
+    },
+    "energy": -33.975799560546875,
+    "entry_id": "mp_mattersim_mp-1207313",
+    "mp_id": "mp-1207313"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 4.0,
+      "Cl": 2.0
+    },
+    "energy": -15.22525405883789,
+    "entry_id": "mp_mattersim_mp-1018810",
+    "mp_id": "mp-1018810"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 3.0,
+      "Cl": 1.0
+    },
+    "energy": -8.834370613098145,
+    "entry_id": "mp_mattersim_mp-1064484",
+    "mp_id": "mp-1064484"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 6.0,
+      "Cl": 3.0
+    },
+    "energy": -23.29723358154297,
+    "entry_id": "mp_mattersim_mp-990084",
+    "mp_id": "mp-990084"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 6.0,
+      "Cl": 6.0
+    },
+    "energy": -39.97694396972656,
+    "entry_id": "mp_mattersim_mp-1120767",
+    "mp_id": "mp-1120767"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 1.0,
+      "Cl": 7.0
+    },
+    "energy": -15.512870788574219,
+    "entry_id": "mp_mattersim_mp-1080771",
+    "mp_id": "mp-1080771"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 1.0,
+      "Cl": 1.0
+    },
+    "energy": -6.468630790710449,
+    "entry_id": "mp_mattersim_mp-22851",
+    "mp_id": "mp-22851"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 2.0,
+      "Cl": 6.0
+    },
+    "energy": -17.941009521484375,
+    "entry_id": "mp_mattersim_mp-1078558",
+    "mp_id": "mp-1078558"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 4.0,
+      "Cl": 4.0
+    },
+    "energy": -27.075374603271484,
+    "entry_id": "mp_mattersim_mp-22862",
+    "mp_id": "mp-22862"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 4.0,
+      "Cl": 12.0
+    },
+    "energy": -41.175537109375,
+    "entry_id": "mp_mattersim_mp-1189265",
+    "mp_id": "mp-1189265"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 6.0,
+      "Cl": 4.0
+    },
+    "energy": -27.759899139404297,
+    "entry_id": "mp_mattersim_mp-1069676",
+    "mp_id": "mp-1069676"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 8.0,
+      "Cl": 4.0
+    },
+    "energy": -30.42666244506836,
+    "entry_id": "mp_mattersim_mp-1077015",
+    "mp_id": "mp-1077015"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 8.0,
+      "Cl": 4.0
+    },
+    "energy": -29.908571243286133,
+    "entry_id": "mp_mattersim_mp-1077288",
+    "mp_id": "mp-1077288"
+  },
+  {
+    "chemsys": "Cl-Na",
+    "composition": {
+      "Na": 6.0,
+      "Cl": 4.0
+    },
+    "energy": -27.543766021728516,
+    "entry_id": "mp_mattersim_mp-1095060",
+    "mp_id": "mp-1095060"
+  },
+  {
+    "chemsys": "Cl-Rb",
+    "composition": {
+      "Cl": 1.0,
+      "Rb": 1.0
+    },
+    "energy": -6.574199676513672,
+    "entry_id": "mp_mattersim_mp-23299",
+    "mp_id": "mp-23299"
+  },
+  {
+    "chemsys": "Cl-Rb",
+    "composition": {
+      "Cl": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -26.797115325927734,
+    "entry_id": "mp_mattersim_mp-23295",
+    "mp_id": "mp-23295"
+  },
+  {
+    "chemsys": "Cl-Sc",
+    "composition": {
+      "Cl": 20.0,
+      "Sc": 14.0
+    },
+    "energy": -181.93038940429688,
+    "entry_id": "mp_mattersim_mp-27513",
+    "mp_id": "mp-27513"
+  },
+  {
+    "chemsys": "Cl-Sc",
+    "composition": {
+      "Cl": 16.0,
+      "Sc": 10.0
+    },
+    "energy": -137.64427185058594,
+    "entry_id": "mp_mattersim_mp-542449",
+    "mp_id": "mp-542449"
+  },
+  {
+    "chemsys": "Cl-Sc",
+    "composition": {
+      "Cl": 36.0,
+      "Sc": 21.0
+    },
+    "energy": -298.9178161621094,
+    "entry_id": "mp_mattersim_mp-23186",
+    "mp_id": "mp-23186"
+  },
+  {
+    "chemsys": "Cl-Sc",
+    "composition": {
+      "Cl": 18.0,
+      "Sc": 6.0
+    },
+    "energy": -122.0157470703125,
+    "entry_id": "mp_mattersim_mp-23309",
+    "mp_id": "mp-23309"
+  },
+  {
+    "chemsys": "Cl-Sc",
+    "composition": {
+      "Cl": 6.0,
+      "Sc": 6.0
+    },
+    "energy": -66.10826110839844,
+    "entry_id": "mp_mattersim_mp-27507",
+    "mp_id": "mp-27507"
+  },
+  {
+    "chemsys": "Cl-Sr",
+    "composition": {
+      "Cl": 6.0,
+      "Sr": 2.0
+    },
+    "energy": -26.481714248657227,
+    "entry_id": "mp_mattersim_mp-1187157",
+    "mp_id": "mp-1187157"
+  },
+  {
+    "chemsys": "Cl-Sr",
+    "composition": {
+      "Cl": 52.0,
+      "Sr": 25.0
+    },
+    "energy": -322.6538391113281,
+    "entry_id": "mp_mattersim_mp-1366228",
+    "mp_id": "mp-1366228"
+  },
+  {
+    "chemsys": "Cl-Sr",
+    "composition": {
+      "Cl": 52.0,
+      "Sr": 25.0
+    },
+    "energy": -323.5558166503906,
+    "entry_id": "mp_mattersim_mp-531572",
+    "mp_id": "mp-531572"
+  },
+  {
+    "chemsys": "Cl-Sr",
+    "composition": {
+      "Cl": 52.0,
+      "Sr": 25.0
+    },
+    "energy": -320.17034912109375,
+    "entry_id": "mp_mattersim_mp-724714",
+    "mp_id": "mp-724714"
+  },
+  {
+    "chemsys": "Cl-Sr",
+    "composition": {
+      "Cl": 8.0,
+      "Sr": 4.0
+    },
+    "energy": -51.267799377441406,
+    "entry_id": "mp_mattersim_mp-23209",
+    "mp_id": "mp-23209"
+  },
+  {
+    "chemsys": "Cl-Y",
+    "composition": {
+      "Cl": 12.0,
+      "Y": 4.0
+    },
+    "energy": -84.63009643554688,
+    "entry_id": "mp_mattersim_mp-27455",
+    "mp_id": "mp-27455"
+  },
+  {
+    "chemsys": "Cl-Y",
+    "composition": {
+      "Cl": 12.0,
+      "Y": 8.0
+    },
+    "energy": -108.3123779296875,
+    "entry_id": "mp_mattersim_mp-27678",
+    "mp_id": "mp-27678"
+  },
+  {
+    "chemsys": "Cl-Y",
+    "composition": {
+      "Cl": 6.0,
+      "Y": 6.0
+    },
+    "energy": -67.73504638671875,
+    "entry_id": "mp_mattersim_mp-540884",
+    "mp_id": "mp-540884"
+  },
+  {
+    "chemsys": "Cs-F",
+    "composition": {
+      "F": 1.0,
+      "Cs": 1.0
+    },
+    "energy": -7.795285224914551,
+    "entry_id": "mp_mattersim_mp-8455",
+    "mp_id": "mp-8455"
+  },
+  {
+    "chemsys": "Cs-F",
+    "composition": {
+      "F": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -32.1099853515625,
+    "entry_id": "mp_mattersim_mp-1784",
+    "mp_id": "mp-1784"
+  },
+  {
+    "chemsys": "Cs-I",
+    "composition": {
+      "I": 16.0,
+      "Cs": 4.0
+    },
+    "energy": -40.51706314086914,
+    "entry_id": "mp_mattersim_mp-571011",
+    "mp_id": "mp-571011"
+  },
+  {
+    "chemsys": "Cs-I",
+    "composition": {
+      "I": 2.0,
+      "Cs": 6.0
+    },
+    "energy": -14.282700538635254,
+    "entry_id": "mp_mattersim_mp-1184038",
+    "mp_id": "mp-1184038"
+  },
+  {
+    "chemsys": "Cs-I",
+    "composition": {
+      "I": 1.0,
+      "Cs": 1.0
+    },
+    "energy": -5.4508490562438965,
+    "entry_id": "mp_mattersim_mp-1056920",
+    "mp_id": "mp-1056920"
+  },
+  {
+    "chemsys": "Cs-I",
+    "composition": {
+      "I": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -21.896461486816406,
+    "entry_id": "mp_mattersim_mp-614603",
+    "mp_id": "mp-614603"
+  },
+  {
+    "chemsys": "Cs-I",
+    "composition": {
+      "I": 2.0,
+      "Cs": 2.0
+    },
+    "energy": -10.948200225830078,
+    "entry_id": "mp_mattersim_mp-1078801",
+    "mp_id": "mp-1078801"
+  },
+  {
+    "chemsys": "Cs-I",
+    "composition": {
+      "I": 2.0,
+      "Cs": 2.0
+    },
+    "energy": -10.948118209838867,
+    "entry_id": "mp_mattersim_mp-1444738",
+    "mp_id": "mp-1444738"
+  },
+  {
+    "chemsys": "Cs-I",
+    "composition": {
+      "I": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -21.855674743652344,
+    "entry_id": "mp_mattersim_mp-1079694",
+    "mp_id": "mp-1079694"
+  },
+  {
+    "chemsys": "Cs-I",
+    "composition": {
+      "I": 12.0,
+      "Cs": 4.0
+    },
+    "energy": -34.49574279785156,
+    "entry_id": "mp_mattersim_mp-22876",
+    "mp_id": "mp-22876"
+  },
+  {
+    "chemsys": "Cs-N",
+    "composition": {
+      "N": 3.0,
+      "Cs": 1.0
+    },
+    "energy": -26.41863250732422,
+    "entry_id": "mp_mattersim_mp-1225892",
+    "mp_id": "mp-1225892"
+  },
+  {
+    "chemsys": "Cs-N",
+    "composition": {
+      "N": 8.0,
+      "Cs": 4.0
+    },
+    "energy": -64.5744400024414,
+    "entry_id": "mp_mattersim_mp-1104441",
+    "mp_id": "mp-1104441"
+  },
+  {
+    "chemsys": "Cs-N",
+    "composition": {
+      "N": 12.0,
+      "Cs": 4.0
+    },
+    "energy": -105.94758605957031,
+    "entry_id": "mp_mattersim_mp-510557",
+    "mp_id": "mp-510557"
+  },
+  {
+    "chemsys": "Cs-N",
+    "composition": {
+      "N": 1.0,
+      "Cs": 1.0
+    },
+    "energy": -6.392063617706299,
+    "entry_id": "mp_mattersim_mp-1059879",
+    "mp_id": "mp-1059879"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 4.0,
+      "Cs": 2.0
+    },
+    "energy": -26.78466796875,
+    "entry_id": "mp_mattersim_mp-1441",
+    "mp_id": "mp-1441"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 12.0,
+      "Cs": 4.0
+    },
+    "energy": -73.11746978759766,
+    "entry_id": "mp_mattersim_mp-1189507",
+    "mp_id": "mp-1189507"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 12.0,
+      "Cs": 44.0
+    },
+    "energy": -133.57713317871094,
+    "entry_id": "mp_mattersim_mp-562001",
+    "mp_id": "mp-562001"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 3.0,
+      "Cs": 6.0
+    },
+    "energy": -28.922256469726562,
+    "entry_id": "mp_mattersim_mp-7988",
+    "mp_id": "mp-7988"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 3.0,
+      "Cs": 21.0
+    },
+    "energy": -41.81297302246094,
+    "entry_id": "mp_mattersim_mp-561735",
+    "mp_id": "mp-561735"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 2.0,
+      "Cs": 6.0
+    },
+    "energy": -21.106008529663086,
+    "entry_id": "mp_mattersim_mp-510262",
+    "mp_id": "mp-510262"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 12.0,
+      "Cs": 16.0
+    },
+    "energy": -95.46294403076172,
+    "entry_id": "mp_mattersim_mp-1105918",
+    "mp_id": "mp-1105918"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 24.0,
+      "Cs": 16.0
+    },
+    "energy": -170.66400146484375,
+    "entry_id": "mp_mattersim_mp-1213719",
+    "mp_id": "mp-1213719"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 3.0,
+      "Cs": 2.0
+    },
+    "energy": -16.731374740600586,
+    "entry_id": "mp_mattersim_mp-1185535",
+    "mp_id": "mp-1185535"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -28.059720993041992,
+    "entry_id": "mp_mattersim_mp-1213702",
+    "mp_id": "mp-1213702"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 4.0,
+      "Cs": 2.0
+    },
+    "energy": -26.784420013427734,
+    "entry_id": "mp_mattersim_mp-684583",
+    "mp_id": "mp-684583"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 2.0,
+      "Cs": 4.0
+    },
+    "energy": -18.83928680419922,
+    "entry_id": "mp_mattersim_mp-755060",
+    "mp_id": "mp-755060"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 4.0,
+      "Cs": 8.0
+    },
+    "energy": -37.497467041015625,
+    "entry_id": "mp_mattersim_mp-755573",
+    "mp_id": "mp-755573"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -27.614412307739258,
+    "entry_id": "mp_mattersim_mp-1063779",
+    "mp_id": "mp-1063779"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 4.0,
+      "Cs": 2.0
+    },
+    "energy": -26.529909133911133,
+    "entry_id": "mp_mattersim_mp-1096936",
+    "mp_id": "mp-1096936"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 4.0,
+      "Cs": 2.0
+    },
+    "energy": -26.530235290527344,
+    "entry_id": "mp_mattersim_mp-1181502",
+    "mp_id": "mp-1181502"
+  },
+  {
+    "chemsys": "Cs-O",
+    "composition": {
+      "O": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -31.31146812438965,
+    "entry_id": "mp_mattersim_mp-7896",
+    "mp_id": "mp-7896"
+  },
+  {
+    "chemsys": "Cs-P",
+    "composition": {
+      "P": 28.0,
+      "Cs": 4.0
+    },
+    "energy": -158.74864196777344,
+    "entry_id": "mp_mattersim_mp-1213206",
+    "mp_id": "mp-1213206"
+  },
+  {
+    "chemsys": "Cs-P",
+    "composition": {
+      "P": 28.0,
+      "Cs": 4.0
+    },
+    "energy": -158.74879455566406,
+    "entry_id": "mp_mattersim_mp-1201790",
+    "mp_id": "mp-1201790"
+  },
+  {
+    "chemsys": "Cs-P",
+    "composition": {
+      "P": 24.0,
+      "Cs": 16.0
+    },
+    "energy": -160.8998565673828,
+    "entry_id": "mp_mattersim_mp-14652",
+    "mp_id": "mp-14652"
+  },
+  {
+    "chemsys": "Cs-P",
+    "composition": {
+      "P": 28.0,
+      "Cs": 12.0
+    },
+    "energy": -175.9071044921875,
+    "entry_id": "mp_mattersim_mp-541113",
+    "mp_id": "mp-541113"
+  },
+  {
+    "chemsys": "Cs-S",
+    "composition": {
+      "S": 20.0,
+      "Cs": 8.0
+    },
+    "energy": -105.74529266357422,
+    "entry_id": "mp_mattersim_mp-1193140",
+    "mp_id": "mp-1193140"
+  },
+  {
+    "chemsys": "Cs-S",
+    "composition": {
+      "S": 2.0,
+      "Cs": 4.0
+    },
+    "energy": -17.040647506713867,
+    "entry_id": "mp_mattersim_mp-1077814",
+    "mp_id": "mp-1077814"
+  },
+  {
+    "chemsys": "Cs-S",
+    "composition": {
+      "S": 12.0,
+      "Cs": 4.0
+    },
+    "energy": -61.13042068481445,
+    "entry_id": "mp_mattersim_mp-1188913",
+    "mp_id": "mp-1188913"
+  },
+  {
+    "chemsys": "Cs-S",
+    "composition": {
+      "S": 1.0,
+      "Cs": 1.0
+    },
+    "energy": -5.796186447143555,
+    "entry_id": "mp_mattersim_mp-1057486",
+    "mp_id": "mp-1057486"
+  },
+  {
+    "chemsys": "Cs-S",
+    "composition": {
+      "S": 12.0,
+      "Cs": 8.0
+    },
+    "energy": -72.39242553710938,
+    "entry_id": "mp_mattersim_mp-1079600",
+    "mp_id": "mp-1079600"
+  },
+  {
+    "chemsys": "Cs-S",
+    "composition": {
+      "S": 4.0,
+      "Cs": 8.0
+    },
+    "energy": -35.21379852294922,
+    "entry_id": "mp_mattersim_mp-540703",
+    "mp_id": "mp-540703"
+  },
+  {
+    "chemsys": "Cs-S",
+    "composition": {
+      "S": 4.0,
+      "Cs": 4.0
+    },
+    "energy": -27.603866577148438,
+    "entry_id": "mp_mattersim_mp-29266",
+    "mp_id": "mp-29266"
+  },
+  {
+    "chemsys": "F-K",
+    "composition": {
+      "F": 4.0,
+      "K": 2.0
+    },
+    "energy": -20.677696228027344,
+    "entry_id": "mp_mattersim_mp-976802",
+    "mp_id": "mp-976802"
+  },
+  {
+    "chemsys": "F-K",
+    "composition": {
+      "F": 24.0,
+      "K": 8.0
+    },
+    "energy": -101.3940658569336,
+    "entry_id": "mp_mattersim_mp-867934",
+    "mp_id": "mp-867934"
+  },
+  {
+    "chemsys": "F-K",
+    "composition": {
+      "F": 1.0,
+      "K": 1.0
+    },
+    "energy": -8.213216781616211,
+    "entry_id": "mp_mattersim_mp-8454",
+    "mp_id": "mp-8454"
+  },
+  {
+    "chemsys": "F-K",
+    "composition": {
+      "F": 4.0,
+      "K": 4.0
+    },
+    "energy": -33.73030471801758,
+    "entry_id": "mp_mattersim_mp-463",
+    "mp_id": "mp-463"
+  },
+  {
+    "chemsys": "F-K",
+    "composition": {
+      "F": 20.0,
+      "K": 4.0
+    },
+    "energy": -65.05947875976562,
+    "entry_id": "mp_mattersim_mp-1095521",
+    "mp_id": "mp-1095521"
+  },
+  {
+    "chemsys": "F-Li",
+    "composition": {
+      "Li": 2.0,
+      "F": 2.0
+    },
+    "energy": -19.43226432800293,
+    "entry_id": "mp_mattersim_mp-1185301",
+    "mp_id": "mp-1185301"
+  },
+  {
+    "chemsys": "F-Li",
+    "composition": {
+      "Li": 2.0,
+      "F": 6.0
+    },
+    "energy": -23.96805191040039,
+    "entry_id": "mp_mattersim_mp-1185348",
+    "mp_id": "mp-1185348"
+  },
+  {
+    "chemsys": "F-Li",
+    "composition": {
+      "Li": 1.0,
+      "F": 1.0
+    },
+    "energy": -9.117708206176758,
+    "entry_id": "mp_mattersim_mp-1009009",
+    "mp_id": "mp-1009009"
+  },
+  {
+    "chemsys": "F-Li",
+    "composition": {
+      "Li": 4.0,
+      "F": 4.0
+    },
+    "energy": -38.8870849609375,
+    "entry_id": "mp_mattersim_mp-1138",
+    "mp_id": "mp-1138"
+  },
+  {
+    "chemsys": "F-Mg",
+    "composition": {
+      "F": 8.0,
+      "Mg": 4.0
+    },
+    "energy": -62.32743453979492,
+    "entry_id": "mp_mattersim_mp-560236",
+    "mp_id": "mp-560236"
+  },
+  {
+    "chemsys": "F-Mg",
+    "composition": {
+      "F": 4.0,
+      "Mg": 2.0
+    },
+    "energy": -31.80927085876465,
+    "entry_id": "mp_mattersim_mp-1249",
+    "mp_id": "mp-1249"
+  },
+  {
+    "chemsys": "F-Mg",
+    "composition": {
+      "F": 6.0,
+      "Mg": 2.0
+    },
+    "energy": -30.86063003540039,
+    "entry_id": "mp_mattersim_mp-1185862",
+    "mp_id": "mp-1185862"
+  },
+  {
+    "chemsys": "F-Mg",
+    "composition": {
+      "F": 8.0,
+      "Mg": 4.0
+    },
+    "energy": -62.83417510986328,
+    "entry_id": "mp_mattersim_mp-1746",
+    "mp_id": "mp-1746"
+  },
+  {
+    "chemsys": "F-Mg",
+    "composition": {
+      "F": 4.0,
+      "Mg": 2.0
+    },
+    "energy": -30.25548553466797,
+    "entry_id": "mp_mattersim_mp-1062842",
+    "mp_id": "mp-1062842"
+  },
+  {
+    "chemsys": "F-Mg",
+    "composition": {
+      "F": 4.0,
+      "Mg": 2.0
+    },
+    "energy": -31.80913543701172,
+    "entry_id": "mp_mattersim_mp-1072956",
+    "mp_id": "mp-1072956"
+  },
+  {
+    "chemsys": "F-Mg",
+    "composition": {
+      "F": 8.0,
+      "Mg": 4.0
+    },
+    "energy": -63.29392623901367,
+    "entry_id": "mp_mattersim_mp-1102433",
+    "mp_id": "mp-1102433"
+  },
+  {
+    "chemsys": "F-Mg",
+    "composition": {
+      "F": 8.0,
+      "Mg": 4.0
+    },
+    "energy": -62.327720642089844,
+    "entry_id": "mp_mattersim_mp-1180279",
+    "mp_id": "mp-1180279"
+  },
+  {
+    "chemsys": "F-Na",
+    "composition": {
+      "F": 6.0,
+      "Na": 2.0
+    },
+    "energy": -22.711566925048828,
+    "entry_id": "mp_mattersim_mp-976404",
+    "mp_id": "mp-976404"
+  },
+  {
+    "chemsys": "F-Na",
+    "composition": {
+      "F": 4.0,
+      "Na": 4.0
+    },
+    "energy": -34.58210372924805,
+    "entry_id": "mp_mattersim_mp-682",
+    "mp_id": "mp-682"
+  },
+  {
+    "chemsys": "F-Rb",
+    "composition": {
+      "F": 4.0,
+      "Rb": 2.0
+    },
+    "energy": -20.363306045532227,
+    "entry_id": "mp_mattersim_mp-863016",
+    "mp_id": "mp-863016"
+  },
+  {
+    "chemsys": "F-Rb",
+    "composition": {
+      "F": 6.0,
+      "Rb": 2.0
+    },
+    "energy": -25.073671340942383,
+    "entry_id": "mp_mattersim_mp-975337",
+    "mp_id": "mp-975337"
+  },
+  {
+    "chemsys": "F-Rb",
+    "composition": {
+      "F": 12.0,
+      "Rb": 4.0
+    },
+    "energy": -50.32872772216797,
+    "entry_id": "mp_mattersim_mp-1179728",
+    "mp_id": "mp-1179728"
+  },
+  {
+    "chemsys": "F-Rb",
+    "composition": {
+      "F": 1.0,
+      "Rb": 1.0
+    },
+    "energy": -7.967202663421631,
+    "entry_id": "mp_mattersim_mp-2064",
+    "mp_id": "mp-2064"
+  },
+  {
+    "chemsys": "F-Rb",
+    "composition": {
+      "F": 3.0,
+      "Rb": 1.0
+    },
+    "energy": -11.076459884643555,
+    "entry_id": "mp_mattersim_mp-975312",
+    "mp_id": "mp-975312"
+  },
+  {
+    "chemsys": "F-Rb",
+    "composition": {
+      "F": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -32.683998107910156,
+    "entry_id": "mp_mattersim_mp-11718",
+    "mp_id": "mp-11718"
+  },
+  {
+    "chemsys": "F-Rb",
+    "composition": {
+      "F": 12.0,
+      "Rb": 4.0
+    },
+    "energy": -50.32530212402344,
+    "entry_id": "mp_mattersim_mp-726170",
+    "mp_id": "mp-726170"
+  },
+  {
+    "chemsys": "F-Rb",
+    "composition": {
+      "F": 12.0,
+      "Rb": 4.0
+    },
+    "energy": -47.692901611328125,
+    "entry_id": "mp_mattersim_mp-975422",
+    "mp_id": "mp-975422"
+  },
+  {
+    "chemsys": "F-Sc",
+    "composition": {
+      "F": 9.0,
+      "Sc": 3.0
+    },
+    "energy": -83.58633422851562,
+    "entry_id": "mp_mattersim_mp-559092",
+    "mp_id": "mp-559092"
+  },
+  {
+    "chemsys": "F-Sc",
+    "composition": {
+      "F": 18.0,
+      "Sc": 6.0
+    },
+    "energy": -167.1710662841797,
+    "entry_id": "mp_mattersim_mp-1078300",
+    "mp_id": "mp-1078300"
+  },
+  {
+    "chemsys": "F-Sc",
+    "composition": {
+      "F": 6.0,
+      "Sc": 2.0
+    },
+    "energy": -54.71378707885742,
+    "entry_id": "mp_mattersim_mp-695817",
+    "mp_id": "mp-695817"
+  },
+  {
+    "chemsys": "F-Sc",
+    "composition": {
+      "F": 3.0,
+      "Sc": 1.0
+    },
+    "energy": -27.86223030090332,
+    "entry_id": "mp_mattersim_mp-10694",
+    "mp_id": "mp-10694"
+  },
+  {
+    "chemsys": "F-Sc",
+    "composition": {
+      "F": 6.0,
+      "Sc": 2.0
+    },
+    "energy": -55.72425842285156,
+    "entry_id": "mp_mattersim_mp-1179500",
+    "mp_id": "mp-1179500"
+  },
+  {
+    "chemsys": "F-Sc",
+    "composition": {
+      "F": 6.0,
+      "Sc": 2.0
+    },
+    "energy": -55.72389221191406,
+    "entry_id": "mp_mattersim_mp-634805",
+    "mp_id": "mp-634805"
+  },
+  {
+    "chemsys": "F-Sc",
+    "composition": {
+      "F": 12.0,
+      "Sc": 4.0
+    },
+    "energy": -109.76954650878906,
+    "entry_id": "mp_mattersim_mp-1094067",
+    "mp_id": "mp-1094067"
+  },
+  {
+    "chemsys": "F-Sr",
+    "composition": {
+      "F": 6.0,
+      "Sr": 2.0
+    },
+    "energy": -37.97068786621094,
+    "entry_id": "mp_mattersim_mp-727311",
+    "mp_id": "mp-727311"
+  },
+  {
+    "chemsys": "F-Sr",
+    "composition": {
+      "F": 6.0,
+      "Sr": 2.0
+    },
+    "energy": -37.36021423339844,
+    "entry_id": "mp_mattersim_mp-1187177",
+    "mp_id": "mp-1187177"
+  },
+  {
+    "chemsys": "F-Sr",
+    "composition": {
+      "F": 2.0,
+      "Sr": 2.0
+    },
+    "energy": -17.608169555664062,
+    "entry_id": "mp_mattersim_mp-1187162",
+    "mp_id": "mp-1187162"
+  },
+  {
+    "chemsys": "F-Sr",
+    "composition": {
+      "F": 4.0,
+      "Sr": 2.0
+    },
+    "energy": -33.53264617919922,
+    "entry_id": "mp_mattersim_mp-1019258",
+    "mp_id": "mp-1019258"
+  },
+  {
+    "chemsys": "F-Sr",
+    "composition": {
+      "F": 8.0,
+      "Sr": 4.0
+    },
+    "energy": -69.05366516113281,
+    "entry_id": "mp_mattersim_mp-981",
+    "mp_id": "mp-981"
+  },
+  {
+    "chemsys": "F-Sr",
+    "composition": {
+      "F": 8.0,
+      "Sr": 4.0
+    },
+    "energy": -69.05354309082031,
+    "entry_id": "mp_mattersim_mp-1102240",
+    "mp_id": "mp-1102240"
+  },
+  {
+    "chemsys": "F-Sr",
+    "composition": {
+      "F": 8.0,
+      "Sr": 4.0
+    },
+    "energy": -68.49551391601562,
+    "entry_id": "mp_mattersim_mp-1102911",
+    "mp_id": "mp-1102911"
+  },
+  {
+    "chemsys": "F-Y",
+    "composition": {
+      "F": 18.0,
+      "Y": 6.0
+    },
+    "energy": -170.21267700195312,
+    "entry_id": "mp_mattersim_mp-1191736",
+    "mp_id": "mp-1191736"
+  },
+  {
+    "chemsys": "F-Y",
+    "composition": {
+      "F": 9.0,
+      "Y": 3.0
+    },
+    "energy": -83.32586669921875,
+    "entry_id": "mp_mattersim_mp-556242",
+    "mp_id": "mp-556242"
+  },
+  {
+    "chemsys": "F-Y",
+    "composition": {
+      "F": 12.0,
+      "Y": 4.0
+    },
+    "energy": -114.1033935546875,
+    "entry_id": "mp_mattersim_mp-2416",
+    "mp_id": "mp-2416"
+  },
+  {
+    "chemsys": "I-K",
+    "composition": {
+      "K": 1.0,
+      "I": 1.0
+    },
+    "energy": -5.483551502227783,
+    "entry_id": "mp_mattersim_mp-22901",
+    "mp_id": "mp-22901"
+  },
+  {
+    "chemsys": "I-K",
+    "composition": {
+      "K": 4.0,
+      "I": 4.0
+    },
+    "energy": -22.421072006225586,
+    "entry_id": "mp_mattersim_mp-22898",
+    "mp_id": "mp-22898"
+  },
+  {
+    "chemsys": "I-K",
+    "composition": {
+      "K": 4.0,
+      "I": 4.0
+    },
+    "energy": -22.339998245239258,
+    "entry_id": "mp_mattersim_mp-726865",
+    "mp_id": "mp-726865"
+  },
+  {
+    "chemsys": "I-K",
+    "composition": {
+      "K": 4.0,
+      "I": 4.0
+    },
+    "energy": -22.339948654174805,
+    "entry_id": "mp_mattersim_mp-1078836",
+    "mp_id": "mp-1078836"
+  },
+  {
+    "chemsys": "I-Li",
+    "composition": {
+      "Li": 2.0,
+      "I": 2.0
+    },
+    "energy": -11.78127670288086,
+    "entry_id": "mp_mattersim_mp-570935",
+    "mp_id": "mp-570935"
+  },
+  {
+    "chemsys": "I-Li",
+    "composition": {
+      "Li": 2.0,
+      "I": 2.0
+    },
+    "energy": -11.583672523498535,
+    "entry_id": "mp_mattersim_mp-568273",
+    "mp_id": "mp-568273"
+  },
+  {
+    "chemsys": "I-Li",
+    "composition": {
+      "Li": 4.0,
+      "I": 4.0
+    },
+    "energy": -23.291967391967773,
+    "entry_id": "mp_mattersim_mp-22899",
+    "mp_id": "mp-22899"
+  },
+  {
+    "chemsys": "I-Mg",
+    "composition": {
+      "Mg": 1.0,
+      "I": 2.0
+    },
+    "energy": -7.782125949859619,
+    "entry_id": "mp_mattersim_mp-23205",
+    "mp_id": "mp-23205"
+  },
+  {
+    "chemsys": "I-Mg",
+    "composition": {
+      "Mg": 149.0,
+      "I": 1.0
+    },
+    "energy": -225.3056640625,
+    "entry_id": "mp_mattersim_mp-1185590",
+    "mp_id": "mp-1185590"
+  },
+  {
+    "chemsys": "I-Mg",
+    "composition": {
+      "Mg": 2.0,
+      "I": 6.0
+    },
+    "energy": -17.306194305419922,
+    "entry_id": "mp_mattersim_mp-1185906",
+    "mp_id": "mp-1185906"
+  },
+  {
+    "chemsys": "I-Na",
+    "composition": {
+      "Na": 4.0,
+      "I": 4.0
+    },
+    "energy": -20.620759963989258,
+    "entry_id": "mp_mattersim_mp-723629",
+    "mp_id": "mp-723629"
+  },
+  {
+    "chemsys": "I-Na",
+    "composition": {
+      "Na": 4.0,
+      "I": 4.0
+    },
+    "energy": -21.53310775756836,
+    "entry_id": "mp_mattersim_mp-23268",
+    "mp_id": "mp-23268"
+  },
+  {
+    "chemsys": "I-Na",
+    "composition": {
+      "Na": 2.0,
+      "I": 2.0
+    },
+    "energy": -10.321464538574219,
+    "entry_id": "mp_mattersim_mp-1246268",
+    "mp_id": "mp-1246268"
+  },
+  {
+    "chemsys": "I-Rb",
+    "composition": {
+      "Rb": 1.0,
+      "I": 1.0
+    },
+    "energy": -5.417045593261719,
+    "entry_id": "mp_mattersim_mp-23302",
+    "mp_id": "mp-23302"
+  },
+  {
+    "chemsys": "I-Rb",
+    "composition": {
+      "Rb": 4.0,
+      "I": 4.0
+    },
+    "energy": -21.9351749420166,
+    "entry_id": "mp_mattersim_mp-22903",
+    "mp_id": "mp-22903"
+  },
+  {
+    "chemsys": "I-Rb",
+    "composition": {
+      "Rb": 4.0,
+      "I": 12.0
+    },
+    "energy": -34.07685852050781,
+    "entry_id": "mp_mattersim_mp-28328",
+    "mp_id": "mp-28328"
+  },
+  {
+    "chemsys": "I-Sc",
+    "composition": {
+      "Sc": 2.0,
+      "I": 4.0
+    },
+    "energy": -24.79203987121582,
+    "entry_id": "mp_mattersim_mp-862329",
+    "mp_id": "mp-862329"
+  },
+  {
+    "chemsys": "I-Sc",
+    "composition": {
+      "Sc": 2.0,
+      "I": 6.0
+    },
+    "energy": -31.274917602539062,
+    "entry_id": "mp_mattersim_mp-1186991",
+    "mp_id": "mp-1186991"
+  },
+  {
+    "chemsys": "I-Sc",
+    "composition": {
+      "Sc": 24.0,
+      "I": 50.0
+    },
+    "energy": -312.0987243652344,
+    "entry_id": "mp_mattersim_mp-685088",
+    "mp_id": "mp-685088"
+  },
+  {
+    "chemsys": "I-Sr",
+    "composition": {
+      "Sr": 2.0,
+      "I": 4.0
+    },
+    "energy": -19.609825134277344,
+    "entry_id": "mp_mattersim_mp-1187178",
+    "mp_id": "mp-1187178"
+  },
+  {
+    "chemsys": "I-Sr",
+    "composition": {
+      "Sr": 8.0,
+      "I": 16.0
+    },
+    "energy": -78.3333969116211,
+    "entry_id": "mp_mattersim_mp-23181",
+    "mp_id": "mp-23181"
+  },
+  {
+    "chemsys": "I-Sr",
+    "composition": {
+      "Sr": 4.0,
+      "I": 8.0
+    },
+    "energy": -39.34505081176758,
+    "entry_id": "mp_mattersim_mp-568284",
+    "mp_id": "mp-568284"
+  },
+  {
+    "chemsys": "I-Y",
+    "composition": {
+      "Y": 6.0,
+      "I": 18.0
+    },
+    "energy": -100.44413757324219,
+    "entry_id": "mp_mattersim_mp-571442",
+    "mp_id": "mp-571442"
+  },
+  {
+    "chemsys": "I-Y",
+    "composition": {
+      "Y": 2.0,
+      "I": 2.0
+    },
+    "energy": -19.466978073120117,
+    "entry_id": "mp_mattersim_mp-1065933",
+    "mp_id": "mp-1065933"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 2.0,
+      "K": 2.0
+    },
+    "energy": -13.572575569152832,
+    "entry_id": "mp_mattersim_mp-1064119",
+    "mp_id": "mp-1064119"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 12.0,
+      "K": 4.0
+    },
+    "energy": -90.33190155029297,
+    "entry_id": "mp_mattersim_mp-636056",
+    "mp_id": "mp-636056"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 12.0,
+      "K": 4.0
+    },
+    "energy": -106.71055603027344,
+    "entry_id": "mp_mattersim_mp-827",
+    "mp_id": "mp-827"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 2.0,
+      "K": 6.0
+    },
+    "energy": -19.44676399230957,
+    "entry_id": "mp_mattersim_mp-11801",
+    "mp_id": "mp-11801"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 4.0,
+      "K": 4.0
+    },
+    "energy": -27.14515495300293,
+    "entry_id": "mp_mattersim_mp-1058689",
+    "mp_id": "mp-1058689"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 8.0,
+      "K": 4.0
+    },
+    "energy": -64.54679870605469,
+    "entry_id": "mp_mattersim_mp-1071868",
+    "mp_id": "mp-1071868"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 2.0,
+      "K": 2.0
+    },
+    "energy": -13.572610855102539,
+    "entry_id": "mp_mattersim_mp-1064647",
+    "mp_id": "mp-1064647"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 8.0,
+      "K": 4.0
+    },
+    "energy": -64.6173324584961,
+    "entry_id": "mp_mattersim_mp-1180757",
+    "mp_id": "mp-1180757"
+  },
+  {
+    "chemsys": "K-N",
+    "composition": {
+      "N": 4.0,
+      "K": 2.0
+    },
+    "energy": -36.005470275878906,
+    "entry_id": "mp_mattersim_mp-1206884",
+    "mp_id": "mp-1206884"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 4.0,
+      "K": 8.0
+    },
+    "energy": -40.734230041503906,
+    "entry_id": "mp_mattersim_mp-998914",
+    "mp_id": "mp-998914"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 2.0,
+      "K": 1.0
+    },
+    "energy": -9.723276138305664,
+    "entry_id": "mp_mattersim_mp-1223320",
+    "mp_id": "mp-1223320"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 1.0,
+      "K": 2.0
+    },
+    "energy": -9.649482727050781,
+    "entry_id": "mp_mattersim_mp-1223784",
+    "mp_id": "mp-1223784"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 16.0
+    },
+    "energy": -80.67324829101562,
+    "entry_id": "mp_mattersim_mp-776104",
+    "mp_id": "mp-776104"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 4.0,
+      "K": 2.0
+    },
+    "energy": -27.244640350341797,
+    "entry_id": "mp_mattersim_mp-1866",
+    "mp_id": "mp-1866"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 4.0
+    },
+    "energy": -54.48808288574219,
+    "entry_id": "mp_mattersim_mp-1180711",
+    "mp_id": "mp-1180711"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 4.0
+    },
+    "energy": -54.48773193359375,
+    "entry_id": "mp_mattersim_mp-1180742",
+    "mp_id": "mp-1180742"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 4.0
+    },
+    "energy": -54.45646667480469,
+    "entry_id": "mp_mattersim_mp-734250",
+    "mp_id": "mp-734250"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 24.0,
+      "K": 8.0
+    },
+    "energy": -148.281005859375,
+    "entry_id": "mp_mattersim_mp-1726",
+    "mp_id": "mp-1726"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 4.0,
+      "K": 8.0
+    },
+    "energy": -40.64327621459961,
+    "entry_id": "mp_mattersim_mp-936219",
+    "mp_id": "mp-936219"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 3.0,
+      "K": 6.0
+    },
+    "energy": -30.090349197387695,
+    "entry_id": "mp_mattersim_mp-998929",
+    "mp_id": "mp-998929"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 4.0
+    },
+    "energy": -51.08909225463867,
+    "entry_id": "mp_mattersim_mp-1071539",
+    "mp_id": "mp-1071539"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 4.0
+    },
+    "energy": -53.71991729736328,
+    "entry_id": "mp_mattersim_mp-21325",
+    "mp_id": "mp-21325"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 4.0,
+      "K": 8.0
+    },
+    "energy": -40.64350509643555,
+    "entry_id": "mp_mattersim_mp-684904",
+    "mp_id": "mp-684904"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 6.0,
+      "K": 6.0
+    },
+    "energy": -48.71760559082031,
+    "entry_id": "mp_mattersim_mp-998917",
+    "mp_id": "mp-998917"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 4.0
+    },
+    "energy": -54.255126953125,
+    "entry_id": "mp_mattersim_mp-998916",
+    "mp_id": "mp-998916"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 4.0,
+      "K": 8.0
+    },
+    "energy": -40.97774124145508,
+    "entry_id": "mp_mattersim_mp-971",
+    "mp_id": "mp-971"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 2.0,
+      "K": 4.0
+    },
+    "energy": -20.12031364440918,
+    "entry_id": "mp_mattersim_mp-776081",
+    "mp_id": "mp-776081"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 6.0,
+      "K": 2.0
+    },
+    "energy": -37.155487060546875,
+    "entry_id": "mp_mattersim_mp-998913",
+    "mp_id": "mp-998913"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 2.0,
+      "K": 4.0
+    },
+    "energy": -20.299602508544922,
+    "entry_id": "mp_mattersim_mp-998915",
+    "mp_id": "mp-998915"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 16.0
+    },
+    "energy": -81.95464324951172,
+    "entry_id": "mp_mattersim_mp-776016",
+    "mp_id": "mp-776016"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 4.0,
+      "K": 4.0
+    },
+    "energy": -29.545669555664062,
+    "entry_id": "mp_mattersim_mp-1097008",
+    "mp_id": "mp-1097008"
+  },
+  {
+    "chemsys": "K-O",
+    "composition": {
+      "O": 8.0,
+      "K": 8.0
+    },
+    "energy": -65.43940734863281,
+    "entry_id": "mp_mattersim_mp-2672",
+    "mp_id": "mp-2672"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 12.0,
+      "K": 8.0
+    },
+    "energy": -82.11734771728516,
+    "entry_id": "mp_mattersim_mp-664980",
+    "mp_id": "mp-664980"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 3.0,
+      "K": 3.0
+    },
+    "energy": -16.899065017700195,
+    "entry_id": "mp_mattersim_mp-1058315",
+    "mp_id": "mp-1058315"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 8.0,
+      "K": 8.0
+    },
+    "energy": -58.127525329589844,
+    "entry_id": "mp_mattersim_mp-7441",
+    "mp_id": "mp-7441"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 2.0,
+      "K": 6.0
+    },
+    "energy": -19.226451873779297,
+    "entry_id": "mp_mattersim_mp-7897",
+    "mp_id": "mp-7897"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 30.0,
+      "K": 2.0
+    },
+    "energy": -166.1136932373047,
+    "entry_id": "mp_mattersim_mp-1211471",
+    "mp_id": "mp-1211471"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 4.0,
+      "K": 4.0
+    },
+    "energy": -21.180349349975586,
+    "entry_id": "mp_mattersim_mp-1180622",
+    "mp_id": "mp-1180622"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 44.0,
+      "K": 12.0
+    },
+    "energy": -265.95343017578125,
+    "entry_id": "mp_mattersim_mp-1568",
+    "mp_id": "mp-1568"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 12.0,
+      "K": 16.0
+    },
+    "energy": -92.02330780029297,
+    "entry_id": "mp_mattersim_mp-28424",
+    "mp_id": "mp-28424"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 24.0,
+      "K": 16.0
+    },
+    "energy": -164.23681640625,
+    "entry_id": "mp_mattersim_mp-8262",
+    "mp_id": "mp-8262"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 48.0,
+      "K": 32.0
+    },
+    "energy": -328.4707336425781,
+    "entry_id": "mp_mattersim_mp-569857",
+    "mp_id": "mp-569857"
+  },
+  {
+    "chemsys": "K-P",
+    "composition": {
+      "P": 2.0,
+      "K": 2.0
+    },
+    "energy": -12.059017181396484,
+    "entry_id": "mp_mattersim_mp-1057787",
+    "mp_id": "mp-1057787"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 2.0,
+      "K": 2.0
+    },
+    "energy": -10.087356567382812,
+    "entry_id": "mp_mattersim_mp-1180648",
+    "mp_id": "mp-1180648"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 1.0,
+      "K": 1.0
+    },
+    "energy": -6.226458549499512,
+    "entry_id": "mp_mattersim_mp-1180621",
+    "mp_id": "mp-1180621"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 24.0,
+      "K": 8.0
+    },
+    "energy": -123.01620483398438,
+    "entry_id": "mp_mattersim_mp-1196514",
+    "mp_id": "mp-1196514"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 6.0,
+      "K": 6.0
+    },
+    "energy": -42.53882598876953,
+    "entry_id": "mp_mattersim_mp-1287",
+    "mp_id": "mp-1287"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 20.0,
+      "K": 8.0
+    },
+    "energy": -106.90740966796875,
+    "entry_id": "mp_mattersim_mp-17146",
+    "mp_id": "mp-17146"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 20.0,
+      "K": 8.0
+    },
+    "energy": -106.30049896240234,
+    "entry_id": "mp_mattersim_mp-672372",
+    "mp_id": "mp-672372"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 2.0,
+      "K": 4.0
+    },
+    "energy": -18.426042556762695,
+    "entry_id": "mp_mattersim_mp-559278",
+    "mp_id": "mp-559278"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 1.0,
+      "K": 1.0
+    },
+    "energy": -6.168041229248047,
+    "entry_id": "mp_mattersim_mp-1057125",
+    "mp_id": "mp-1057125"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 4.0,
+      "K": 8.0
+    },
+    "energy": -37.988426208496094,
+    "entry_id": "mp_mattersim_mp-1022",
+    "mp_id": "mp-1022"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 4.0,
+      "K": 4.0
+    },
+    "energy": -24.028911590576172,
+    "entry_id": "mp_mattersim_mp-1058119",
+    "mp_id": "mp-1058119"
+  },
+  {
+    "chemsys": "K-S",
+    "composition": {
+      "S": 12.0,
+      "K": 8.0
+    },
+    "energy": -73.82975006103516,
+    "entry_id": "mp_mattersim_mp-7667",
+    "mp_id": "mp-7667"
+  },
+  {
+    "chemsys": "Li-N",
+    "composition": {
+      "Li": 3.0,
+      "N": 2.0
+    },
+    "energy": -20.102684020996094,
+    "entry_id": "mp_mattersim_mp-1222421",
+    "mp_id": "mp-1222421"
+  },
+  {
+    "chemsys": "Li-N",
+    "composition": {
+      "Li": 2.0,
+      "N": 6.0
+    },
+    "energy": -55.04954528808594,
+    "entry_id": "mp_mattersim_mp-2659",
+    "mp_id": "mp-2659"
+  },
+  {
+    "chemsys": "Li-N",
+    "composition": {
+      "Li": 8.0,
+      "N": 8.0
+    },
+    "energy": -83.99395751953125,
+    "entry_id": "mp_mattersim_mp-1180489",
+    "mp_id": "mp-1180489"
+  },
+  {
+    "chemsys": "Li-N",
+    "composition": {
+      "Li": 3.0,
+      "N": 1.0
+    },
+    "energy": -15.635969161987305,
+    "entry_id": "mp_mattersim_mp-2251",
+    "mp_id": "mp-2251"
+  },
+  {
+    "chemsys": "Li-N",
+    "composition": {
+      "Li": 6.0,
+      "N": 2.0
+    },
+    "energy": -31.09709930419922,
+    "entry_id": "mp_mattersim_mp-2341",
+    "mp_id": "mp-2341"
+  },
+  {
+    "chemsys": "Li-N",
+    "composition": {
+      "Li": 4.0,
+      "N": 4.0
+    },
+    "energy": -31.305946350097656,
+    "entry_id": "mp_mattersim_mp-1059612",
+    "mp_id": "mp-1059612"
+  },
+  {
+    "chemsys": "Li-N",
+    "composition": {
+      "Li": 8.0,
+      "N": 4.0
+    },
+    "energy": -49.5408935546875,
+    "entry_id": "mp_mattersim_mp-1062345",
+    "mp_id": "mp-1062345"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 1.0,
+      "O": 8.0
+    },
+    "energy": -43.64948272705078,
+    "entry_id": "mp_mattersim_mp-1232999",
+    "mp_id": "mp-1232999"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 1.0,
+      "O": 8.0
+    },
+    "energy": -43.64800262451172,
+    "entry_id": "mp_mattersim_mp-1236127",
+    "mp_id": "mp-1236127"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 68.0,
+      "O": 34.0
+    },
+    "energy": -473.97125244140625,
+    "entry_id": "mp_mattersim_mp-1245009",
+    "mp_id": "mp-1245009"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 68.0,
+      "O": 34.0
+    },
+    "energy": -473.6592102050781,
+    "entry_id": "mp_mattersim_mp-1245092",
+    "mp_id": "mp-1245092"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 68.0,
+      "O": 34.0
+    },
+    "energy": -482.7047424316406,
+    "entry_id": "mp_mattersim_mp-1245224",
+    "mp_id": "mp-1245224"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 68.0,
+      "O": 34.0
+    },
+    "energy": -475.11773681640625,
+    "entry_id": "mp_mattersim_mp-1245303",
+    "mp_id": "mp-1245303"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 4.0,
+      "O": 8.0
+    },
+    "energy": -57.911903381347656,
+    "entry_id": "mp_mattersim_mp-1094135",
+    "mp_id": "mp-1094135"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 2.0,
+      "O": 16.0
+    },
+    "energy": -87.52056121826172,
+    "entry_id": "mp_mattersim_mp-1235252",
+    "mp_id": "mp-1235252"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 2.0,
+      "O": 16.0
+    },
+    "energy": -86.76647186279297,
+    "entry_id": "mp_mattersim_mp-1236522",
+    "mp_id": "mp-1236522"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 1.0,
+      "O": 1.0
+    },
+    "energy": -8.872732162475586,
+    "entry_id": "mp_mattersim_mp-1097030",
+    "mp_id": "mp-1097030"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 3.0,
+      "O": 6.0
+    },
+    "energy": -43.81450271606445,
+    "entry_id": "mp_mattersim_mp-1094129",
+    "mp_id": "mp-1094129"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 4.0,
+      "O": 4.0
+    },
+    "energy": -37.849708557128906,
+    "entry_id": "mp_mattersim_mp-558312",
+    "mp_id": "mp-558312"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 4.0,
+      "O": 4.0
+    },
+    "energy": -38.8707275390625,
+    "entry_id": "mp_mattersim_mp-841",
+    "mp_id": "mp-841"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 1.0,
+      "O": 1.0
+    },
+    "energy": -8.872764587402344,
+    "entry_id": "mp_mattersim_mp-1180619",
+    "mp_id": "mp-1180619"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 4.0,
+      "O": 8.0
+    },
+    "energy": -48.31098175048828,
+    "entry_id": "mp_mattersim_mp-1097725",
+    "mp_id": "mp-1097725"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 8.0,
+      "O": 4.0
+    },
+    "energy": -57.47010040283203,
+    "entry_id": "mp_mattersim_mp-1960",
+    "mp_id": "mp-1960"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 2.0,
+      "O": 6.0
+    },
+    "energy": -38.588134765625,
+    "entry_id": "mp_mattersim_mp-1001790",
+    "mp_id": "mp-1001790"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 2.0,
+      "O": 16.0
+    },
+    "energy": -87.29606628417969,
+    "entry_id": "mp_mattersim_mp-1235185",
+    "mp_id": "mp-1235185"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 2.0,
+      "O": 4.0
+    },
+    "energy": -29.224746704101562,
+    "entry_id": "mp_mattersim_mp-1018789",
+    "mp_id": "mp-1018789"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 8.0,
+      "O": 4.0
+    },
+    "energy": -56.332801818847656,
+    "entry_id": "mp_mattersim_mp-755894",
+    "mp_id": "mp-755894"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 2.0,
+      "O": 16.0
+    },
+    "energy": -87.3357162475586,
+    "entry_id": "mp_mattersim_mp-1235059",
+    "mp_id": "mp-1235059"
+  },
+  {
+    "chemsys": "Li-O",
+    "composition": {
+      "Li": 2.0,
+      "O": 16.0
+    },
+    "energy": -87.1981201171875,
+    "entry_id": "mp_mattersim_mp-1235698",
+    "mp_id": "mp-1235698"
+  },
+  {
+    "chemsys": "Li-P",
+    "composition": {
+      "Li": 8.0,
+      "P": 8.0
+    },
+    "energy": -65.62794494628906,
+    "entry_id": "mp_mattersim_mp-9588",
+    "mp_id": "mp-9588"
+  },
+  {
+    "chemsys": "Li-P",
+    "composition": {
+      "Li": 16.0,
+      "P": 112.0
+    },
+    "energy": -650.1796875,
+    "entry_id": "mp_mattersim_mp-27687",
+    "mp_id": "mp-27687"
+  },
+  {
+    "chemsys": "Li-P",
+    "composition": {
+      "Li": 12.0,
+      "P": 28.0
+    },
+    "energy": -184.97821044921875,
+    "entry_id": "mp_mattersim_mp-28336",
+    "mp_id": "mp-28336"
+  },
+  {
+    "chemsys": "Li-P",
+    "composition": {
+      "Li": 2.0,
+      "P": 6.0
+    },
+    "energy": -37.84602355957031,
+    "entry_id": "mp_mattersim_mp-1025406",
+    "mp_id": "mp-1025406"
+  },
+  {
+    "chemsys": "Li-P",
+    "composition": {
+      "Li": 6.0,
+      "P": 2.0
+    },
+    "energy": -27.884794235229492,
+    "entry_id": "mp_mattersim_mp-736",
+    "mp_id": "mp-736"
+  },
+  {
+    "chemsys": "Li-P",
+    "composition": {
+      "Li": 4.0,
+      "P": 20.0
+    },
+    "energy": -119.65043640136719,
+    "entry_id": "mp_mattersim_mp-2412",
+    "mp_id": "mp-2412"
+  },
+  {
+    "chemsys": "Li-P",
+    "composition": {
+      "Li": 4.0,
+      "P": 20.0
+    },
+    "energy": -118.52107238769531,
+    "entry_id": "mp_mattersim_mp-32760",
+    "mp_id": "mp-32760"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 22.0,
+      "S": 11.0
+    },
+    "energy": -129.38958740234375,
+    "entry_id": "mp_mattersim_mp-723352",
+    "mp_id": "mp-723352"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 2.0,
+      "S": 8.0
+    },
+    "energy": -38.852134704589844,
+    "entry_id": "mp_mattersim_mp-995393",
+    "mp_id": "mp-995393"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 2.0,
+      "S": 2.0
+    },
+    "energy": -14.525723457336426,
+    "entry_id": "mp_mattersim_mp-1057216",
+    "mp_id": "mp-1057216"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 8.0,
+      "S": 8.0
+    },
+    "energy": -61.044864654541016,
+    "entry_id": "mp_mattersim_mp-1180520",
+    "mp_id": "mp-1180520"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 66.0,
+      "S": 33.0
+    },
+    "energy": -388.1673278808594,
+    "entry_id": "mp_mattersim_mp-32899",
+    "mp_id": "mp-32899"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 4.0,
+      "S": 2.0
+    },
+    "energy": -22.978254318237305,
+    "entry_id": "mp_mattersim_mp-557142",
+    "mp_id": "mp-557142"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 8.0,
+      "S": 4.0
+    },
+    "energy": -47.93934631347656,
+    "entry_id": "mp_mattersim_mp-1153",
+    "mp_id": "mp-1153"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 4.0,
+      "S": 4.0
+    },
+    "energy": -28.258817672729492,
+    "entry_id": "mp_mattersim_mp-32641",
+    "mp_id": "mp-32641"
+  },
+  {
+    "chemsys": "Li-S",
+    "composition": {
+      "Li": 8.0,
+      "S": 4.0
+    },
+    "energy": -47.246307373046875,
+    "entry_id": "mp_mattersim_mp-1125",
+    "mp_id": "mp-1125"
+  },
+  {
+    "chemsys": "Mg-N",
+    "composition": {
+      "N": 2.0,
+      "Mg": 6.0
+    },
+    "energy": -27.118776321411133,
+    "entry_id": "mp_mattersim_mp-1185783",
+    "mp_id": "mp-1185783"
+  },
+  {
+    "chemsys": "Mg-N",
+    "composition": {
+      "N": 32.0,
+      "Mg": 48.0
+    },
+    "energy": -399.7609558105469,
+    "entry_id": "mp_mattersim_mp-1559",
+    "mp_id": "mp-1559"
+  },
+  {
+    "chemsys": "Mg-N",
+    "composition": {
+      "N": 16.0,
+      "Mg": 2.0
+    },
+    "energy": -113.9915771484375,
+    "entry_id": "mp_mattersim_mp-1078930",
+    "mp_id": "mp-1078930"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 40.0,
+      "Mg": 40.0
+    },
+    "energy": -451.5668640136719,
+    "entry_id": "mp_mattersim_mp-1244962",
+    "mp_id": "mp-1244962"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 40.0,
+      "Mg": 40.0
+    },
+    "energy": -466.77825927734375,
+    "entry_id": "mp_mattersim_mp-1245039",
+    "mp_id": "mp-1245039"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 40.0,
+      "Mg": 40.0
+    },
+    "energy": -451.36474609375,
+    "entry_id": "mp_mattersim_mp-1245045",
+    "mp_id": "mp-1245045"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 40.0,
+      "Mg": 40.0
+    },
+    "energy": -447.52813720703125,
+    "entry_id": "mp_mattersim_mp-1245128",
+    "mp_id": "mp-1245128"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 40.0,
+      "Mg": 40.0
+    },
+    "energy": -451.5290222167969,
+    "entry_id": "mp_mattersim_mp-1245143",
+    "mp_id": "mp-1245143"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 40.0,
+      "Mg": 40.0
+    },
+    "energy": -453.481689453125,
+    "entry_id": "mp_mattersim_mp-1245157",
+    "mp_id": "mp-1245157"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 40.0,
+      "Mg": 40.0
+    },
+    "energy": -450.6673889160156,
+    "entry_id": "mp_mattersim_mp-1245195",
+    "mp_id": "mp-1245195"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 40.0,
+      "Mg": 40.0
+    },
+    "energy": -450.5308837890625,
+    "entry_id": "mp_mattersim_mp-1245232",
+    "mp_id": "mp-1245232"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 4.0,
+      "Mg": 2.0
+    },
+    "energy": -32.5816650390625,
+    "entry_id": "mp_mattersim_mp-1096803",
+    "mp_id": "mp-1096803"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 4.0,
+      "Mg": 2.0
+    },
+    "energy": -32.58171463012695,
+    "entry_id": "mp_mattersim_mp-1180260",
+    "mp_id": "mp-1180260"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 24.0,
+      "Mg": 24.0
+    },
+    "energy": -276.84722900390625,
+    "entry_id": "mp_mattersim_mp-1191789",
+    "mp_id": "mp-1191789"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 6.0,
+      "Mg": 6.0
+    },
+    "energy": -70.19657897949219,
+    "entry_id": "mp_mattersim_mp-775808",
+    "mp_id": "mp-775808"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 6.0,
+      "Mg": 3.0
+    },
+    "energy": -48.872779846191406,
+    "entry_id": "mp_mattersim_mp-1180271",
+    "mp_id": "mp-1180271"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 24.0,
+      "Mg": 24.0
+    },
+    "energy": -282.1806640625,
+    "entry_id": "mp_mattersim_mp-1180973",
+    "mp_id": "mp-1180973"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 2.0,
+      "Mg": 2.0
+    },
+    "energy": -23.449676513671875,
+    "entry_id": "mp_mattersim_mp-549706",
+    "mp_id": "mp-549706"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 4.0,
+      "Mg": 4.0
+    },
+    "energy": -46.753807067871094,
+    "entry_id": "mp_mattersim_mp-776911",
+    "mp_id": "mp-776911"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 1.0,
+      "Mg": 1.0
+    },
+    "energy": -11.18299674987793,
+    "entry_id": "mp_mattersim_mp-1009129",
+    "mp_id": "mp-1009129"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 12.0,
+      "Mg": 12.0
+    },
+    "energy": -139.5306396484375,
+    "entry_id": "mp_mattersim_mp-1190533",
+    "mp_id": "mp-1190533"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 2.0,
+      "Mg": 2.0
+    },
+    "energy": -23.59869384765625,
+    "entry_id": "mp_mattersim_mp-1065577",
+    "mp_id": "mp-1065577"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 12.0,
+      "Mg": 12.0
+    },
+    "energy": -141.53878784179688,
+    "entry_id": "mp_mattersim_mp-1192189",
+    "mp_id": "mp-1192189"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 8.0,
+      "Mg": 4.0
+    },
+    "energy": -64.55706024169922,
+    "entry_id": "mp_mattersim_mp-1245393",
+    "mp_id": "mp-1245393"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 8.0,
+      "Mg": 4.0
+    },
+    "energy": -66.0483627319336,
+    "entry_id": "mp_mattersim_mp-2589",
+    "mp_id": "mp-2589"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 1.0,
+      "Mg": 1.0
+    },
+    "energy": -10.379453659057617,
+    "entry_id": "mp_mattersim_mp-1009127",
+    "mp_id": "mp-1009127"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 6.0,
+      "Mg": 6.0
+    },
+    "energy": -69.66559600830078,
+    "entry_id": "mp_mattersim_mp-1101930",
+    "mp_id": "mp-1101930"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 4.0,
+      "Mg": 4.0
+    },
+    "energy": -47.48060607910156,
+    "entry_id": "mp_mattersim_mp-1265",
+    "mp_id": "mp-1265"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 16.0,
+      "Mg": 16.0
+    },
+    "energy": -187.36080932617188,
+    "entry_id": "mp_mattersim_mp-1180312",
+    "mp_id": "mp-1180312"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 24.0,
+      "Mg": 24.0
+    },
+    "energy": -281.73590087890625,
+    "entry_id": "mp_mattersim_mp-1192043",
+    "mp_id": "mp-1192043"
+  },
+  {
+    "chemsys": "Mg-O",
+    "composition": {
+      "O": 24.0,
+      "Mg": 24.0
+    },
+    "energy": -277.5616455078125,
+    "entry_id": "mp_mattersim_mp-1190649",
+    "mp_id": "mp-1190649"
+  },
+  {
+    "chemsys": "Mg-P",
+    "composition": {
+      "Mg": 2.0,
+      "P": 8.0
+    },
+    "energy": -49.50508117675781,
+    "entry_id": "mp_mattersim_mp-384",
+    "mp_id": "mp-384"
+  },
+  {
+    "chemsys": "Mg-P",
+    "composition": {
+      "Mg": 9.0,
+      "P": 9.0
+    },
+    "energy": -69.5217514038086,
+    "entry_id": "mp_mattersim_mp-978292",
+    "mp_id": "mp-978292"
+  },
+  {
+    "chemsys": "Mg-P",
+    "composition": {
+      "Mg": 149.0,
+      "P": 1.0
+    },
+    "energy": -229.14451599121094,
+    "entry_id": "mp_mattersim_mp-1185593",
+    "mp_id": "mp-1185593"
+  },
+  {
+    "chemsys": "Mg-P",
+    "composition": {
+      "Mg": 48.0,
+      "P": 32.0
+    },
+    "energy": -298.37249755859375,
+    "entry_id": "mp_mattersim_mp-2514",
+    "mp_id": "mp-2514"
+  },
+  {
+    "chemsys": "Mg-P",
+    "composition": {
+      "Mg": 4.0,
+      "P": 2.0
+    },
+    "energy": -16.83562469482422,
+    "entry_id": "mp_mattersim_mp-1210592",
+    "mp_id": "mp-1210592"
+  },
+  {
+    "chemsys": "Mg-P",
+    "composition": {
+      "Mg": 6.0,
+      "P": 4.0
+    },
+    "energy": -35.87599182128906,
+    "entry_id": "mp_mattersim_mp-8085",
+    "mp_id": "mp-8085"
+  },
+  {
+    "chemsys": "Mg-P",
+    "composition": {
+      "Mg": 8.0,
+      "P": 4.0
+    },
+    "energy": -38.544254302978516,
+    "entry_id": "mp_mattersim_mp-1185775",
+    "mp_id": "mp-1185775"
+  },
+  {
+    "chemsys": "Mg-P",
+    "composition": {
+      "Mg": 8.0,
+      "P": 4.0
+    },
+    "energy": -37.80559158325195,
+    "entry_id": "mp_mattersim_mp-1185772",
+    "mp_id": "mp-1185772"
+  },
+  {
+    "chemsys": "Mg-S",
+    "composition": {
+      "Mg": 2.0,
+      "S": 4.0
+    },
+    "energy": -24.561199188232422,
+    "entry_id": "mp_mattersim_mp-1185959",
+    "mp_id": "mp-1185959"
+  },
+  {
+    "chemsys": "Mg-S",
+    "composition": {
+      "Mg": 2.0,
+      "S": 2.0
+    },
+    "energy": -17.058467864990234,
+    "entry_id": "mp_mattersim_mp-1185942",
+    "mp_id": "mp-1185942"
+  },
+  {
+    "chemsys": "Mg-S",
+    "composition": {
+      "Mg": 149.0,
+      "S": 1.0
+    },
+    "energy": -228.5713348388672,
+    "entry_id": "mp_mattersim_mp-1185578",
+    "mp_id": "mp-1185578"
+  },
+  {
+    "chemsys": "Mg-S",
+    "composition": {
+      "Mg": 4.0,
+      "S": 4.0
+    },
+    "energy": -34.077476501464844,
+    "entry_id": "mp_mattersim_mp-13032",
+    "mp_id": "mp-13032"
+  },
+  {
+    "chemsys": "Mg-S",
+    "composition": {
+      "Mg": 4.0,
+      "S": 4.0
+    },
+    "energy": -33.97113800048828,
+    "entry_id": "mp_mattersim_mp-1315",
+    "mp_id": "mp-1315"
+  },
+  {
+    "chemsys": "Mg-S",
+    "composition": {
+      "Mg": 1.0,
+      "S": 3.0
+    },
+    "energy": -15.757513046264648,
+    "entry_id": "mp_mattersim_mp-1185949",
+    "mp_id": "mp-1185949"
+  },
+  {
+    "chemsys": "Mg-S",
+    "composition": {
+      "Mg": 4.0,
+      "S": 8.0
+    },
+    "energy": -49.0966682434082,
+    "entry_id": "mp_mattersim_mp-1185953",
+    "mp_id": "mp-1185953"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 6.0,
+      "Na": 2.0
+    },
+    "energy": -45.62339782714844,
+    "entry_id": "mp_mattersim_mp-1064272",
+    "mp_id": "mp-1064272"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 6.0,
+      "Na": 2.0
+    },
+    "energy": -53.430908203125,
+    "entry_id": "mp_mattersim_mp-1064715",
+    "mp_id": "mp-1064715"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 6.0,
+      "Na": 2.0
+    },
+    "energy": -45.61992263793945,
+    "entry_id": "mp_mattersim_mp-1065265",
+    "mp_id": "mp-1065265"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 6.0,
+      "Na": 2.0
+    },
+    "energy": -45.50989532470703,
+    "entry_id": "mp_mattersim_mp-22777",
+    "mp_id": "mp-22777"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 6.0,
+      "Na": 2.0
+    },
+    "energy": -45.60349655151367,
+    "entry_id": "mp_mattersim_mp-2925199",
+    "mp_id": "mp-2925199"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 6.0,
+      "Na": 2.0
+    },
+    "energy": -53.441734313964844,
+    "entry_id": "mp_mattersim_mp-570538",
+    "mp_id": "mp-570538"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 9.0,
+      "Na": 3.0
+    },
+    "energy": -80.1672134399414,
+    "entry_id": "mp_mattersim_mp-1066400",
+    "mp_id": "mp-1066400"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 9.0,
+      "Na": 3.0
+    },
+    "energy": -80.16725158691406,
+    "entry_id": "mp_mattersim_mp-22003",
+    "mp_id": "mp-22003"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 6.0,
+      "Na": 18.0
+    },
+    "energy": -66.2874526977539,
+    "entry_id": "mp_mattersim_mp-1190632",
+    "mp_id": "mp-1190632"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 1.0,
+      "Na": 3.0
+    },
+    "energy": -11.18689250946045,
+    "entry_id": "mp_mattersim_mp-999496",
+    "mp_id": "mp-999496"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 3.0,
+      "Na": 1.0
+    },
+    "energy": -14.96825885772705,
+    "entry_id": "mp_mattersim_mp-1064161",
+    "mp_id": "mp-1064161"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 1.0,
+      "Na": 3.0
+    },
+    "energy": -11.382376670837402,
+    "entry_id": "mp_mattersim_mp-2639",
+    "mp_id": "mp-2639"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 4.0,
+      "Na": 4.0
+    },
+    "energy": -28.377038955688477,
+    "entry_id": "mp_mattersim_mp-1009221",
+    "mp_id": "mp-1009221"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 4.0,
+      "Na": 12.0
+    },
+    "energy": -41.72135925292969,
+    "entry_id": "mp_mattersim_mp-999495",
+    "mp_id": "mp-999495"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 6.0,
+      "Na": 2.0
+    },
+    "energy": -53.43504333496094,
+    "entry_id": "mp_mattersim_mp-634410",
+    "mp_id": "mp-634410"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 4.0,
+      "Na": 12.0
+    },
+    "energy": -44.630088806152344,
+    "entry_id": "mp_mattersim_mp-1189035",
+    "mp_id": "mp-1189035"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 16.0,
+      "Na": 16.0
+    },
+    "energy": -151.232421875,
+    "entry_id": "mp_mattersim_mp-1080032",
+    "mp_id": "mp-1080032"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 16.0,
+      "Na": 16.0
+    },
+    "energy": -149.1091766357422,
+    "entry_id": "mp_mattersim_mp-1179882",
+    "mp_id": "mp-1179882"
+  },
+  {
+    "chemsys": "N-Na",
+    "composition": {
+      "N": 3.0,
+      "Na": 1.0
+    },
+    "energy": -26.721940994262695,
+    "entry_id": "mp_mattersim_mp-1064952",
+    "mp_id": "mp-1064952"
+  },
+  {
+    "chemsys": "N-Rb",
+    "composition": {
+      "N": 3.0,
+      "Rb": 1.0
+    },
+    "energy": -26.490488052368164,
+    "entry_id": "mp_mattersim_mp-581833",
+    "mp_id": "mp-581833"
+  },
+  {
+    "chemsys": "N-Rb",
+    "composition": {
+      "N": 12.0,
+      "Rb": 4.0
+    },
+    "energy": -106.11943817138672,
+    "entry_id": "mp_mattersim_mp-743",
+    "mp_id": "mp-743"
+  },
+  {
+    "chemsys": "N-Rb",
+    "composition": {
+      "N": 1.0,
+      "Rb": 1.0
+    },
+    "energy": -6.525110244750977,
+    "entry_id": "mp_mattersim_mp-1209103",
+    "mp_id": "mp-1209103"
+  },
+  {
+    "chemsys": "N-Rb",
+    "composition": {
+      "N": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -26.273054122924805,
+    "entry_id": "mp_mattersim_mp-1209181",
+    "mp_id": "mp-1209181"
+  },
+  {
+    "chemsys": "N-Rb",
+    "composition": {
+      "N": 6.0,
+      "Rb": 2.0
+    },
+    "energy": -46.72621536254883,
+    "entry_id": "mp_mattersim_mp-1219567",
+    "mp_id": "mp-1219567"
+  },
+  {
+    "chemsys": "N-Rb",
+    "composition": {
+      "N": 2.0,
+      "Rb": 2.0
+    },
+    "energy": -13.136442184448242,
+    "entry_id": "mp_mattersim_mp-1064529",
+    "mp_id": "mp-1064529"
+  },
+  {
+    "chemsys": "N-Rb",
+    "composition": {
+      "N": 2.0,
+      "Rb": 2.0
+    },
+    "energy": -13.136420249938965,
+    "entry_id": "mp_mattersim_mp-1066707",
+    "mp_id": "mp-1066707"
+  },
+  {
+    "chemsys": "N-Rb",
+    "composition": {
+      "N": 2.0,
+      "Rb": 2.0
+    },
+    "energy": -13.136547088623047,
+    "entry_id": "mp_mattersim_mp-1179691",
+    "mp_id": "mp-1179691"
+  },
+  {
+    "chemsys": "N-Sc",
+    "composition": {
+      "N": 34.0,
+      "Sc": 39.0
+    },
+    "energy": -659.8038330078125,
+    "entry_id": "mp_mattersim_mp-685209",
+    "mp_id": "mp-685209"
+  },
+  {
+    "chemsys": "N-Sc",
+    "composition": {
+      "N": 4.0,
+      "Sc": 4.0
+    },
+    "energy": -71.555908203125,
+    "entry_id": "mp_mattersim_mp-1009750",
+    "mp_id": "mp-1009750"
+  },
+  {
+    "chemsys": "N-Sc",
+    "composition": {
+      "N": 1.0,
+      "Sc": 1.0
+    },
+    "energy": -16.431175231933594,
+    "entry_id": "mp_mattersim_mp-12981",
+    "mp_id": "mp-12981"
+  },
+  {
+    "chemsys": "N-Sc",
+    "composition": {
+      "N": 4.0,
+      "Sc": 4.0
+    },
+    "energy": -73.8946304321289,
+    "entry_id": "mp_mattersim_mp-2857",
+    "mp_id": "mp-2857"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 3.0,
+      "Sr": 4.0
+    },
+    "energy": -34.40263366699219,
+    "entry_id": "mp_mattersim_mp-685023",
+    "mp_id": "mp-685023"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 6.0,
+      "Sr": 8.0
+    },
+    "energy": -68.80524444580078,
+    "entry_id": "mp_mattersim_mp-1173210",
+    "mp_id": "mp-1173210"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 2.0,
+      "Sr": 4.0
+    },
+    "energy": -11.009832382202148,
+    "entry_id": "mp_mattersim_mp-1179538",
+    "mp_id": "mp-1179538"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 6.0,
+      "Sr": 8.0
+    },
+    "energy": -68.76921081542969,
+    "entry_id": "mp_mattersim_mp-1218446",
+    "mp_id": "mp-1218446"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 8.0,
+      "Sr": 8.0
+    },
+    "energy": -88.58772277832031,
+    "entry_id": "mp_mattersim_mp-29973",
+    "mp_id": "mp-29973"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 4.0,
+      "Sr": 2.0
+    },
+    "energy": -39.60011291503906,
+    "entry_id": "mp_mattersim_mp-10564",
+    "mp_id": "mp-10564"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 8.0,
+      "Sr": 4.0
+    },
+    "energy": -54.42230224609375,
+    "entry_id": "mp_mattersim_mp-1071980",
+    "mp_id": "mp-1071980"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 3.0,
+      "Sr": 6.0
+    },
+    "energy": -39.94841766357422,
+    "entry_id": "mp_mattersim_mp-1245",
+    "mp_id": "mp-1245"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 12.0,
+      "Sr": 2.0
+    },
+    "energy": -105.91542053222656,
+    "entry_id": "mp_mattersim_mp-655986",
+    "mp_id": "mp-655986"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 32.0,
+      "Sr": 48.0
+    },
+    "energy": -388.8645935058594,
+    "entry_id": "mp_mattersim_mp-986716",
+    "mp_id": "mp-986716"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 2.0,
+      "Sr": 3.0
+    },
+    "energy": -21.672531127929688,
+    "entry_id": "mp_mattersim_mp-1013529",
+    "mp_id": "mp-1013529"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 4.0,
+      "Sr": 4.0
+    },
+    "energy": -40.9100227355957,
+    "entry_id": "mp_mattersim_mp-1058586",
+    "mp_id": "mp-1058586"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 4.0,
+      "Sr": 4.0
+    },
+    "energy": -40.90998077392578,
+    "entry_id": "mp_mattersim_mp-1078609",
+    "mp_id": "mp-1078609"
+  },
+  {
+    "chemsys": "N-Sr",
+    "composition": {
+      "N": 48.0,
+      "Sr": 8.0
+    },
+    "energy": -423.6426086425781,
+    "entry_id": "mp_mattersim_mp-2131",
+    "mp_id": "mp-2131"
+  },
+  {
+    "chemsys": "N-Y",
+    "composition": {
+      "N": 1.0,
+      "Y": 1.0
+    },
+    "energy": -17.248489379882812,
+    "entry_id": "mp_mattersim_mp-998899",
+    "mp_id": "mp-998899"
+  },
+  {
+    "chemsys": "N-Y",
+    "composition": {
+      "N": 2.0,
+      "Y": 2.0
+    },
+    "energy": -34.951866149902344,
+    "entry_id": "mp_mattersim_mp-1017533",
+    "mp_id": "mp-1017533"
+  },
+  {
+    "chemsys": "N-Y",
+    "composition": {
+      "N": 2.0,
+      "Y": 2.0
+    },
+    "energy": -36.0218505859375,
+    "entry_id": "mp_mattersim_mp-6913",
+    "mp_id": "mp-6913"
+  },
+  {
+    "chemsys": "N-Y",
+    "composition": {
+      "N": 4.0,
+      "Y": 4.0
+    },
+    "energy": -70.72991180419922,
+    "entry_id": "mp_mattersim_mp-13099",
+    "mp_id": "mp-13099"
+  },
+  {
+    "chemsys": "N-Y",
+    "composition": {
+      "N": 1.0,
+      "Y": 1.0
+    },
+    "energy": -16.324813842773438,
+    "entry_id": "mp_mattersim_mp-13098",
+    "mp_id": "mp-13098"
+  },
+  {
+    "chemsys": "N-Y",
+    "composition": {
+      "N": 4.0,
+      "Y": 4.0
+    },
+    "energy": -72.69688415527344,
+    "entry_id": "mp_mattersim_mp-2114",
+    "mp_id": "mp-2114"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 34.0,
+      "Na": 68.0
+    },
+    "energy": -365.9853820800781,
+    "entry_id": "mp_mattersim_mp-1245205",
+    "mp_id": "mp-1245205"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 34.0,
+      "Na": 68.0
+    },
+    "energy": -371.89312744140625,
+    "entry_id": "mp_mattersim_mp-1245278",
+    "mp_id": "mp-1245278"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 20.0,
+      "Na": 4.0
+    },
+    "energy": -112.61607360839844,
+    "entry_id": "mp_mattersim_mp-1180210",
+    "mp_id": "mp-1180210"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 4.0,
+      "Na": 2.0
+    },
+    "energy": -26.963451385498047,
+    "entry_id": "mp_mattersim_mp-1238787",
+    "mp_id": "mp-1238787"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 32.0,
+      "Na": 4.0
+    },
+    "energy": -167.25997924804688,
+    "entry_id": "mp_mattersim_mp-1180536",
+    "mp_id": "mp-1180536"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 32.0,
+      "Na": 4.0
+    },
+    "energy": -168.300537109375,
+    "entry_id": "mp_mattersim_mp-1201981",
+    "mp_id": "mp-1201981"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 36.0,
+      "Na": 8.0
+    },
+    "energy": -205.9757080078125,
+    "entry_id": "mp_mattersim_mp-1204051",
+    "mp_id": "mp-1204051"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 3.0,
+      "Na": 6.0
+    },
+    "energy": -32.9535026550293,
+    "entry_id": "mp_mattersim_mp-776952",
+    "mp_id": "mp-776952"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 3.0,
+      "Na": 6.0
+    },
+    "energy": -32.95343017578125,
+    "entry_id": "mp_mattersim_mp-1974948",
+    "mp_id": "mp-1974948"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 6.0,
+      "Na": 3.0
+    },
+    "energy": -40.02316665649414,
+    "entry_id": "mp_mattersim_mp-1220954",
+    "mp_id": "mp-1220954"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 3.0,
+      "Na": 3.0
+    },
+    "energy": -23.1700382232666,
+    "entry_id": "mp_mattersim_mp-1237667",
+    "mp_id": "mp-1237667"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 6.0,
+      "Na": 12.0
+    },
+    "energy": -66.06101989746094,
+    "entry_id": "mp_mattersim_mp-755413",
+    "mp_id": "mp-755413"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 3.0,
+      "Na": 6.0
+    },
+    "energy": -32.95348358154297,
+    "entry_id": "mp_mattersim_mp-1119338",
+    "mp_id": "mp-1119338"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 6.0,
+      "Na": 6.0
+    },
+    "energy": -50.56631851196289,
+    "entry_id": "mp_mattersim_mp-2340",
+    "mp_id": "mp-2340"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 8.0,
+      "Na": 4.0
+    },
+    "energy": -54.570377349853516,
+    "entry_id": "mp_mattersim_mp-614",
+    "mp_id": "mp-614"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 1.0,
+      "Na": 1.0
+    },
+    "energy": -7.723344802856445,
+    "entry_id": "mp_mattersim_mp-1061395",
+    "mp_id": "mp-1061395"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 4.0,
+      "Na": 8.0
+    },
+    "energy": -44.90187454223633,
+    "entry_id": "mp_mattersim_mp-2352",
+    "mp_id": "mp-2352"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 6.0,
+      "Na": 36.0
+    },
+    "energy": -94.97113800048828,
+    "entry_id": "mp_mattersim_mp-1173794",
+    "mp_id": "mp-1173794"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 6.0,
+      "Na": 2.0
+    },
+    "energy": -37.128299713134766,
+    "entry_id": "mp_mattersim_mp-22464",
+    "mp_id": "mp-22464"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 4.0,
+      "Na": 4.0
+    },
+    "energy": -30.892898559570312,
+    "entry_id": "mp_mattersim_mp-1180226",
+    "mp_id": "mp-1180226"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 4.0,
+      "Na": 2.0
+    },
+    "energy": -27.256235122680664,
+    "entry_id": "mp_mattersim_mp-1901",
+    "mp_id": "mp-1901"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 2.0,
+      "Na": 4.0
+    },
+    "energy": -22.244482040405273,
+    "entry_id": "mp_mattersim_mp-755072",
+    "mp_id": "mp-755072"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 16.0,
+      "Na": 8.0
+    },
+    "energy": -108.36282348632812,
+    "entry_id": "mp_mattersim_mp-1180165",
+    "mp_id": "mp-1180165"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 16.0,
+      "Na": 8.0
+    },
+    "energy": -108.40192413330078,
+    "entry_id": "mp_mattersim_mp-1180346",
+    "mp_id": "mp-1180346"
+  },
+  {
+    "chemsys": "Na-O",
+    "composition": {
+      "O": 4.0,
+      "Na": 4.0
+    },
+    "energy": -31.005157470703125,
+    "entry_id": "mp_mattersim_mp-1094115",
+    "mp_id": "mp-1094115"
+  },
+  {
+    "chemsys": "Na-P",
+    "composition": {
+      "Na": 16.0,
+      "P": 112.0
+    },
+    "energy": -641.857421875,
+    "entry_id": "mp_mattersim_mp-1195785",
+    "mp_id": "mp-1195785"
+  },
+  {
+    "chemsys": "Na-P",
+    "composition": {
+      "Na": 8.0,
+      "P": 8.0
+    },
+    "energy": -58.93244552612305,
+    "entry_id": "mp_mattersim_mp-7440",
+    "mp_id": "mp-7440"
+  },
+  {
+    "chemsys": "Na-P",
+    "composition": {
+      "Na": 6.0,
+      "P": 2.0
+    },
+    "energy": -21.39244842529297,
+    "entry_id": "mp_mattersim_mp-1598",
+    "mp_id": "mp-1598"
+  },
+  {
+    "chemsys": "Na-P",
+    "composition": {
+      "Na": 2.0,
+      "P": 30.0
+    },
+    "energy": -166.07603454589844,
+    "entry_id": "mp_mattersim_mp-1194653",
+    "mp_id": "mp-1194653"
+  },
+  {
+    "chemsys": "Na-P",
+    "composition": {
+      "Na": 12.0,
+      "P": 44.0
+    },
+    "energy": -265.11578369140625,
+    "entry_id": "mp_mattersim_mp-473",
+    "mp_id": "mp-473"
+  },
+  {
+    "chemsys": "Na-P",
+    "composition": {
+      "Na": 4.0,
+      "P": 20.0
+    },
+    "energy": -116.67534637451172,
+    "entry_id": "mp_mattersim_mp-31086",
+    "mp_id": "mp-31086"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 2.0,
+      "S": 2.0
+    },
+    "energy": -10.788134574890137,
+    "entry_id": "mp_mattersim_mp-1180106",
+    "mp_id": "mp-1180106"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 16.0,
+      "S": 32.0
+    },
+    "energy": -179.10885620117188,
+    "entry_id": "mp_mattersim_mp-12180",
+    "mp_id": "mp-12180"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 6.0,
+      "S": 6.0
+    },
+    "energy": -42.65222930908203,
+    "entry_id": "mp_mattersim_mp-409",
+    "mp_id": "mp-409"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 4.0,
+      "S": 4.0
+    },
+    "energy": -28.415760040283203,
+    "entry_id": "mp_mattersim_mp-2400",
+    "mp_id": "mp-2400"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 4.0,
+      "S": 2.0
+    },
+    "energy": -19.362348556518555,
+    "entry_id": "mp_mattersim_mp-8374",
+    "mp_id": "mp-8374"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 1.0,
+      "S": 1.0
+    },
+    "energy": -6.409248352050781,
+    "entry_id": "mp_mattersim_mp-1058159",
+    "mp_id": "mp-1058159"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 4.0,
+      "S": 4.0
+    },
+    "energy": -24.679805755615234,
+    "entry_id": "mp_mattersim_mp-1058171",
+    "mp_id": "mp-1058171"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 8.0,
+      "S": 4.0
+    },
+    "energy": -39.892974853515625,
+    "entry_id": "mp_mattersim_mp-648",
+    "mp_id": "mp-648"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 8.0,
+      "S": 20.0
+    },
+    "energy": -106.18464660644531,
+    "entry_id": "mp_mattersim_mp-28127",
+    "mp_id": "mp-28127"
+  },
+  {
+    "chemsys": "Na-S",
+    "composition": {
+      "Na": 8.0,
+      "S": 4.0
+    },
+    "energy": -39.41822814941406,
+    "entry_id": "mp_mattersim_mp-556978",
+    "mp_id": "mp-556978"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 2.0,
+      "Rb": 2.0
+    },
+    "energy": -14.218527793884277,
+    "entry_id": "mp_mattersim_mp-1206677",
+    "mp_id": "mp-1206677"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 4.0,
+      "Rb": 18.0
+    },
+    "energy": -48.84377670288085,
+    "entry_id": "mp_mattersim_mp-27561",
+    "mp_id": "mp-27561"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 24.0,
+      "Rb": 16.0
+    },
+    "energy": -171.15357971191406,
+    "entry_id": "mp_mattersim_mp-1188205",
+    "mp_id": "mp-1188205"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 2.0,
+      "Rb": 1.0
+    },
+    "energy": -9.513270378112793,
+    "entry_id": "mp_mattersim_mp-1219565",
+    "mp_id": "mp-1219565"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 4.0,
+      "Rb": 2.0
+    },
+    "energy": -26.928518295288086,
+    "entry_id": "mp_mattersim_mp-12105",
+    "mp_id": "mp-12105"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 12.0,
+      "Rb": 4.0
+    },
+    "energy": -73.44231414794922,
+    "entry_id": "mp_mattersim_mp-1806",
+    "mp_id": "mp-1806"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 2.0,
+      "Rb": 4.0
+    },
+    "energy": -19.234201431274414,
+    "entry_id": "mp_mattersim_mp-755459",
+    "mp_id": "mp-755459"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 8.0,
+      "Rb": 4.0
+    },
+    "energy": -38.56951904296875,
+    "entry_id": "mp_mattersim_mp-33234",
+    "mp_id": "mp-33234"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 3.0,
+      "Rb": 6.0
+    },
+    "energy": -28.970630645751953,
+    "entry_id": "mp_mattersim_mp-776922",
+    "mp_id": "mp-776922"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 3.0,
+      "Rb": 6.0
+    },
+    "energy": -28.970563888549805,
+    "entry_id": "mp_mattersim_mp-753746",
+    "mp_id": "mp-753746"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 4.0,
+      "Rb": 24.0
+    },
+    "energy": -54.458091735839844,
+    "entry_id": "mp_mattersim_mp-540855",
+    "mp_id": "mp-540855"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 24.0,
+      "Rb": 128.0
+    },
+    "energy": -308.55523681640625,
+    "entry_id": "mp_mattersim_mp-1220248",
+    "mp_id": "mp-1220248"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 24.0,
+      "Rb": 16.0
+    },
+    "energy": -171.9480438232422,
+    "entry_id": "mp_mattersim_mp-2571",
+    "mp_id": "mp-2571"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -28.437271118164062,
+    "entry_id": "mp_mattersim_mp-1209332",
+    "mp_id": "mp-1209332"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 4.0,
+      "Rb": 8.0
+    },
+    "energy": -38.46895980834961,
+    "entry_id": "mp_mattersim_mp-1394",
+    "mp_id": "mp-1394"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 24.0,
+      "Rb": 152.0
+    },
+    "energy": -332.50927734375,
+    "entry_id": "mp_mattersim_mp-779582",
+    "mp_id": "mp-779582"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 2.0,
+      "Rb": 4.0
+    },
+    "energy": -19.234363555908203,
+    "entry_id": "mp_mattersim_mp-1101405",
+    "mp_id": "mp-1101405"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 8.0,
+      "Rb": 16.0
+    },
+    "energy": -76.93736267089844,
+    "entry_id": "mp_mattersim_mp-776890",
+    "mp_id": "mp-776890"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 4.0,
+      "Rb": 8.0
+    },
+    "energy": -38.15039825439453,
+    "entry_id": "mp_mattersim_mp-755738",
+    "mp_id": "mp-755738"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -28.4295654296875,
+    "entry_id": "mp_mattersim_mp-1206669",
+    "mp_id": "mp-1206669"
+  },
+  {
+    "chemsys": "O-Rb",
+    "composition": {
+      "O": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -31.678682327270508,
+    "entry_id": "mp_mattersim_mp-7895",
+    "mp_id": "mp-7895"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 18.0,
+      "Sc": 12.0
+    },
+    "energy": -269.463134765625,
+    "entry_id": "mp_mattersim_mp-558748",
+    "mp_id": "mp-558748"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 18.0,
+      "Sc": 12.0
+    },
+    "energy": -268.98724365234375,
+    "entry_id": "mp_mattersim_mp-754455",
+    "mp_id": "mp-754455"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 3.0,
+      "Sc": 2.0
+    },
+    "energy": -44.60247039794922,
+    "entry_id": "mp_mattersim_mp-13060",
+    "mp_id": "mp-13060"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 45.0,
+      "Sc": 48.0
+    },
+    "energy": -787.7022705078125,
+    "entry_id": "mp_mattersim_mp-759946",
+    "mp_id": "mp-759946"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 18.0,
+      "Sc": 12.0
+    },
+    "energy": -270.61273193359375,
+    "entry_id": "mp_mattersim_mp-755313",
+    "mp_id": "mp-755313"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 6.0,
+      "Sc": 2.0
+    },
+    "energy": -51.381378173828125,
+    "entry_id": "mp_mattersim_mp-1186987",
+    "mp_id": "mp-1186987"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 48.0,
+      "Sc": 32.0
+    },
+    "energy": -724.4301147460938,
+    "entry_id": "mp_mattersim_mp-216",
+    "mp_id": "mp-216"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 4.0,
+      "Sc": 4.0
+    },
+    "energy": -68.2892837524414,
+    "entry_id": "mp_mattersim_mp-644481",
+    "mp_id": "mp-644481"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 24.0,
+      "Sc": 16.0
+    },
+    "energy": -359.0204772949219,
+    "entry_id": "mp_mattersim_mp-775837",
+    "mp_id": "mp-775837"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 4.0,
+      "Sc": 2.0
+    },
+    "energy": -47.86179733276367,
+    "entry_id": "mp_mattersim_mp-1206234",
+    "mp_id": "mp-1206234"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 8.0,
+      "Sc": 4.0
+    },
+    "energy": -95.83390808105469,
+    "entry_id": "mp_mattersim_mp-1179114",
+    "mp_id": "mp-1179114"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 8.0,
+      "Sc": 4.0
+    },
+    "energy": -98.58551025390625,
+    "entry_id": "mp_mattersim_mp-1179108",
+    "mp_id": "mp-1179108"
+  },
+  {
+    "chemsys": "O-Sc",
+    "composition": {
+      "O": 38.0,
+      "Sc": 40.0
+    },
+    "energy": -661.8787231445311,
+    "entry_id": "mp_mattersim_mp-684697",
+    "mp_id": "mp-684697"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 10.0,
+      "Sr": 1.0
+    },
+    "energy": -55.65996551513672,
+    "entry_id": "mp_mattersim_mp-1179197",
+    "mp_id": "mp-1179197"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 10.0,
+      "Sr": 1.0
+    },
+    "energy": -52.998580932617195,
+    "entry_id": "mp_mattersim_mp-1208655",
+    "mp_id": "mp-1208655"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 4.0,
+      "Sr": 1.0
+    },
+    "energy": -23.186294555664062,
+    "entry_id": "mp_mattersim_mp-1208665",
+    "mp_id": "mp-1208665"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 20.0,
+      "Sr": 2.0
+    },
+    "energy": -110.97537994384766,
+    "entry_id": "mp_mattersim_mp-1179224",
+    "mp_id": "mp-1179224"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 20.0,
+      "Sr": 2.0
+    },
+    "energy": -111.32788848876955,
+    "entry_id": "mp_mattersim_mp-1179236",
+    "mp_id": "mp-1179236"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 40.0,
+      "Sr": 4.0
+    },
+    "energy": -221.3174591064453,
+    "entry_id": "mp_mattersim_mp-1179215",
+    "mp_id": "mp-1179215"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 40.0,
+      "Sr": 4.0
+    },
+    "energy": -221.28038024902344,
+    "entry_id": "mp_mattersim_mp-1201811",
+    "mp_id": "mp-1201811"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 4.0,
+      "Sr": 2.0
+    },
+    "energy": -34.55533218383789,
+    "entry_id": "mp_mattersim_mp-2697",
+    "mp_id": "mp-2697"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 24.0,
+      "Sr": 4.0
+    },
+    "energy": -145.679443359375,
+    "entry_id": "mp_mattersim_mp-1179128",
+    "mp_id": "mp-1179128"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 24.0,
+      "Sr": 4.0
+    },
+    "energy": -145.50660705566406,
+    "entry_id": "mp_mattersim_mp-1179143",
+    "mp_id": "mp-1179143"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 2.0,
+      "Sr": 2.0
+    },
+    "energy": -23.82349395751953,
+    "entry_id": "mp_mattersim_mp-754282",
+    "mp_id": "mp-754282"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 2.0,
+      "Sr": 2.0
+    },
+    "energy": -24.02129364013672,
+    "entry_id": "mp_mattersim_mp-754824",
+    "mp_id": "mp-754824"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 1.0,
+      "Sr": 1.0
+    },
+    "energy": -11.27769660949707,
+    "entry_id": "mp_mattersim_mp-1009819",
+    "mp_id": "mp-1009819"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 3.0,
+      "Sr": 2.0
+    },
+    "energy": -25.81973648071289,
+    "entry_id": "mp_mattersim_mp-1187089",
+    "mp_id": "mp-1187089"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 4.0,
+      "Sr": 4.0
+    },
+    "energy": -48.386940002441406,
+    "entry_id": "mp_mattersim_mp-2472",
+    "mp_id": "mp-2472"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 6.0,
+      "Sr": 2.0
+    },
+    "energy": -44.13866424560547,
+    "entry_id": "mp_mattersim_mp-1206311",
+    "mp_id": "mp-1206311"
+  },
+  {
+    "chemsys": "O-Sr",
+    "composition": {
+      "O": 8.0,
+      "Sr": 4.0
+    },
+    "energy": -69.08340454101562,
+    "entry_id": "mp_mattersim_mp-726705",
+    "mp_id": "mp-726705"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 60.0,
+      "Y": 40.0
+    },
+    "energy": -888.3479003906251,
+    "entry_id": "mp_mattersim_mp-1244888",
+    "mp_id": "mp-1244888"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 60.0,
+      "Y": 40.0
+    },
+    "energy": -892.1485595703125,
+    "entry_id": "mp_mattersim_mp-1244949",
+    "mp_id": "mp-1244949"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 60.0,
+      "Y": 40.0
+    },
+    "energy": -889.672119140625,
+    "entry_id": "mp_mattersim_mp-1245017",
+    "mp_id": "mp-1245017"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 60.0,
+      "Y": 40.0
+    },
+    "energy": -891.9154052734376,
+    "entry_id": "mp_mattersim_mp-1245291",
+    "mp_id": "mp-1245291"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 4.0,
+      "Y": 2.0
+    },
+    "energy": -48.77145004272461,
+    "entry_id": "mp_mattersim_mp-1206610",
+    "mp_id": "mp-1206610"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 18.0,
+      "Y": 12.0
+    },
+    "energy": -271.762451171875,
+    "entry_id": "mp_mattersim_mp-775907",
+    "mp_id": "mp-775907"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 12.0,
+      "Y": 8.0
+    },
+    "energy": -180.49615478515625,
+    "entry_id": "mp_mattersim_mp-777514",
+    "mp_id": "mp-777514"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 3.0,
+      "Y": 2.0
+    },
+    "energy": -44.28307342529297,
+    "entry_id": "mp_mattersim_mp-1216050",
+    "mp_id": "mp-1216050"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 18.0,
+      "Y": 12.0
+    },
+    "energy": -271.8883056640625,
+    "entry_id": "mp_mattersim_mp-558573",
+    "mp_id": "mp-558573"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 8.0,
+      "Y": 4.0
+    },
+    "energy": -95.95034790039062,
+    "entry_id": "mp_mattersim_mp-1102883",
+    "mp_id": "mp-1102883"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 8.0,
+      "Y": 4.0
+    },
+    "energy": -96.42778015136719,
+    "entry_id": "mp_mattersim_mp-1178684",
+    "mp_id": "mp-1178684"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 8.0,
+      "Y": 4.0
+    },
+    "energy": -95.95037078857422,
+    "entry_id": "mp_mattersim_mp-1977753",
+    "mp_id": "mp-1977753"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 3.0,
+      "Y": 2.0
+    },
+    "energy": -45.200767517089844,
+    "entry_id": "mp_mattersim_mp-13061",
+    "mp_id": "mp-13061"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 18.0,
+      "Y": 12.0
+    },
+    "energy": -271.89019775390625,
+    "entry_id": "mp_mattersim_mp-754759",
+    "mp_id": "mp-754759"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 6.0,
+      "Y": 2.0
+    },
+    "energy": -54.54617691040039,
+    "entry_id": "mp_mattersim_mp-1206099",
+    "mp_id": "mp-1206099"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 2.0,
+      "Y": 2.0
+    },
+    "energy": -33.78541564941406,
+    "entry_id": "mp_mattersim_mp-1187855",
+    "mp_id": "mp-1187855"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 48.0,
+      "Y": 32.0
+    },
+    "energy": -728.8958740234375,
+    "entry_id": "mp_mattersim_mp-2652",
+    "mp_id": "mp-2652"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 6.0,
+      "Y": 4.0
+    },
+    "energy": -86.47798156738281,
+    "entry_id": "mp_mattersim_mp-673247",
+    "mp_id": "mp-673247"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 24.0,
+      "Y": 16.0
+    },
+    "energy": -362.0854187011719,
+    "entry_id": "mp_mattersim_mp-775906",
+    "mp_id": "mp-775906"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 12.0,
+      "Y": 8.0
+    },
+    "energy": -179.79537963867188,
+    "entry_id": "mp_mattersim_mp-1178770",
+    "mp_id": "mp-1178770"
+  },
+  {
+    "chemsys": "O-Y",
+    "composition": {
+      "O": 12.0,
+      "Y": 4.0
+    },
+    "energy": -108.85061645507812,
+    "entry_id": "mp_mattersim_mp-1189335",
+    "mp_id": "mp-1189335"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 44.0,
+      "Rb": 4.0
+    },
+    "energy": -245.5456085205078,
+    "entry_id": "mp_mattersim_mp-1209498",
+    "mp_id": "mp-1209498"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 44.0,
+      "Rb": 12.0
+    },
+    "energy": -255.83242797851565,
+    "entry_id": "mp_mattersim_mp-1173444",
+    "mp_id": "mp-1173444"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 2.0,
+      "Rb": 2.0
+    },
+    "energy": -11.073589324951172,
+    "entry_id": "mp_mattersim_mp-1179688",
+    "mp_id": "mp-1179688"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 3.0,
+      "Rb": 3.0
+    },
+    "energy": -15.419565200805664,
+    "entry_id": "mp_mattersim_mp-1060787",
+    "mp_id": "mp-1060787"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 66.0,
+      "Rb": 18.0
+    },
+    "energy": -375.3031311035156,
+    "entry_id": "mp_mattersim_mp-673817",
+    "mp_id": "mp-673817"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 30.0,
+      "Rb": 2.0
+    },
+    "energy": -165.78512573242188,
+    "entry_id": "mp_mattersim_mp-1209298",
+    "mp_id": "mp-1209298"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -20.269498825073242,
+    "entry_id": "mp_mattersim_mp-1179679",
+    "mp_id": "mp-1179679"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 4.0,
+      "Rb": 12.0
+    },
+    "energy": -34.3165168762207,
+    "entry_id": "mp_mattersim_mp-974822",
+    "mp_id": "mp-974822"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 44.0,
+      "Rb": 12.0
+    },
+    "energy": -264.8172302246094,
+    "entry_id": "mp_mattersim_mp-1197062",
+    "mp_id": "mp-1197062"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 4.0,
+      "Rb": 8.0
+    },
+    "energy": -29.377403259277344,
+    "entry_id": "mp_mattersim_mp-1101799",
+    "mp_id": "mp-1101799"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 24.0,
+      "Rb": 16.0
+    },
+    "energy": -161.98904418945312,
+    "entry_id": "mp_mattersim_mp-2079",
+    "mp_id": "mp-2079"
+  },
+  {
+    "chemsys": "P-Rb",
+    "composition": {
+      "P": 2.0,
+      "Rb": 2.0
+    },
+    "energy": -11.073578834533691,
+    "entry_id": "mp_mattersim_mp-1058499",
+    "mp_id": "mp-1058499"
+  },
+  {
+    "chemsys": "P-Sc",
+    "composition": {
+      "P": 2.0,
+      "Sc": 6.0
+    },
+    "energy": -52.40182876586914,
+    "entry_id": "mp_mattersim_mp-981385",
+    "mp_id": "mp-981385"
+  },
+  {
+    "chemsys": "P-Sc",
+    "composition": {
+      "P": 6.0,
+      "Sc": 14.0
+    },
+    "energy": -139.86959838867188,
+    "entry_id": "mp_mattersim_mp-1105778",
+    "mp_id": "mp-1105778"
+  },
+  {
+    "chemsys": "P-Sc",
+    "composition": {
+      "P": 4.0,
+      "Sc": 4.0
+    },
+    "energy": -54.63597106933594,
+    "entry_id": "mp_mattersim_mp-1009746",
+    "mp_id": "mp-1009746"
+  },
+  {
+    "chemsys": "P-Sc",
+    "composition": {
+      "P": 1.0,
+      "Sc": 1.0
+    },
+    "energy": -13.600091934204102,
+    "entry_id": "mp_mattersim_mp-16728",
+    "mp_id": "mp-16728"
+  },
+  {
+    "chemsys": "P-Sc",
+    "composition": {
+      "P": 4.0,
+      "Sc": 4.0
+    },
+    "energy": -58.8337287902832,
+    "entry_id": "mp_mattersim_mp-2807",
+    "mp_id": "mp-2807"
+  },
+  {
+    "chemsys": "P-Sc",
+    "composition": {
+      "P": 4.0,
+      "Sc": 12.0
+    },
+    "energy": -109.75658416748047,
+    "entry_id": "mp_mattersim_mp-1188800",
+    "mp_id": "mp-1188800"
+  },
+  {
+    "chemsys": "P-Sc",
+    "composition": {
+      "P": 8.0,
+      "Sc": 12.0
+    },
+    "energy": -144.4669189453125,
+    "entry_id": "mp_mattersim_mp-21182",
+    "mp_id": "mp-21182"
+  },
+  {
+    "chemsys": "P-Sc",
+    "composition": {
+      "P": 8.0,
+      "Sc": 12.0
+    },
+    "energy": -144.6293182373047,
+    "entry_id": "mp_mattersim_mp-22600",
+    "mp_id": "mp-22600"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 8.0,
+      "Sr": 6.0
+    },
+    "energy": -66.66009521484375,
+    "entry_id": "mp_mattersim_mp-682953",
+    "mp_id": "mp-682953"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 12.0,
+      "Sr": 4.0
+    },
+    "energy": -81.39784240722656,
+    "entry_id": "mp_mattersim_mp-11108",
+    "mp_id": "mp-11108"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 24.0,
+      "Sr": 8.0
+    },
+    "energy": -162.3424530029297,
+    "entry_id": "mp_mattersim_mp-569867",
+    "mp_id": "mp-569867"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 32.0,
+      "Sr": 48.0
+    },
+    "energy": -338.1644287109375,
+    "entry_id": "mp_mattersim_mp-32635",
+    "mp_id": "mp-32635"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 12.0,
+      "Sr": 6.0
+    },
+    "energy": -88.5169906616211,
+    "entry_id": "mp_mattersim_mp-1105302",
+    "mp_id": "mp-1105302"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 28.0,
+      "Sr": 6.0
+    },
+    "energy": -174.94190979003906,
+    "entry_id": "mp_mattersim_mp-1853",
+    "mp_id": "mp-1853"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 6.0,
+      "Sr": 6.0
+    },
+    "energy": -55.09230422973633,
+    "entry_id": "mp_mattersim_mp-7931",
+    "mp_id": "mp-7931"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 2.0,
+      "Sr": 6.0
+    },
+    "energy": -25.02713966369629,
+    "entry_id": "mp_mattersim_mp-1187135",
+    "mp_id": "mp-1187135"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 2.0,
+      "Sr": 3.0
+    },
+    "energy": -19.065675735473633,
+    "entry_id": "mp_mattersim_mp-1013552",
+    "mp_id": "mp-1013552"
+  },
+  {
+    "chemsys": "P-Sr",
+    "composition": {
+      "P": 32.0,
+      "Sr": 24.0
+    },
+    "energy": -266.64007568359375,
+    "entry_id": "mp_mattersim_mp-14288",
+    "mp_id": "mp-14288"
+  },
+  {
+    "chemsys": "P-Y",
+    "composition": {
+      "P": 10.0,
+      "Y": 2.0
+    },
+    "energy": -73.39887237548828,
+    "entry_id": "mp_mattersim_mp-9854",
+    "mp_id": "mp-9854"
+  },
+  {
+    "chemsys": "P-Y",
+    "composition": {
+      "P": 2.0,
+      "Y": 6.0
+    },
+    "energy": -52.263427734375,
+    "entry_id": "mp_mattersim_mp-1187795",
+    "mp_id": "mp-1187795"
+  },
+  {
+    "chemsys": "P-Y",
+    "composition": {
+      "P": 1.0,
+      "Y": 3.0
+    },
+    "energy": -26.175342559814453,
+    "entry_id": "mp_mattersim_mp-1187778",
+    "mp_id": "mp-1187778"
+  },
+  {
+    "chemsys": "P-Y",
+    "composition": {
+      "P": 1.0,
+      "Y": 1.0
+    },
+    "energy": -14.015910148620605,
+    "entry_id": "mp_mattersim_mp-16731",
+    "mp_id": "mp-16731"
+  },
+  {
+    "chemsys": "P-Y",
+    "composition": {
+      "P": 4.0,
+      "Y": 4.0
+    },
+    "energy": -60.50450897216797,
+    "entry_id": "mp_mattersim_mp-994",
+    "mp_id": "mp-994"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 2.0,
+      "Rb": 2.0
+    },
+    "energy": -13.857843399047852,
+    "entry_id": "mp_mattersim_mp-1065844",
+    "mp_id": "mp-1065844"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 2.0,
+      "Rb": 2.0
+    },
+    "energy": -9.649261474609375,
+    "entry_id": "mp_mattersim_mp-1179684",
+    "mp_id": "mp-1179684"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 1.0,
+      "Rb": 1.0
+    },
+    "energy": -6.1183695793151855,
+    "entry_id": "mp_mattersim_mp-1179681",
+    "mp_id": "mp-1179681"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 1.0,
+      "Rb": 1.0
+    },
+    "energy": -5.96458625793457,
+    "entry_id": "mp_mattersim_mp-1179682",
+    "mp_id": "mp-1179682"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 6.0,
+      "Rb": 6.0
+    },
+    "energy": -41.5093994140625,
+    "entry_id": "mp_mattersim_mp-9062",
+    "mp_id": "mp-9062"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 20.0,
+      "Rb": 8.0
+    },
+    "energy": -106.1043930053711,
+    "entry_id": "mp_mattersim_mp-16911",
+    "mp_id": "mp-16911"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 2.0,
+      "Rb": 4.0
+    },
+    "energy": -17.563026428222656,
+    "entry_id": "mp_mattersim_mp-721469",
+    "mp_id": "mp-721469"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 1.0,
+      "Rb": 1.0
+    },
+    "energy": -5.949016094207764,
+    "entry_id": "mp_mattersim_mp-1057750",
+    "mp_id": "mp-1057750"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -22.95368003845215,
+    "entry_id": "mp_mattersim_mp-1057437",
+    "mp_id": "mp-1057437"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 4.0,
+      "Rb": 8.0
+    },
+    "energy": -36.11925506591797,
+    "entry_id": "mp_mattersim_mp-8041",
+    "mp_id": "mp-8041"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 12.0,
+      "Rb": 8.0
+    },
+    "energy": -72.72074127197266,
+    "entry_id": "mp_mattersim_mp-7446",
+    "mp_id": "mp-7446"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 4.0,
+      "Rb": 8.0
+    },
+    "energy": -36.040557861328125,
+    "entry_id": "mp_mattersim_mp-1102384",
+    "mp_id": "mp-1102384"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -27.711380004882812,
+    "entry_id": "mp_mattersim_mp-729971",
+    "mp_id": "mp-729971"
+  },
+  {
+    "chemsys": "Rb-S",
+    "composition": {
+      "S": 4.0,
+      "Rb": 4.0
+    },
+    "energy": -27.798580169677734,
+    "entry_id": "mp_mattersim_mp-558071",
+    "mp_id": "mp-558071"
+  },
+  {
+    "chemsys": "S-Sc",
+    "composition": {
+      "S": 12.0,
+      "Sc": 8.0
+    },
+    "energy": -138.40724182128906,
+    "entry_id": "mp_mattersim_mp-684969",
+    "mp_id": "mp-684969"
+  },
+  {
+    "chemsys": "S-Sc",
+    "composition": {
+      "S": 4.0,
+      "Sc": 2.0
+    },
+    "energy": -36.40220260620117,
+    "entry_id": "mp_mattersim_mp-862373",
+    "mp_id": "mp-862373"
+  },
+  {
+    "chemsys": "S-Sc",
+    "composition": {
+      "S": 4.0,
+      "Sc": 4.0
+    },
+    "energy": -56.79365158081055,
+    "entry_id": "mp_mattersim_mp-1476",
+    "mp_id": "mp-1476"
+  },
+  {
+    "chemsys": "S-Sc",
+    "composition": {
+      "S": 12.0,
+      "Sc": 8.0
+    },
+    "energy": -136.60928344726562,
+    "entry_id": "mp_mattersim_mp-1105836",
+    "mp_id": "mp-1105836"
+  },
+  {
+    "chemsys": "S-Sc",
+    "composition": {
+      "S": 48.0,
+      "Sc": 32.0
+    },
+    "energy": -553.8828735351562,
+    "entry_id": "mp_mattersim_mp-401",
+    "mp_id": "mp-401"
+  },
+  {
+    "chemsys": "S-Sc",
+    "composition": {
+      "S": 84.0,
+      "Sc": 58.0
+    },
+    "energy": -961.7612915039062,
+    "entry_id": "mp_mattersim_mp-684978",
+    "mp_id": "mp-684978"
+  },
+  {
+    "chemsys": "S-Sr",
+    "composition": {
+      "S": 8.0,
+      "Sr": 4.0
+    },
+    "energy": -56.04993438720703,
+    "entry_id": "mp_mattersim_mp-1950",
+    "mp_id": "mp-1950"
+  },
+  {
+    "chemsys": "S-Sr",
+    "composition": {
+      "S": 1.0,
+      "Sr": 1.0
+    },
+    "energy": -9.513174057006836,
+    "entry_id": "mp_mattersim_mp-10627",
+    "mp_id": "mp-10627"
+  },
+  {
+    "chemsys": "S-Sr",
+    "composition": {
+      "S": 4.0,
+      "Sr": 4.0
+    },
+    "energy": -40.44710159301758,
+    "entry_id": "mp_mattersim_mp-1087",
+    "mp_id": "mp-1087"
+  },
+  {
+    "chemsys": "S-Sr",
+    "composition": {
+      "S": 12.0,
+      "Sr": 4.0
+    },
+    "energy": -72.36577606201172,
+    "entry_id": "mp_mattersim_mp-1175",
+    "mp_id": "mp-1175"
+  },
+  {
+    "chemsys": "S-Y",
+    "composition": {
+      "S": 18.0,
+      "Y": 12.0
+    },
+    "energy": -214.03407287597656,
+    "entry_id": "mp_mattersim_mp-541289",
+    "mp_id": "mp-541289"
+  },
+  {
+    "chemsys": "S-Y",
+    "composition": {
+      "S": 14.0,
+      "Y": 10.0
+    },
+    "energy": -172.07073974609375,
+    "entry_id": "mp_mattersim_mp-15670",
+    "mp_id": "mp-15670"
+  },
+  {
+    "chemsys": "S-Y",
+    "composition": {
+      "S": 48.0,
+      "Y": 32.0
+    },
+    "energy": -567.9039306640625,
+    "entry_id": "mp_mattersim_mp-32891",
+    "mp_id": "mp-32891"
+  },
+  {
+    "chemsys": "S-Y",
+    "composition": {
+      "S": 4.0,
+      "Y": 4.0
+    },
+    "energy": -56.58266830444336,
+    "entry_id": "mp_mattersim_mp-22562",
+    "mp_id": "mp-22562"
+  },
+  {
+    "chemsys": "S-Y",
+    "composition": {
+      "S": 4.0,
+      "Y": 4.0
+    },
+    "energy": -58.26317596435547,
+    "entry_id": "mp_mattersim_mp-1534",
+    "mp_id": "mp-1534"
+  },
+  {
+    "chemsys": "S-Y",
+    "composition": {
+      "S": 16.0,
+      "Y": 8.0
+    },
+    "energy": -119.9972152709961,
+    "entry_id": "mp_mattersim_mp-16228",
+    "mp_id": "mp-16228"
+  },
+  {
+    "chemsys": "S-Y",
+    "composition": {
+      "S": 12.0,
+      "Y": 8.0
+    },
+    "energy": -142.64959716796875,
+    "entry_id": "mp_mattersim_mp-1188645",
+    "mp_id": "mp-1188645"
+  }
+]

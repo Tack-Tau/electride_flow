@@ -1,0 +1,1204 @@
+{
+  "summary": {
+    "total_structures": 119,
+    "successfully_processed": 119,
+    "failed": 0,
+    "energy_reference": "MatterSim-v1.0.0-5M",
+    "convergence": "fmax=0.001, max_steps=800",
+    "mp_reference_source": "MP API GGA phases relaxed with MatterSim (legacy pymatgen MPRester)",
+    "mp_functional_filter": "pure_pbe",
+    "mp_cache": "/scratch/stao/vaspflow/REFINE_VASP_JOBS/mp_mattersim.json"
+  },
+  "results": [
+    {
+      "structure_id": "Ba5Al1P4_s002",
+      "composition": "Ba5Al1P4",
+      "chemsys": "Al-Ba-P",
+      "mattersim_energy_per_atom": -4.441410064697266,
+      "energy_above_hull": 0.04060790198189501,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca5Al1N4_s054",
+      "composition": "Ca5Al1N4",
+      "chemsys": "Al-Ca-N",
+      "mattersim_energy_per_atom": -5.600322341918945,
+      "energy_above_hull": 0.040386390686039775,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca8Al1N6_s028",
+      "composition": "Ca8Al1N6",
+      "chemsys": "Al-Ca-N",
+      "mattersim_energy_per_atom": -5.4171803792317705,
+      "energy_above_hull": 0.12106157938638962,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca4Al1P3_s003",
+      "composition": "Ca4Al1P3",
+      "chemsys": "Al-Ca-P",
+      "mattersim_energy_per_atom": -4.330873966217041,
+      "energy_above_hull": 0.044465871957632075,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca4Al1P3_s015",
+      "composition": "Ca4Al1P3",
+      "chemsys": "Al-Ca-P",
+      "mattersim_energy_per_atom": -4.368535995483398,
+      "energy_above_hull": 0.006803842691274653,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca4Al1P3_s019",
+      "composition": "Ca4Al1P3",
+      "chemsys": "Al-Ca-P",
+      "mattersim_energy_per_atom": -4.378620147705078,
+      "energy_above_hull": -0.0032803095304050345,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca4Al1P3_s028",
+      "composition": "Ca4Al1P3",
+      "chemsys": "Al-Ca-P",
+      "mattersim_energy_per_atom": -4.375206470489502,
+      "energy_above_hull": 0.0001333676851711374,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca4Al1P3_s006",
+      "composition": "Ca4Al1P3",
+      "chemsys": "Al-Ca-P",
+      "mattersim_energy_per_atom": -4.3788957595825195,
+      "energy_above_hull": -0.0035559214078464407,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca4Al1P3_s024",
+      "composition": "Ca4Al1P3",
+      "chemsys": "Al-Ca-P",
+      "mattersim_energy_per_atom": -4.375298023223877,
+      "energy_above_hull": 4.1814950796137396e-05,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca7Al1P5_s007",
+      "composition": "Ca7Al1P5",
+      "chemsys": "Al-Ca-P",
+      "mattersim_energy_per_atom": -4.387177100548377,
+      "energy_above_hull": -0.064853156576965,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca7Al2P6_s005",
+      "composition": "Ca7Al2P6",
+      "chemsys": "Al-Ca-P",
+      "mattersim_energy_per_atom": -4.586363728841146,
+      "energy_above_hull": -0.05326919555664045,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs3Al1F5_s026",
+      "composition": "Cs3Al1F5",
+      "chemsys": "Al-Cs-F",
+      "mattersim_energy_per_atom": -4.548290676540798,
+      "energy_above_hull": 0.10713597580238865,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs3Al1F5_s016",
+      "composition": "Cs3Al1F5",
+      "chemsys": "Al-Cs-F",
+      "mattersim_energy_per_atom": -4.559449937608507,
+      "energy_above_hull": 0.09597671473467972,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4Al3P4_s006",
+      "composition": "Cs4Al3P4",
+      "chemsys": "Al-Cs-P",
+      "mattersim_energy_per_atom": -3.858796553178267,
+      "energy_above_hull": -0.08631010489030366,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs5Al2P3_s005",
+      "composition": "Cs5Al2P3",
+      "chemsys": "Al-Cs-P",
+      "mattersim_energy_per_atom": -3.1724288940429686,
+      "energy_above_hull": 0.028323587775230585,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs5Al2P3_s003",
+      "composition": "Cs5Al2P3",
+      "chemsys": "Al-Cs-P",
+      "mattersim_energy_per_atom": -3.172297477722168,
+      "energy_above_hull": 0.02845500409603119,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs1Al1S1_s003",
+      "composition": "Cs1Al1S1",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -3.706995964050293,
+      "energy_above_hull": -0.013018908324065492,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Al1S2_s014",
+      "composition": "Cs2Al1S2",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -3.775891876220703,
+      "energy_above_hull": -0.08975918557908802,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Al1S2_s003",
+      "composition": "Cs2Al1S2",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -3.818772888183594,
+      "energy_above_hull": -0.13264019754197864,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Al1S2_s066",
+      "composition": "Cs2Al1S2",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -3.8187713623046875,
+      "energy_above_hull": -0.1326386716630723,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Al2S3_s011",
+      "composition": "Cs2Al2S3",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -4.1108406611851285,
+      "energy_above_hull": -0.10258228816683346,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Al2S3_s013",
+      "composition": "Cs2Al2S3",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -4.128667286464146,
+      "energy_above_hull": -0.12040891344585081,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Al2S3_s003",
+      "composition": "Cs2Al2S3",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -4.11154910496303,
+      "energy_above_hull": -0.10329073194473537,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Al2S3_s039",
+      "composition": "Cs2Al2S3",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -4.097607476370675,
+      "energy_above_hull": -0.08934910335238033,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs3Al2S4_s001",
+      "composition": "Cs3Al2S4",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -4.048723432752821,
+      "energy_above_hull": -0.11466333306865861,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4Al1S3_s008",
+      "composition": "Cs4Al1S3",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -3.4951560497283936,
+      "energy_above_hull": -0.09088333116637326,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs6Al1S4_s001",
+      "composition": "Cs6Al1S4",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -3.372518366033381,
+      "energy_above_hull": -0.0963638165984495,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs6Al2S5_s013",
+      "composition": "Cs6Al2S5",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -3.609312497652494,
+      "energy_above_hull": -0.09663209752139856,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs8Al1S5_s023",
+      "composition": "Cs8Al1S5",
+      "chemsys": "Al-Cs-S",
+      "mattersim_energy_per_atom": -3.2474457877022878,
+      "energy_above_hull": -0.04450162062569252,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K4Al2P3_s035",
+      "composition": "K4Al2P3",
+      "chemsys": "Al-K-P",
+      "mattersim_energy_per_atom": -3.544364081488715,
+      "energy_above_hull": 0.04308191052189558,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K4Al2P3_s051",
+      "composition": "K4Al2P3",
+      "chemsys": "Al-K-P",
+      "mattersim_energy_per_atom": -3.544361538357205,
+      "energy_above_hull": 0.04308445365340585,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb2Al1P1_s030",
+      "composition": "Rb2Al1P1",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.0421152114868164,
+      "energy_above_hull": 0.020095348358154297,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb2Al1P1_s028",
+      "composition": "Rb2Al1P1",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.042114734649658,
+      "energy_above_hull": 0.0200958251953125,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb4Al2P3_s009",
+      "composition": "Rb4Al2P3",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.4473669264051647,
+      "energy_above_hull": -0.044800193221480544,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb4Al2P3_s054",
+      "composition": "Rb4Al2P3",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.4534859127468533,
+      "energy_above_hull": -0.05091917956316916,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb4Al2P3_s035",
+      "composition": "Rb4Al2P3",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.3233439127604165,
+      "energy_above_hull": 0.07922282042326767,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb4Al3P4_s021",
+      "composition": "Rb4Al3P4",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.893903905695135,
+      "energy_above_hull": -0.1666841217965791,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb4Al3P4_s008",
+      "composition": "Rb4Al3P4",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.893904599276456,
+      "energy_above_hull": -0.16668481537790036,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb4Al4P5_s023",
+      "composition": "Rb4Al4P5",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -4.039498549241286,
+      "energy_above_hull": -0.08751896100166556,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Al1P2_s035",
+      "composition": "Rb5Al1P2",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -2.681349515914917,
+      "energy_above_hull": -0.033468743165334214,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Al1P2_s048",
+      "composition": "Rb5Al1P2",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -2.682626724243164,
+      "energy_above_hull": -0.034745951493581284,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Al2P3_s059",
+      "composition": "Rb5Al2P3",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.194804000854492,
+      "energy_above_hull": -0.03886768023173026,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Al2P3_s001",
+      "composition": "Rb5Al2P3",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.2016525268554688,
+      "energy_above_hull": -0.045716206232707,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Al2P3_s005",
+      "composition": "Rb5Al2P3",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -3.1724435806274416,
+      "energy_above_hull": -0.016507260004679836,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb7Al1P3_s011",
+      "composition": "Rb7Al1P3",
+      "chemsys": "Al-P-Rb",
+      "mattersim_energy_per_atom": -2.6800771193070845,
+      "energy_above_hull": -0.027260072303540994,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Sr5Al1P4_s024",
+      "composition": "Sr5Al1P4",
+      "chemsys": "Al-P-Sr",
+      "mattersim_energy_per_atom": -4.355558395385742,
+      "energy_above_hull": 0.03027305603027397,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ba2B1N2_s031",
+      "composition": "Ba2B1N2",
+      "chemsys": "B-Ba-N",
+      "mattersim_energy_per_atom": -6.296794637044271,
+      "energy_above_hull": 0.05193331638972065,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ba5B1N4_s012",
+      "composition": "Ba5B1N4",
+      "chemsys": "B-Ba-N",
+      "mattersim_energy_per_atom": -5.588204193115234,
+      "energy_above_hull": 0.04479039510091187,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs1B4N4_s013",
+      "composition": "Cs1B4N4",
+      "chemsys": "B-Cs-N",
+      "mattersim_energy_per_atom": -7.923706902398004,
+      "energy_above_hull": -0.022470057010651523,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4B1O3_s003",
+      "composition": "Cs4B1O3",
+      "chemsys": "B-Cs-O",
+      "mattersim_energy_per_atom": -4.7492876052856445,
+      "energy_above_hull": -0.009885556995868683,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4B1O3_s028",
+      "composition": "Cs4B1O3",
+      "chemsys": "B-Cs-O",
+      "mattersim_energy_per_atom": -4.747730731964111,
+      "energy_above_hull": -0.00832868367433548,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs10B1P4_s010",
+      "composition": "Cs10B1P4",
+      "chemsys": "B-Cs-P",
+      "mattersim_energy_per_atom": -2.6777826944986978,
+      "energy_above_hull": 0.030102262232039045,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs10B1P4_s024",
+      "composition": "Cs10B1P4",
+      "chemsys": "B-Cs-P",
+      "mattersim_energy_per_atom": -2.682173665364583,
+      "energy_above_hull": 0.025711291366153688,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4B1P2_s013",
+      "composition": "Cs4B1P2",
+      "chemsys": "B-Cs-P",
+      "mattersim_energy_per_atom": -3.301206043788365,
+      "energy_above_hull": 0.02481159993580384,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4B1P2_s035",
+      "composition": "Cs4B1P2",
+      "chemsys": "B-Cs-P",
+      "mattersim_energy_per_atom": -3.3012095860072543,
+      "energy_above_hull": 0.024808057716914522,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K6B1O4_s013",
+      "composition": "K6B1O4",
+      "chemsys": "B-K-O",
+      "mattersim_energy_per_atom": -4.4474709250710225,
+      "energy_above_hull": -0.04193160268995477,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K4B1P2_s015",
+      "composition": "K4B1P2",
+      "chemsys": "B-K-P",
+      "mattersim_energy_per_atom": -3.4293384552001953,
+      "energy_above_hull": 0.041805165154593205,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Li10B1N4_s004",
+      "composition": "Li10B1N4",
+      "chemsys": "B-Li-N",
+      "mattersim_energy_per_atom": -4.45821787516276,
+      "energy_above_hull": 0.036357879638671875,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Li10B1N4_s020",
+      "composition": "Li10B1N4",
+      "chemsys": "B-Li-N",
+      "mattersim_energy_per_atom": -4.450055948893229,
+      "energy_above_hull": 0.04451980590820348,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Na4B1N2_s009",
+      "composition": "Na4B1N2",
+      "chemsys": "B-N-Na",
+      "mattersim_energy_per_atom": -4.477749960763114,
+      "energy_above_hull": 0.04832175799778504,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Sr5B1N4_s002",
+      "composition": "Sr5B1N4",
+      "chemsys": "B-N-Sr",
+      "mattersim_energy_per_atom": -5.590522003173828,
+      "energy_above_hull": 0.04298081398010112,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Sr5B2N5_s010",
+      "composition": "Sr5B2N5",
+      "chemsys": "B-N-Sr",
+      "mattersim_energy_per_atom": -6.2159989674886065,
+      "energy_above_hull": 0.031019104851615076,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb4B1O3_s046",
+      "composition": "Rb4B1O3",
+      "chemsys": "B-O-Rb",
+      "mattersim_energy_per_atom": -4.65200138092041,
+      "energy_above_hull": 0.01389620039198114,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5B1P2_s013",
+      "composition": "Rb5B1P2",
+      "chemsys": "B-P-Rb",
+      "mattersim_energy_per_atom": -3.0494842529296875,
+      "energy_above_hull": 0.01638329029083252,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb7B1P3_s002",
+      "composition": "Rb7B1P3",
+      "chemsys": "B-P-Rb",
+      "mattersim_energy_per_atom": -2.9219349947842685,
+      "energy_above_hull": 0.034872430743592364,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb7B1P3_s015",
+      "composition": "Rb7B1P3",
+      "chemsys": "B-P-Rb",
+      "mattersim_energy_per_atom": -2.9219349947842685,
+      "energy_above_hull": 0.034872430743592364,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ba3C1N3_s029",
+      "composition": "Ba3C1N3",
+      "chemsys": "Ba-C-N",
+      "mattersim_energy_per_atom": -6.291433606828962,
+      "energy_above_hull": 0.04094496227446065,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ba4C2N5_s003",
+      "composition": "Ba4C2N5",
+      "chemsys": "Ba-C-N",
+      "mattersim_energy_per_atom": -6.800695245916193,
+      "energy_above_hull": 0.0476659138997384,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ba5Ga1N4_s004",
+      "composition": "Ba5Ga1N4",
+      "chemsys": "Ba-Ga-N",
+      "mattersim_energy_per_atom": -4.9991004943847654,
+      "energy_above_hull": 0.0495841979980467,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs10C1P4_s021",
+      "composition": "Cs10C1P4",
+      "chemsys": "C-Cs-P",
+      "mattersim_energy_per_atom": -2.7780835469563803,
+      "energy_above_hull": 0.04068344748682495,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca2Ge2F11_s001",
+      "composition": "Ca2Ge2F11",
+      "chemsys": "Ca-F-Ge",
+      "mattersim_energy_per_atom": -5.174365743001302,
+      "energy_above_hull": 0.032021522521972656,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca2Ga1N2_s008",
+      "composition": "Ca2Ga1N2",
+      "chemsys": "Ca-Ga-N",
+      "mattersim_energy_per_atom": -5.479342651367188,
+      "energy_above_hull": 0.02797441482545171,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca4Ga1P3_s036",
+      "composition": "Ca4Ga1P3",
+      "chemsys": "Ca-Ga-P",
+      "mattersim_energy_per_atom": -4.319991111755371,
+      "energy_above_hull": 0.0169370174407959,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca5Ga2P5_s024",
+      "composition": "Ca5Ga2P5",
+      "chemsys": "Ca-Ga-P",
+      "mattersim_energy_per_atom": -4.4855302174886065,
+      "energy_above_hull": 0.04104566574096413,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca7Ga1P5_s020",
+      "composition": "Ca7Ga1P5",
+      "chemsys": "Ca-Ga-P",
+      "mattersim_energy_per_atom": -4.32537607046274,
+      "energy_above_hull": -0.0187400915683833,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Ca7Ga2P6_s028",
+      "composition": "Ca7Ga2P6",
+      "chemsys": "Ca-Ga-P",
+      "mattersim_energy_per_atom": -4.425863647460938,
+      "energy_above_hull": 0.04912719726562376,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs3Ga1Cl4_s014",
+      "composition": "Cs3Ga1Cl4",
+      "chemsys": "Cl-Cs-Ga",
+      "mattersim_energy_per_atom": -3.2756576538085938,
+      "energy_above_hull": 0.03557666142781546,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs1Ga1F2_s073",
+      "composition": "Cs1Ga1F2",
+      "chemsys": "Cs-F-Ga",
+      "mattersim_energy_per_atom": -4.1637468338012695,
+      "energy_above_hull": 0.06168206532796283,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs3Ga1F4_s048",
+      "composition": "Cs3Ga1F4",
+      "chemsys": "Cs-F-Ga",
+      "mattersim_energy_per_atom": -4.079679489135742,
+      "energy_above_hull": 0.03990928332010846,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs1Ga1O1_s094",
+      "composition": "Cs1Ga1O1",
+      "chemsys": "Cs-Ga-O",
+      "mattersim_energy_per_atom": -4.109510739644368,
+      "energy_above_hull": 0.0390142864651164,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Ga1O2_s006",
+      "composition": "Cs2Ga1O2",
+      "chemsys": "Cs-Ga-O",
+      "mattersim_energy_per_atom": -4.337363433837891,
+      "energy_above_hull": 0.009027608235678386,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs3Ga1O2_s005",
+      "composition": "Cs3Ga1O2",
+      "chemsys": "Cs-Ga-O",
+      "mattersim_energy_per_atom": -3.723480542500814,
+      "energy_above_hull": 0.04035510328482239,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs7Ga1O4_s001",
+      "composition": "Cs7Ga1O4",
+      "chemsys": "Cs-Ga-O",
+      "mattersim_energy_per_atom": -3.5112342834472656,
+      "energy_above_hull": 0.024688507119814407,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs10Ga1P4_s024",
+      "composition": "Cs10Ga1P4",
+      "chemsys": "Cs-Ga-P",
+      "mattersim_energy_per_atom": -2.4271949768066405,
+      "energy_above_hull": 0.04002517991595811,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Ga1P1_s030",
+      "composition": "Cs2Ga1P1",
+      "chemsys": "Cs-Ga-P",
+      "mattersim_energy_per_atom": -2.842045545578003,
+      "energy_above_hull": 0.015396737465352306,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4Ga1P2_s015",
+      "composition": "Cs4Ga1P2",
+      "chemsys": "Cs-Ga-P",
+      "mattersim_energy_per_atom": -2.767702375139509,
+      "energy_above_hull": 0.04260498285293535,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4Ga1P2_s013",
+      "composition": "Cs4Ga1P2",
+      "chemsys": "Cs-Ga-P",
+      "mattersim_energy_per_atom": -2.767702647617885,
+      "energy_above_hull": 0.042604710374559485,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4Ga1P2_s019",
+      "composition": "Cs4Ga1P2",
+      "chemsys": "Cs-Ga-P",
+      "mattersim_energy_per_atom": -2.7831946781703403,
+      "energy_above_hull": 0.02711267982210419,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs4Ga1P2_s017",
+      "composition": "Cs4Ga1P2",
+      "chemsys": "Cs-Ga-P",
+      "mattersim_energy_per_atom": -2.7831954956054688,
+      "energy_above_hull": 0.027111862386975716,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs2Ge1O2_s004",
+      "composition": "Cs2Ge1O2",
+      "chemsys": "Cs-Ge-O",
+      "mattersim_energy_per_atom": -4.670903015136719,
+      "energy_above_hull": -0.0011557769775398796,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs10Ge1P4_s020",
+      "composition": "Cs10Ge1P4",
+      "chemsys": "Cs-Ge-P",
+      "mattersim_energy_per_atom": -2.5065081278483072,
+      "energy_above_hull": 0.044135140048132904,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs7Ge1S5_s017",
+      "composition": "Cs7Ge1S5",
+      "chemsys": "Cs-Ge-S",
+      "mattersim_energy_per_atom": -3.3220587510329027,
+      "energy_above_hull": -0.002498764258165309,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs7Ge1S5_s006",
+      "composition": "Cs7Ge1S5",
+      "chemsys": "Cs-Ge-S",
+      "mattersim_energy_per_atom": -3.3778695326585035,
+      "energy_above_hull": -0.058309545883766134,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs6Si1P3_s050",
+      "composition": "Cs6Si1P3",
+      "chemsys": "Cs-P-Si",
+      "mattersim_energy_per_atom": -2.98459529876709,
+      "energy_above_hull": 0.0052263200283051425,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs9Si1P4_s013",
+      "composition": "Cs9Si1P4",
+      "chemsys": "Cs-P-Si",
+      "mattersim_energy_per_atom": -2.7409144810267856,
+      "energy_above_hull": 0.013820634001777243,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Cs5Si1S4_s001",
+      "composition": "Cs5Si1S4",
+      "chemsys": "Cs-S-Si",
+      "mattersim_energy_per_atom": -3.691534423828125,
+      "energy_above_hull": -0.026729893684386496,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K3Ga1F5_s043",
+      "composition": "K3Ga1F5",
+      "chemsys": "F-Ga-K",
+      "mattersim_energy_per_atom": -4.322572496202257,
+      "energy_above_hull": 0.09864916624846387,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K1Ga1P1_s043",
+      "composition": "K1Ga1P1",
+      "chemsys": "Ga-K-P",
+      "mattersim_energy_per_atom": -3.567896525065104,
+      "energy_above_hull": -0.024039283631339448,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K2Ga1P1_s055",
+      "composition": "K2Ga1P1",
+      "chemsys": "Ga-K-P",
+      "mattersim_energy_per_atom": -2.9238696098327637,
+      "energy_above_hull": 0.017126599947611787,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K2Ga1P1_s070",
+      "composition": "K2Ga1P1",
+      "chemsys": "Ga-K-P",
+      "mattersim_energy_per_atom": -2.9313149452209473,
+      "energy_above_hull": 0.009681264559428193,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K2Ga1P1_s099",
+      "composition": "K2Ga1P1",
+      "chemsys": "Ga-K-P",
+      "mattersim_energy_per_atom": -2.9342966079711914,
+      "energy_above_hull": 0.006699601809184053,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K2Ga1P1_s032",
+      "composition": "K2Ga1P1",
+      "chemsys": "Ga-K-P",
+      "mattersim_energy_per_atom": -2.9256327152252197,
+      "energy_above_hull": 0.015363494555155732,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K2Ga1P1_s033",
+      "composition": "K2Ga1P1",
+      "chemsys": "Ga-K-P",
+      "mattersim_energy_per_atom": -2.9084391593933105,
+      "energy_above_hull": 0.03255705038706491,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K2Ga1P1_s001",
+      "composition": "K2Ga1P1",
+      "chemsys": "Ga-K-P",
+      "mattersim_energy_per_atom": -2.9084391593933105,
+      "energy_above_hull": 0.03255705038706491,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb7Ga1P3_s003",
+      "composition": "Rb7Ga1P3",
+      "chemsys": "Ga-P-Rb",
+      "mattersim_energy_per_atom": -2.585249814120206,
+      "energy_above_hull": 0.04857308936841509,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb7Ga1P3_s010",
+      "composition": "Rb7Ga1P3",
+      "chemsys": "Ga-P-Rb",
+      "mattersim_energy_per_atom": -2.5885779640891333,
+      "energy_above_hull": 0.045244939399487816,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Sr1Ga2P2_s018",
+      "composition": "Sr1Ga2P2",
+      "chemsys": "Ga-P-Sr",
+      "mattersim_energy_per_atom": -4.2005126953125,
+      "energy_above_hull": 0.15300551823207353,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Sr5Ga2P5_s009",
+      "composition": "Sr5Ga2P5",
+      "chemsys": "Ga-P-Sr",
+      "mattersim_energy_per_atom": -4.346800486246745,
+      "energy_above_hull": 0.025258013180321726,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K2Ge1O2_s012",
+      "composition": "K2Ge1O2",
+      "chemsys": "Ge-K-O",
+      "mattersim_energy_per_atom": -4.778916931152343,
+      "energy_above_hull": 0.04493727719873508,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K1Ge1P1_s046",
+      "composition": "K1Ge1P1",
+      "chemsys": "Ge-K-P",
+      "mattersim_energy_per_atom": -3.9899161656697593,
+      "energy_above_hull": -0.020209256668537456,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "K9Ge1P4_s002",
+      "composition": "K9Ge1P4",
+      "chemsys": "Ge-K-P",
+      "mattersim_energy_per_atom": -2.8065408979143416,
+      "energy_above_hull": 0.0398575646536683,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb4Ge2O5_s008",
+      "composition": "Rb4Ge2O5",
+      "chemsys": "Ge-O-Rb",
+      "mattersim_energy_per_atom": -5.007462935014204,
+      "energy_above_hull": 0.03161152444704829,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Ge2P4_s001",
+      "composition": "Rb5Ge2P4",
+      "chemsys": "Ge-P-Rb",
+      "mattersim_energy_per_atom": -3.5396690368652344,
+      "energy_above_hull": 0.021460273049094702,
+      "is_stable": false,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Ge1S4_s005",
+      "composition": "Rb5Ge1S4",
+      "chemsys": "Ge-Rb-S",
+      "mattersim_energy_per_atom": -3.5390491485595703,
+      "energy_above_hull": 0.00048633813858067754,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb6Si1P3_s053",
+      "composition": "Rb6Si1P3",
+      "chemsys": "P-Rb-Si",
+      "mattersim_energy_per_atom": -3.03012752532959,
+      "energy_above_hull": -0.07783761024475133,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb6Si1P3_s024",
+      "composition": "Rb6Si1P3",
+      "chemsys": "P-Rb-Si",
+      "mattersim_energy_per_atom": -3.0095373153686524,
+      "energy_above_hull": -0.05724740028381392,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb9Si1P4_s023",
+      "composition": "Rb9Si1P4",
+      "chemsys": "P-Rb-Si",
+      "mattersim_energy_per_atom": -2.7870614188058034,
+      "energy_above_hull": -0.04012548355829182,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Si1S4_s001",
+      "composition": "Rb5Si1S4",
+      "chemsys": "Rb-S-Si",
+      "mattersim_energy_per_atom": -3.708891677856445,
+      "energy_above_hull": -0.0020747184753409087,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    },
+    {
+      "structure_id": "Rb5Si1S4_s046",
+      "composition": "Rb5Si1S4",
+      "chemsys": "Rb-S-Si",
+      "mattersim_energy_per_atom": -3.7144710540771486,
+      "energy_above_hull": -0.007654094696044389,
+      "is_stable": true,
+      "passed_prescreening": true,
+      "error": null
+    }
+  ]
+}

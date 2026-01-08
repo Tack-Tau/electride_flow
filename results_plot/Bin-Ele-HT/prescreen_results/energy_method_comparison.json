@@ -1,0 +1,40 @@
+{
+  "mp_phases": {
+    "statistics": {
+      "n_structures": 954,
+      "total_energy": {
+        "mae": 25.12876078317632,
+        "rmse": 65.30024672420411,
+        "mean_diff": -24.620880397932233,
+        "std_diff": 60.480860366504764,
+        "correlation": 0.911959481786263
+      },
+      "per_atom_energy": {
+        "mae": 0.057306909348578246,
+        "rmse": 0.1624973350910355,
+        "mean_diff": -0.03197517694739107,
+        "std_diff": 0.15932034387005103,
+        "correlation": 0.9965395317740783
+      }
+    },
+    "n_matched": 954,
+    "coverage": 100.0
+  },
+  "generated_structures": {
+    "statistics": {
+      "n_structures": 17195,
+      "n_total_matched": 17493,
+      "n_outliers_filtered": 298,
+      "outlier_threshold": 0.2,
+      "mae": 0.05357520600312294,
+      "rmse": 0.06725102563053291,
+      "mean_diff": -0.050642974190014824,
+      "std_diff": 0.04424917641660788,
+      "correlation": 0.9996639897927012,
+      "min_diff": -0.37551556607828784,
+      "max_diff": 0.29335728190234267
+    },
+    "n_matched": 17195,
+    "coverage": 99.53342816500711
+  }
+}
