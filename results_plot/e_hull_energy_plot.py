@@ -66,8 +66,8 @@ def save_figure(fig, output_dir, filename_base):
     png_file = output_dir / f"{filename_base}.png"
     pdf_file = output_dir / f"{filename_base}.pdf"
     
-    fig.savefig(png_file, dpi=300, bbox_inches='tight')
-    fig.savefig(pdf_file, bbox_inches='tight')
+    fig.savefig(png_file, dpi=300)
+    fig.savefig(pdf_file)
     
     print(f"    {png_file.name}")
     print(f"    {pdf_file.name}")
@@ -138,9 +138,10 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     # ===========================================================================================
     # COMBINED SCATTER PLOT: Hull E_hull (left) + Generated Structures (right)
     # ===========================================================================================
-    fig = plt.figure(figsize=(24, 12))
+    # Use FIXED figure dimensions and subplot positions for consistent LaTeX embedding
+    fig = plt.figure(figsize=(24, 10))
     
-    # Calculate data ranges first to determine subplot widths
+    # Calculate data ranges for axis limits
     # LEFT plot data
     x1 = dft_vals_hull
     y1 = mattersim_vals_hull
@@ -149,8 +150,6 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     margin1 = (val_max1 - val_min1) * 0.05
     plot_min1, plot_max1 = val_min1 - margin1, val_max1 + margin1
     threshold = stats_hull.get('threshold', 0.1)
-    x_range1 = plot_max1 - plot_min1
-    y_range1 = threshold - plot_min1
     
     # RIGHT plot data
     x2 = vasp_vals_gen
@@ -159,23 +158,10 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     val_min2, val_max2 = all_vals2.min(), all_vals2.max()
     margin2 = (val_max2 - val_min2) * 0.05
     plot_min2, plot_max2 = val_min2 - margin2, val_max2 + margin2
-    x_range2 = plot_max2 - plot_min2
-    y_range2 = plot_max2 - plot_min2
     
-    # Calculate subplot widths based on aspect ratios
-    # We want both to have the same physical y-axis height
-    # Width is proportional to x_range / y_range
-    aspect1 = x_range1 / y_range1
-    aspect2 = x_range2 / y_range2  # This should be ~1.0
-    
-    # Normalize widths so they fit in the figure
-    total_aspect = aspect1 + aspect2
-    width1 = aspect1 / total_aspect * 0.85  # 0.85 to leave margins
-    width2 = aspect2 / total_aspect * 0.85
-    
-    # Define axes positions [left, bottom, width, height]
-    ax1 = fig.add_axes([0.06, 0.12, width1, 0.75])
-    ax2 = fig.add_axes([0.06 + width1 + 0.04, 0.12, width2, 0.75])
+    # FIXED subplot positions [left, bottom, width, height]
+    ax1 = fig.add_axes([0.06, 0.1, 0.525, 0.85])
+    ax2 = fig.add_axes([0.635, 0.1, 0.355, 0.85])
     
     # ===== LEFT: Hull Comparison Scatter =====
     xy1 = np.vstack([x1, y1])
@@ -264,7 +250,12 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     # ===========================================================================================
     # COMBINED RESIDUAL PLOT: Hull Residuals (left) + Generated Structures Residuals (right)
     # ===========================================================================================
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 12))
+    # Use FIXED figure dimensions and subplot positions for consistent LaTeX embedding
+    fig = plt.figure(figsize=(24, 12))
+    
+    # FIXED subplot positions [left, bottom, width, height]
+    ax1 = fig.add_axes([0.06, 0.1, 0.425, 0.85])
+    ax2 = fig.add_axes([0.555, 0.1, 0.425, 0.85])
     
     # ===== LEFT: Hull Comparison Residuals =====
     residuals1 = mattersim_vals_hull - dft_vals_hull
@@ -297,7 +288,7 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     ax1.axhline(y=-0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6)
     
     ax1.set_xlabel('VASP E_hull (eV/atom)', fontsize=22, fontweight='bold')
-    ax1.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=22, fontweight='bold')
+    ax1.set_ylabel(r'E_hull$_{\mathrm{MatterSim}}$ - E_hull$_{\mathrm{VASP}}$ (eV/atom)', fontsize=22, fontweight='bold')
     ax1.set_title('DFT E_hull Residuals', fontsize=24, fontweight='bold')
     
     residual_range1 = max(abs(residuals1.min()), abs(residuals1.max()))
@@ -336,7 +327,7 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
               label=f'Mean = {mean_residual2:+.4f} eV/atom')
     
     ax2.set_xlabel('VASP Energy (eV/atom)', fontsize=22, fontweight='bold')
-    ax2.set_ylabel('Residual (MatterSim - VASP) (eV/atom)', fontsize=22, fontweight='bold')
+    ax2.set_ylabel(r'E$_{\mathrm{MatterSim}}$ - E$_{\mathrm{VASP}}$ (eV/atom)', fontsize=22, fontweight='bold')
     ax2.set_title('DFT Energy Residuals', fontsize=24, fontweight='bold')
     
     residual_range2 = max(abs(residuals2.min()), abs(residuals2.max()))
@@ -353,7 +344,6 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     ax2.grid(True, alpha=0.3, linestyle='--')
     ax2.legend(loc='lower right', fontsize=18)
     
-    plt.tight_layout()
     save_figure(fig, output_dir, "hull_energy_comparison_residuals")
     plt.close()
 
@@ -433,7 +423,12 @@ def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir):
     # ===========================================================================================
     # COMBINED PLOT: MP Phases Scatter (left) + Residuals (right)
     # ===========================================================================================
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 12))
+    # Use FIXED figure dimensions and subplot positions for consistent LaTeX embedding
+    fig = plt.figure(figsize=(24, 12))
+    
+    # FIXED subplot positions [left, bottom, width, height]
+    ax1 = fig.add_axes([0.06, 0.1, 0.425, 0.85])
+    ax2 = fig.add_axes([0.555, 0.1, 0.425, 0.85])
     
     # ===== LEFT: Scatter Plot =====
     ax1.scatter(dft_per_atom, ms_per_atom, alpha=0.6, s=50, 
@@ -480,14 +475,13 @@ def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir):
               label=f'Mean = {mean_diff:+.4f} eV/atom')
     
     ax2.set_xlabel('MP Raw DFT Energy (eV/atom)', fontsize=22, fontweight='bold')
-    ax2.set_ylabel('Residual (MatterSim - MP DFT) (eV/atom)', fontsize=22, fontweight='bold')
+    ax2.set_ylabel(r'E$_{\mathrm{MatterSim}}$ - E$_{\mathrm{MP}}$ (eV/atom)', fontsize=22, fontweight='bold')
     ax2.set_title('Energy Residuals', fontsize=24, fontweight='bold')
     
     ax2.tick_params(axis='both', which='major', labelsize=18)
     ax2.grid(True, alpha=0.3, linestyle='--')
     ax2.legend(loc='lower right', fontsize=18)
     
-    plt.tight_layout()
     save_figure(fig, output_dir, "mp_phases_comparison")
     plt.close()
 
