@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Create figure and axis
-fig, ax = plt.subplots(figsize=(5, 4))
+fig, ax = plt.subplots(figsize=(5, 3.5))
 
 
 x_points = np.array([-2, 0, 0.5, 2])

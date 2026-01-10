@@ -96,7 +96,7 @@ for row, df in enumerate([df1, df2]):
         f"R2  = {correlation1:.4f}\n"
         f"MAE = {mae1:.4f} eV/atom"
     )
-    
+
     stats_text2 = (
         f"R2  = {correlation2:.4f}\n"
         f"MAE = {mae2:.4f} eV/atom"
@@ -105,7 +105,7 @@ for row, df in enumerate([df1, df2]):
     ax1.text(0.05, 0.8, stats_text2, transform=ax1.transAxes, fontsize=18)
     ax2.text(0.05, 0.8, stats_text1, transform=ax2.transAxes, fontsize=18)
     ax1.set_xlabel('$E_\\text{abs-DFT}$ (eV/atom)', fontsize=20)
-    ax1.set_ylabel('$E\\text{abs-MLP}$ (eV/atom)', fontsize=20)
+    ax1.set_ylabel('$E_\\text{abs-MLP}$ (eV/atom)', fontsize=20)
     ax2.set_xlabel('$E_\\text{ref-hull-DFT}$ (eV/atom)', fontsize=20)
     ax2.set_ylabel('$E_\\text{ref-hull-MLP}$ (eV/atom)', fontsize=20)
 
