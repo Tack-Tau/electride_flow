@@ -58,7 +58,7 @@ for row, df in enumerate([df1, df2]):
     ax1.grid(True, alpha=0.3, linestyle='--')
     ax1.minorticks_on()
     ax1.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax1.legend(loc='lower right', fontsize=18, frameon=False)
+    ax1.legend(loc='lower right', fontsize=17, frameon=False)
 
     ax1.set_xlim(plot_min2, plot_max2)
     ax1.set_ylim(plot_min2, plot_max2)
@@ -86,28 +86,28 @@ for row, df in enumerate([df1, df2]):
     ax2.grid(True, alpha=0.3, linestyle='--')
     ax2.minorticks_on()
     ax2.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax2.legend(loc='lower right', fontsize=18, frameon=False)
+    ax2.legend(loc='lower right', fontsize=17, frameon=False)
 
     ax2.set_xlim(plot_min1, plot_max1)
     ax2.set_ylim(plot_min1, threshold)
-    ax2.tick_params(axis='both', which='major', labelsize=18)
+    ax2.tick_params(axis='both', which='major', labelsize=17)
 
     stats_text1 = (
-        f"R2  = {correlation1:.4f}\n"
-        f"MAE = {mae1:.4f} eV/atom"
+        f"R2:  {correlation1:.4f}\n"
+        f"MAE: {mae1:.4f} eV/atom"
     )
 
     stats_text2 = (
-        f"R2  = {correlation2:.4f}\n"
-        f"MAE = {mae2:.4f} eV/atom"
+        f"R2: {correlation2:.4f}\n"
+        f"MAE: {mae2:.4f} eV/atom"
     )
 
-    ax1.text(0.05, 0.8, stats_text2, transform=ax1.transAxes, fontsize=18)
-    ax2.text(0.05, 0.8, stats_text1, transform=ax2.transAxes, fontsize=18)
-    ax1.set_xlabel('$E_\\text{abs-DFT}$ (eV/atom)', fontsize=20)
-    ax1.set_ylabel('$E_\\text{abs-MLP}$ (eV/atom)', fontsize=20)
-    ax2.set_xlabel('$E_\\text{ref-hull-DFT}$ (eV/atom)', fontsize=20)
-    ax2.set_ylabel('$E_\\text{ref-hull-MLP}$ (eV/atom)', fontsize=20)
+    ax1.text(0.05, 0.8, stats_text2, transform=ax1.transAxes, fontsize=17)
+    ax2.text(0.05, 0.8, stats_text1, transform=ax2.transAxes, fontsize=17)
+    ax1.set_xlabel('$E_\\text{abs-DFT}$ (eV/atom)', fontsize=19)
+    ax1.set_ylabel('$E_\\text{abs-MLP}$ (eV/atom)', fontsize=19)
+    ax2.set_xlabel('$E_\\text{ref-hull-DFT}$ (eV/atom)', fontsize=19)
+    ax2.set_ylabel('$E_\\text{ref-hull-MLP}$ (eV/atom)', fontsize=19)
 
 # Add row title
 fig.text(0.52, 0.92, '(a) Energy comparison for binaries', ha='center', va='top', fontsize=20, fontweight='bold')

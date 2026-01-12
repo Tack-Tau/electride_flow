@@ -1,9 +1,5 @@
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
-from math import gcd
-from functools import reduce
 
 # Create a figure to have 3 nested for x, y, z loops and each from 0 to 21.
 # Draw the intersection plane on (100), (010), (001).
@@ -11,9 +7,9 @@ from functools import reduce
 
 fig = plt.figure(figsize=(10, 5))
 ax = fig.add_subplot(111, projection='3d')
+color = 'plum'  # Define color variable for consistency
 
-# Set view angle for better visualization
-ax.view_init(elev=20, azim=45)
+
 
 # Define the tetrahedron vertices (x+y+z <= 20)
 vertices = np.array([
@@ -23,19 +19,30 @@ vertices = np.array([
     [0, 0, 20]
 ])
 
-# Draw tetrahedron edges
-edges = [
-    [vertices[0], vertices[1]],
-    [vertices[0], vertices[2]],
-    [vertices[0], vertices[3]],
-    [vertices[1], vertices[2]],
-    [vertices[1], vertices[3]],
-    [vertices[2], vertices[3]]
+# Draw tetrahedron edges with dashed lines for hidden edges
+# Solid edges (front-facing)
+solid_edges = [
+    [vertices[1], vertices[2]],  # x-axis to y-axis
+    [vertices[2], vertices[3]],  # y-axis to z-axis
+    [vertices[1], vertices[3]],  # x-axis to z-axis
 ]
 
-for edge in edges:
+# Dashed edges (back-facing for 3D effect)
+dashed_edges = [
+    [vertices[0], vertices[1]],  # origin to x-axis
+    [vertices[0], vertices[2]],  # origin to y-axis
+    [vertices[0], vertices[3]],  # origin to z-axis
+]
+
+for edge in solid_edges:
     points = np.array(edge)
-    ax.plot3D(points[:, 0], points[:, 1], points[:, 2], 'k-', linewidth=2, alpha=0.6)
+    ax.plot3D(points[:, 0], points[:, 1], points[:, 2], 'k-', 
+              linewidth=2, alpha=0.6)
+
+for edge in dashed_edges:
+    points = np.array(edge)
+    ax.plot3D(points[:, 0], points[:, 1], points[:, 2], 'k--', 
+              linewidth=2, alpha=0.4)
 
 # Draw the three coordinate planes with better styling
 # Plane (100): x = 0
@@ -65,7 +72,8 @@ for v in np.linspace(0.1, 4, 40):
     # Use continuous masking for smooth edges
     mask = (zz >= 0) & (zz <= 20) & (xx + yy + zz <= 20)
     zz[~mask] = np.nan
-    ax.plot_surface(xx, yy, zz, alpha=1.0, color='purple', edgecolor='none', shade=True, antialiased=True, rcount=100, ccount=100)
+    ax.plot_surface(xx, yy, zz, alpha=1.0, color=color, edgecolor='none', 
+                    shade=True, antialiased=True, rcount=100, ccount=100)
 
 # Draw boundary planes for the highlighted region (v=0 and v=4)
 for v, alpha_val in [(0, 0.4), (4, 0.4)]:
@@ -73,7 +81,8 @@ for v, alpha_val in [(0, 0.4), (4, 0.4)]:
     zz = (xx - v - 3*yy) / 3
     mask = (zz >= 0) & (zz <= 20) & (xx + yy + zz <= 20)
     zz[~mask] = np.nan
-    ax.plot_surface(xx, yy, zz, alpha=alpha_val, color='darkviolet', edgecolor='none', antialiased=True, rcount=100, ccount=100)
+    ax.plot_surface(xx, yy, zz, alpha=alpha_val, color='darkviolet', edgecolor='none', 
+                    antialiased=True, rcount=100, ccount=100)
 
 # Remove axis and grids
 ax.set_axis_off()
@@ -84,11 +93,15 @@ ax.set_ylim(0, 20)
 ax.set_zlim(0, 20)
 
 # Add labels at the vertices
+ax.text(0, 0, 0, '0', fontsize=15)
 ax.text(20.1, -3, -4, '$N_\\text{Cs}$', fontsize=15, fontweight='bold')
 ax.text(0, 19, -3, '$N_\\text{Al}$', fontsize=15, fontweight='bold')
 ax.text(0, -1.5, 21, '$N_\\text{P}$', fontsize=15, fontweight='bold')
 ax.text(15, 0, -5, 'Electride region', fontsize=13, fontweight='bold', color='darkviolet')
 #plt.tight_layout()
+
+# Set view angle for better visualization
+ax.view_init(elev=10, azim=40)
 
 plt.savefig('Fig1-1-comp.pdf', dpi=300, bbox_inches='tight')
 #plt.show()
