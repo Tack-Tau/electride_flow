@@ -553,7 +553,7 @@ def plot_ternary_hull(
             
             ax.annotate(formula_latex, xy=(d['cart_x'], d['cart_y']),
                        xytext=(x_offset, y_offset), textcoords='offset points',
-                       fontsize=13, ha='left', color='black', fontweight='bold',
+                       fontsize=18, ha='left', color='black', fontweight='bold',
                        bbox=dict(boxstyle='round,pad=0.4', facecolor='lightgray',
                                alpha=0.8, edgecolor='black', linewidth=1.2),
                        arrowprops=dict(arrowstyle='-', color='black', lw=1.2, alpha=0.7))
@@ -583,15 +583,15 @@ def plot_ternary_hull(
             formula_part = structure_id.split('_')[0] if '_' in structure_id else d['formula']
             formula_latex = formula_to_latex(formula_part)
             if pearson:
-                label_text = f"{pearson}-{formula_latex}_{structure_id.split('_')[-1]}"
+                label_text = f"{pearson}-{formula_latex}"
             else:
-                label_text = structure_id
+                label_text = formula_part
             
             x_offset, y_offset = new_stable_positions[i]
             
             ax.annotate(label_text, xy=(d['cart_x'], d['cart_y']),
                        xytext=(x_offset, y_offset), textcoords='offset points',
-                       fontsize=13, ha='left', color=stable_purple, fontweight='bold',
+                       fontsize=18, ha='left', color=stable_purple, fontweight='bold',
                        bbox=dict(boxstyle='round,pad=0.4', facecolor='lavender',
                                alpha=0.9, edgecolor=stable_purple, linewidth=2),
                        arrowprops=dict(arrowstyle='-', color=stable_purple, lw=1.5, alpha=0.7))
@@ -618,31 +618,38 @@ def plot_ternary_hull(
             formula_latex = formula_to_latex(formula_part)
             e_hull_val = d['e_above_hull']
             if pearson:
-                label_text = f"{pearson}-{formula_latex}_{structure_id.split('_')[-1]}\n({e_hull_val:.3f} eV/atom)"
+                label_text = f"{pearson}-{formula_latex}\n({e_hull_val:.3f} eV/atom)"
             else:
-                label_text = f"{structure_id}\n({e_hull_val:.3f} eV/atom)"
+                label_text = f"{formula_part}\n({e_hull_val:.3f} eV/atom)"
             
             x_offset, y_offset = new_meta_positions[i]
             
             ax.annotate(label_text, xy=(d['cart_x'], d['cart_y']),
                        xytext=(x_offset, y_offset), textcoords='offset points',
-                       fontsize=12, ha='left', color='darkorange',
+                       fontsize=18, ha='left', color='darkorange',
                        bbox=dict(boxstyle='round,pad=0.4', facecolor='lightyellow',
                                alpha=0.8, edgecolor='darkorange', linewidth=1.2),
                        arrowprops=dict(arrowstyle='-', color='darkorange', lw=1.2, alpha=0.7))
     
-    # Add legend entries
+    # Add legend entries (only if points exist)
     if new_stable or new_meta:
-        ax.scatter([], [], facecolors='none', s=220, marker='^', 
-                  edgecolors='red', linewidth=2.5, label='Confirmed electride')
-        ax.scatter([], [], facecolors='none', s=180, marker='s', 
-                  edgecolors='red', linewidth=2, label='Candidate structure')
+        # Count confirmed electrides and non-electrides
+        all_structures = new_stable + new_meta
+        confirmed_count = sum(1 for d in all_structures if d['entry_id'] in confirmed_ids)
+        candidate_count = sum(1 for d in all_structures if d['entry_id'] not in confirmed_ids)
+        
+        if confirmed_count > 0:
+            ax.scatter([], [], facecolors='none', s=220, marker='^', 
+                      edgecolors='red', linewidth=2.5, label='Electride')
+        if candidate_count > 0:
+            ax.scatter([], [], facecolors='none', s=180, marker='s', 
+                      edgecolors='red', linewidth=2, label='Not electride')
     
     # Configure plot
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title(f'{system} Ternary Phase Diagram', fontsize=22, fontweight='bold', pad=25)
-    ax.legend(loc='upper left', fontsize=14, framealpha=0.9, edgecolor='black')
+    ax.set_title(f'{system} Ternary Phase Diagram', fontsize=24, fontweight='bold', pad=25)
+    ax.legend(loc='upper left', fontsize=18, framealpha=0.0, edgecolor='none')
     
     # Save figure
     output_path = output_dir / f'{system.replace("-", "")}_ternary_hull.png'
@@ -773,11 +780,11 @@ def draw_ternary_axes(ax, elements, color='purple'):
     # Label vertices with element names (larger font)
     offset = 0.06
     ax.text(vertices[0,0], vertices[0,1] + offset, elements[0], 
-           ha='center', va='bottom', fontsize=20, fontweight='bold')
+           ha='center', va='bottom', fontsize=22, fontweight='bold')
     ax.text(vertices[1,0] - offset, vertices[1,1], elements[1], 
-           ha='right', va='center', fontsize=20, fontweight='bold')
+           ha='right', va='center', fontsize=22, fontweight='bold')
     ax.text(vertices[2,0] + offset, vertices[2,1], elements[2], 
-           ha='left', va='center', fontsize=20, fontweight='bold')
+           ha='left', va='center', fontsize=22, fontweight='bold')
     
     # Set limits with padding
     ax.set_xlim(-0.1, 1.1)

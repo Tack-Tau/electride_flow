@@ -565,7 +565,7 @@ def plot_binary_hull_combined(
                      new_meta_positions=zoom_new_meta_positions)
     
     # Set single title at top
-    fig.suptitle(f'{system} Binary Phase Diagram', fontsize=22, fontweight='bold', y=0.98)
+    fig.suptitle(f'{system} Binary Phase Diagram', fontsize=24, fontweight='bold', y=0.98)
     
     # Remove individual subplot titles
     ax_full.set_title('')
@@ -871,7 +871,7 @@ def _plot_single_hull(
             
             ax.annotate(formula_latex, xy=(d['x'], d['y']), 
                        xytext=(x_offset, y_offset), textcoords='offset points',
-                       fontsize=13, ha='center', color='black', fontweight='bold',
+                       fontsize=18, ha='center', color='black', fontweight='bold',
                        bbox=dict(boxstyle='round,pad=0.4', facecolor='lightgray', 
                                alpha=0.8, edgecolor='black', linewidth=1.2),
                        arrowprops=dict(arrowstyle='-', color='black', lw=1.2, alpha=0.7))
@@ -903,15 +903,15 @@ def _plot_single_hull(
                 formula_part = structure_id.split('_')[0] if '_' in structure_id else d['formula']
                 formula_latex = formula_to_latex(formula_part)
                 if pearson:
-                    label_text = f"{pearson}-{formula_latex}_{structure_id.split('_')[-1]}"
+                    label_text = f"{pearson}-{formula_latex}"
                 else:
-                    label_text = structure_id
+                    label_text = formula_part
                 
                 x_offset, y_offset = new_stable_positions[i]
                 
                 ax.annotate(label_text, xy=(d['x'], d['y']), 
                            xytext=(x_offset, y_offset), textcoords='offset points',
-                           fontsize=12, ha='center', color='blue', fontweight='bold',
+                           fontsize=18, ha='center', color='blue', fontweight='bold',
                            bbox=dict(boxstyle='round,pad=0.4', facecolor='lightblue', 
                                    alpha=0.9, edgecolor='blue', linewidth=2),
                            arrowprops=dict(arrowstyle='-', color='blue', lw=1.5, alpha=0.7))
@@ -940,32 +940,39 @@ def _plot_single_hull(
                 formula_latex = formula_to_latex(formula_part)
                 e_hull_val = d['e_above_hull']
                 if pearson:
-                    label_text = f"{pearson}-{formula_latex}_{structure_id.split('_')[-1]}"
+                    label_text = f"{pearson}-{formula_latex}"
                 else:
-                    label_text = f"{structure_id}"
+                    label_text = f"{formula_part}"
                 
                 x_offset, y_offset = new_meta_positions[i]
                 
                 ax.annotate(label_text, xy=(d['x'], d['y']), 
                            xytext=(x_offset, y_offset), textcoords='offset points',
-                           fontsize=11, ha='left', color='darkorange',
+                           fontsize=18, ha='left', color='darkorange',
                            bbox=dict(boxstyle='round,pad=0.4', facecolor='lightyellow', 
                                    alpha=0.8, edgecolor='darkorange', linewidth=1.2),
                            arrowprops=dict(arrowstyle='-', color='darkorange', lw=1.2, alpha=0.7))
     
-    # Add legend entries
+    # Add legend entries (only if points exist)
     if new_stable or new_meta:
-        ax.scatter([], [], facecolors='none', s=180, marker='^', 
-                  edgecolors='red', linewidth=2.5, label='Confirmed electride')
-        ax.scatter([], [], facecolors='none', s=150, marker='s', 
-                  edgecolors='red', linewidth=2, label='Candidate structure')
+        # Count confirmed electrides and non-electrides
+        all_structures = new_stable + new_meta
+        confirmed_count = sum(1 for d in all_structures if d['entry_id'] in confirmed_ids)
+        candidate_count = sum(1 for d in all_structures if d['entry_id'] not in confirmed_ids)
+        
+        if confirmed_count > 0:
+            ax.scatter([], [], facecolors='none', s=180, marker='^', 
+                      edgecolors='red', linewidth=2.5, label='Electride')
+        if candidate_count > 0:
+            ax.scatter([], [], facecolors='none', s=150, marker='s', 
+                      edgecolors='red', linewidth=2, label='Not electride')
     
     # Configure axes
-    ax.set_xlabel(f'Composition: x in {gs1_formula}$_{{1-x}}${gs2_formula}$_x$', fontsize=18, fontweight='bold')
-    ax.set_ylabel('Formation Energy (eV/atom)', fontsize=18, fontweight='bold')
+    ax.set_xlabel(f'Composition: x in {gs1_formula}$_{{1-x}}${gs2_formula}$_x$', fontsize=20, fontweight='bold')
+    ax.set_ylabel('Formation Energy (eV/atom)', fontsize=20, fontweight='bold')
     ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='lower left', fontsize=13, framealpha=0.95, edgecolor='black')
-    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.legend(loc='lower left', fontsize=18, framealpha=0.0, edgecolor='none')
+    ax.tick_params(axis='both', which='major', labelsize=16)
     
     # Set x-axis limits with some padding
     ax.set_xlim(-0.05, 1.05)
@@ -974,7 +981,7 @@ def _plot_single_hull(
     y_min = min([d['y'] for d in all_data])
     y_max_data = max([d['y'] for d in all_data if d['on_hull'] or d['e_above_hull'] <= e_hull_max])
     y_range = y_max_data - y_min
-    ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
+    ax.set_ylim(y_min - 0.2 * y_range, y_max + 0.2 * y_range)
 
 
 def main():
