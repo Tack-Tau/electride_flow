@@ -464,7 +464,7 @@ fi
 export I_MPI_FABRICS=shm:ofi
 
 # VASP executable
-VASP_CMD="srun $HOME/apps/vasp.6.2.1/bin/vasp_std"
+VASP_CMD="srun --mpi=pmi2 $HOME/apps/vasp.6.2.1/bin/vasp_std"
 
 # Change to job directory
 cd {job_dir}
