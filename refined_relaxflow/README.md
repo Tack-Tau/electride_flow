@@ -12,7 +12,7 @@ Refined electride workflow for high-precision structure optimization of promisin
 #    - analyze.py completed
 #    - filter_comb_db.py completed
 
-# 2. Submit refined workflow
+# 2. Submit refined relaxation workflow
 bash run_refineflow.sh \
     --input electride_candidates.db \
     --vasp-jobs-dir VASP_JOBS/ \
@@ -23,13 +23,24 @@ tail -f refine_workflow_<JOBID>.out
 
 # 4. Check workflow status
 python3 workflow_status.py REFINE_VASP_JOBS/workflow.json
+
+# 5. (Optional) Run electronic structure analysis
+bash run_electronic_flow.sh \
+    --refine-jobs REFINE_VASP_JOBS/ \
+    --output-dir ELECTRONIC_JOBS/ \
+    --max-concurrent 10
 ```
 
 ---
 
 ## Overview
 
-The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline designed to perform careful 3-step structure optimization on electride candidates that passed initial screening and filtering. It starts from **original unrelaxed structures** (from mattergen CIF files) and applies progressive relaxation with strict electronic convergence checks at each step.
+The **Refined Electride Workflow** is a high-precision DFT pipeline designed to perform careful structure optimization and electronic structure analysis on electride candidates. It consists of two main components:
+
+1. **Refined Relaxation** (`refine_electrideflow.py`): Progressive 3-step structure optimization with tight convergence
+2. **Electronic Structure Analysis** (`electronic_flow_manager.py`): SCF/PARCHG/ELF/BAND/PDOS calculations for detailed electronic properties
+
+The workflow starts from relaxed structures (from the initial screening) and applies progressive relaxation with strict electronic convergence checks, followed by optional detailed electronic structure calculations.
 
 ### Relationship to Original Workflow
 
@@ -73,6 +84,26 @@ The **Refined Electride Workflow** is a high-precision DFT relaxation pipeline d
 │                                                                      │
 │  Timeout handling: Continue if CONTCAR exists + electronic converged│
 │  Output: High-quality refined structures in REFINE_VASP_JOBS/       │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓ (optional)
+┌─────────────────────────────────────────────────────────────────────┐
+│              ELECTRONIC STRUCTURE WORKFLOW                          │
+│  (electronic_flow_manager.py - Detailed Electronic Analysis)       │
+├─────────────────────────────────────────────────────────────────────┤
+│  Load: Refined CONTCARs from REFINE_VASP_JOBS/*/Relax/CONTCAR     │
+│  Symmetrize: PyXtal → Conventional + Primitive cells               │
+│                                                                      │
+│  Sequential Electronic Structure Calculations:                      │
+│    SPE Job (Conventional Cell):                                     │
+│      → SC: Self-consistent field (250 k-pts/Å³)                    │
+│      → PARCHG: 5 energy windows (visualization)                     │
+│      → ELF: Electron localization function                          │
+│    BAND Job (Primitive Cell):                                       │
+│      → Band structure along high-symmetry k-path                    │
+│    DOS Job (Primitive Cell):                                        │
+│      → Projected density of states (NEDOS=3000)                     │
+│                                                                      │
+│  Output: Detailed electronic structure in ELECTRONIC_JOBS/         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -209,6 +240,10 @@ python3 filter_comb_db.py \
   - `refine_electrideflow.py` (Python workflow manager)
   - `run_refineflow.sh` (submission wrapper)
   - `submit_refineflow.sh` (SLURM job script)
+- Electronic structure workflow scripts:
+  - `electronic_flow_manager.py` (Python workflow manager for SCF/PARCHG/ELF/BAND/PDOS)
+  - `run_electronic_flow.sh` (submission wrapper)
+  - `submit_electronic_flow.sh` (SLURM job script)
 - MatterSim e_hull scripts:
   - `compute_mattersim_e_hull.py` (MatterSim relaxation and hull calculation)
   - `run_mattersim_e_hull.sh` (submission wrapper)
@@ -791,6 +826,466 @@ cp workflow.json workflow_backup_$(date +%Y%m%d).json
 
 ---
 
+## Electronic Structure Workflow
+
+After completing the refined relaxation workflow, you can perform detailed electronic structure calculations (SCF/PARCHG/ELF/BAND/PDOS) on the refined structures for in-depth analysis and visualization.
+
+### Purpose
+
+High-precision electronic structure analysis workflow:
+- **SCF (Self-Consistent Field)**: Static calculation with tight convergence
+- **PARCHG (Partial Charge Density)**: 5 energy windows for interstitial electron visualization
+- **ELF (Electron Localization Function)**: Electronic localization analysis
+- **BAND (Band Structure)**: Electronic band structure along high-symmetry k-paths
+- **PDOS (Projected Density of States)**: Orbital-projected density of states
+
+**Key Features**:
+- **Dual cell strategy**: Conventional cell for visualization (SPE), primitive cell for efficiency (BAND/PDOS)
+- **Sequential workflow**: SPE → BAND+DOS (BAND and DOS can run in parallel after SPE completes)
+- **Separate job tracking**: Individual status markers for SC, PARCHG, ELF, BAND, and PDOS stages
+- **High k-point density**: 250 k-points/Å³ for accurate electronic properties
+- **Automatic compression**: PARCHG files are compressed to save disk space
+
+### Workflow Stages
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                  ELECTRONIC STRUCTURE WORKFLOW                      │
+├─────────────────────────────────────────────────────────────────────┤
+│  Input: Refined CONTCARs from REFINE_VASP_JOBS/*/Relax/CONTCAR    │
+│                                                                      │
+│  Stage 1: Symmetrization (PyXtal)                                  │
+│    → Conventional cell (for SPE: visualization)                     │
+│    → Primitive cell (for BAND/PDOS: efficiency)                     │
+│                                                                      │
+│  Stage 2: SPE Job (Conventional Cell)                              │
+│    → SC: Self-consistent calculation (LWAVE=True, LCHARG=True)     │
+│    → PARCHG: 5 energy windows (e0025, e05, e10, band0, band1)     │
+│    → ELF: Electron localization function                            │
+│    Status: SC_DONE → PARCHG_DONE → ELF_DONE                        │
+│                                                                      │
+│  Stage 3: BAND Job (Primitive Cell, parallel with DOS)            │
+│    → Band structure along high-symmetry k-path                      │
+│    → ICHARG=2 (atomic charge density, independent of SPE)          │
+│    → 40 k-points between each high-symmetry point                   │
+│    Status: BAND_DONE                                                │
+│                                                                      │
+│  Stage 4: PDOS Job (Primitive Cell, parallel with BAND)           │
+│    → Projected density of states (LORBIT=11)                        │
+│    → ICHARG=2 (atomic charge density, independent of SPE)          │
+│    → NEDOS=3000 for smooth DOS                                      │
+│    Status: PDOS_DONE                                                │
+│                                                                      │
+│  Final State: COMPLETE (when both BAND_DONE and PDOS_DONE)        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Scripts
+
+1. **`electronic_flow_manager.py`** - Python workflow manager
+   - Loads refined CONTCARs and symmetrizes with PyXtal
+   - Generates VASP inputs for each calculation type
+   - Submits three separate SLURM jobs per structure (SPE, BAND, DOS)
+   - Monitors job status and advances through stages
+   - Tracks individual stage completion (SC/PARCHG/ELF/BAND/PDOS)
+
+2. **`run_electronic_flow.sh`** - User-facing submission wrapper
+   - Validates input paths and structure IDs
+   - Exports configuration as environment variables
+   - Submits `submit_electronic_flow.sh` as SLURM job
+
+3. **`submit_electronic_flow.sh`** - SLURM job script for workflow manager
+   - Runs workflow manager with 15-day time limit
+   - Activates conda environment
+   - Monitors and submits VASP jobs
+
+### Usage
+
+#### Basic Usage
+
+```bash
+cd refined_relaxflow/
+
+# Process all RELAX_DONE structures
+bash run_electronic_flow.sh \
+    --refine-jobs ./REFINE_VASP_JOBS \
+    --output-dir ./ELECTRONIC_JOBS \
+    --max-concurrent 10
+
+# Process specific structure IDs
+bash run_electronic_flow.sh \
+    --refine-jobs ./REFINE_VASP_JOBS \
+    --structure-ids Ba2N_s001 Ca5P3_s002 Y3N2_s003 \
+    --max-concurrent 5
+
+# Test run with 5 structures
+bash run_electronic_flow.sh \
+    --refine-jobs ./REFINE_VASP_JOBS \
+    --max-concurrent 2 \
+    --check-interval 120
+```
+
+#### Options (run_electronic_flow.sh)
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--refine-jobs` | Path to REFINE_VASP_JOBS directory | `./REFINE_VASP_JOBS` |
+| `--output-dir` | Output directory for electronic jobs | `./ELECTRONIC_JOBS` |
+| `--structure-ids` | Specific structure IDs to process | All RELAX_DONE |
+| `--max-concurrent` | Max concurrent structures | 10 |
+| `--check-interval` | Status check interval (seconds) | 60 |
+| `--conda-env` | Conda environment name | `vaspflow` |
+
+### Directory Structure
+
+```
+ELECTRONIC_JOBS/
+├── Ba2N_s001/
+│   ├── SPE/                  # Conventional cell calculations
+│   │   ├── POSCAR            # Conventional cell structure
+│   │   ├── INCAR-SC          # SC calculation settings
+│   │   ├── INCAR-ELF         # ELF calculation settings
+│   │   ├── INCAR-PARCHG-*    # PARCHG INCARs (5 energy windows)
+│   │   ├── KPOINTS           # Gamma-centered Monkhorst-Pack
+│   │   ├── POTCAR            # Pseudopotentials
+│   │   ├── vasprun.xml-SC    # SC results
+│   │   ├── OSZICAR-SC        # SC convergence
+│   │   ├── ELFCAR            # ELF output
+│   │   ├── PARCHG.tar.gz     # Compressed PARCHG files
+│   │   ├── job.sh            # SLURM script (SPE workflow)
+│   │   ├── vasp_*.out/err    # SLURM output
+│   │   ├── SC_DONE           # SC completion marker
+│   │   ├── PARCHG_DONE       # PARCHG completion marker
+│   │   ├── ELF_DONE          # ELF completion marker
+│   │   └── VASP_DONE         # SPE workflow complete
+│   ├── BAND/                 # Primitive cell band structure
+│   │   ├── POSCAR            # Primitive cell structure
+│   │   ├── INCAR             # Band calculation settings
+│   │   ├── KPOINTS           # Line-mode k-path
+│   │   ├── POTCAR            # Pseudopotentials
+│   │   ├── vasprun.xml       # Band structure data
+│   │   ├── EIGENVAL          # Eigenvalues
+│   │   ├── job.sh            # SLURM script (BAND)
+│   │   ├── vasp_*.out/err    # SLURM output
+│   │   └── BAND_DONE         # Completion marker
+│   └── DOS/                  # Primitive cell PDOS
+│       ├── POSCAR            # Primitive cell structure
+│       ├── INCAR             # DOS calculation settings
+│       ├── KPOINTS           # Dense Monkhorst-Pack
+│       ├── POTCAR            # Pseudopotentials
+│       ├── vasprun.xml       # DOS data
+│       ├── DOSCAR            # Density of states
+│       ├── job.sh            # SLURM script (DOS)
+│       ├── vasp_*.out/err    # SLURM output
+│       └── PDOS_DONE         # Completion marker
+├── Ca5P3_s002/
+│   └── ...
+└── workflow.json             # Job tracking database
+```
+
+### Workflow States
+
+The electronic workflow tracks structures through multiple stages:
+
+```
+PENDING → SC_RUNNING → SC_DONE
+                     ↓
+               PARCHG_RUNNING → PARCHG_DONE
+                              ↓
+                        ELF_RUNNING → ELF_DONE
+                                    ↓
+                              ┌─────┴─────┐
+                              ↓           ↓
+                      BAND_RUNNING    PDOS_RUNNING
+                              ↓           ↓
+                         BAND_DONE    PDOS_DONE
+                              └─────┬─────┘
+                                    ↓
+                                COMPLETE
+```
+
+**State Descriptions**:
+
+| State | Description | Next Stage |
+|-------|-------------|------------|
+| `PENDING` | Structure loaded, waiting for submission | Submit SPE job |
+| `SC_RUNNING` | SC calculation running | PARCHG stage |
+| `PARCHG_RUNNING` | PARCHG calculations running | ELF stage |
+| `ELF_RUNNING` | ELF calculation running | BAND+DOS stages |
+| `ELF_DONE` | SPE workflow complete | Submit BAND job |
+| `BAND_RUNNING` | Band structure calculation running | - |
+| `BAND_DONE` | Band structure complete | Submit DOS job |
+| `PDOS_RUNNING` | PDOS calculation running | - |
+| `PDOS_DONE` | PDOS complete | Check for COMPLETE |
+| `COMPLETE` | All stages complete | Analysis ready |
+| `*_FAILED` | Stage failed | Manual inspection |
+
+### VASP Input Settings
+
+**SC Calculation (Conventional Cell)**:
+- `PREC = Accurate`
+- `ALGO = Normal`
+- `EDIFF = 1e-6`
+- `ISMEAR = 0, SIGMA = 0.05`
+- `LWAVE = True, LCHARG = True` (for PARCHG/ELF)
+- `reciprocal_density = 250` (high k-point density)
+
+**PARCHG Calculations (Conventional Cell)**:
+- 5 energy windows: e0025 (E_F - 0.025), e05 (E_F - 0.5), e10 (E_F - 1.0), band0, band1
+- `ICHARG = 11` (read CHGCAR/WAVECAR from SC)
+- `LPARD = True` (write PARCHG)
+- Generated automatically from SC vasprun.xml
+
+**ELF Calculation (Conventional Cell)**:
+- `LELF = True` (compute ELF)
+- `ICHARG = 11` (read CHGCAR/WAVECAR from SC)
+- `ISMEAR = -5` (tetrahedron method)
+- `NEDOS = 1000`
+
+**Band Structure (Primitive Cell)**:
+- `ICHARG = 2` (atomic charge density, independent calculation)
+- `LORBIT = 11` (orbital-projected)
+- `ISMEAR = 0, SIGMA = 0.05`
+- Line-mode k-path: 40 k-points between each high-symmetry point
+- High-symmetry path determined automatically by pymatgen
+
+**PDOS (Primitive Cell)**:
+- `ICHARG = 2` (atomic charge density, independent calculation)
+- `LORBIT = 11` (orbital-projected DOS)
+- `ISMEAR = -5` (tetrahedron method)
+- `NEDOS = 3000` (smooth DOS)
+- `reciprocal_density = 250` (dense k-point sampling)
+
+### Key Design Choices
+
+**Why Conventional Cell for SPE?**
+- **Visualization**: ELF and PARCHG are typically visualized in the conventional cell for clarity
+- **Symmetry**: Easier to identify interstitial sites in conventional cell
+
+**Why Primitive Cell for BAND/PDOS?**
+- **Efficiency**: Fewer atoms → faster calculations
+- **Standard practice**: Band structures are typically computed with primitive cells
+- **Compatibility**: Easier comparison with literature and databases
+
+**Why ICHARG=2 for BAND/PDOS?**
+- **Cell mismatch**: BAND/PDOS use primitive cell, but SC uses conventional cell
+- **Independence**: Cannot reuse CHGCAR from different cell type
+- **Consistency**: Ensures VASP starts from atomic charge density for the correct cell
+
+**Why Separate Jobs for SPE/BAND/DOS?**
+- **Modularity**: Independent failure handling for each stage
+- **Flexibility**: BAND and DOS can run in parallel after SPE
+- **Resource efficiency**: Different time requirements for each stage
+
+### Monitoring Progress
+
+#### Real-time Output
+
+```bash
+# View workflow manager log
+tail -f electronic_flow_*.out
+
+# Example output:
+# [2024-12-12 14:30:15] Checking status...
+# Currently running: 8/10
+#   Ba2N_s001: SC completed, PARCHG running
+#   Ca5P3_s002: ELF completed (SPE workflow done)
+#   Y3N2_s003: Band structure running
+#
+# Statistics:
+#   PENDING: 25
+#   SC_RUNNING: 3
+#   PARCHG_RUNNING: 2
+#   ELF_RUNNING: 1
+#   ELF_DONE: 5
+#   BAND_RUNNING: 2
+#   PDOS_RUNNING: 1
+#   COMPLETE: 12
+```
+
+#### Query Database
+
+```bash
+# Check workflow status
+python3 ../workflow_status.py ELECTRONIC_JOBS/workflow.json
+
+# View specific state
+python3 ../workflow_status.py ELECTRONIC_JOBS/workflow.json --state COMPLETE
+
+# Check individual structure
+grep "Ba2N_s001" ELECTRONIC_JOBS/workflow.json
+```
+
+#### Check Individual Jobs
+
+```bash
+# Check SPE job status
+tail -f ELECTRONIC_JOBS/Ba2N_s001/SPE/vasp_*.out
+
+# Check which stage SPE is at
+ls -lh ELECTRONIC_JOBS/Ba2N_s001/SPE/*_DONE
+
+# Check band structure job
+tail -f ELECTRONIC_JOBS/Ba2N_s001/BAND/vasp_*.out
+
+# Check PDOS job
+tail -f ELECTRONIC_JOBS/Ba2N_s001/DOS/vasp_*.out
+```
+
+### Output Analysis
+
+#### Band Structure
+
+```python
+from pymatgen.io.vasp import Vasprun
+from pymatgen.electronic_structure.plotter import BSPlotter
+
+# Load band structure
+vr = Vasprun("ELECTRONIC_JOBS/Ba2N_s001/BAND/vasprun.xml")
+bs = vr.get_band_structure(line_mode=True)
+
+# Plot
+plotter = BSPlotter(bs)
+plotter.get_plot(ylim=[-5, 5]).savefig("band_structure.png")
+```
+
+#### Density of States
+
+```python
+from pymatgen.io.vasp import Vasprun
+from pymatgen.electronic_structure.plotter import DosPlotter
+
+# Load DOS
+vr = Vasprun("ELECTRONIC_JOBS/Ba2N_s001/DOS/vasprun.xml")
+dos = vr.complete_dos
+
+# Plot
+plotter = DosPlotter()
+plotter.add_dos("Total", dos)
+plotter.get_plot(xlim=[-5, 5]).savefig("dos.png")
+```
+
+#### ELF Visualization
+
+```bash
+# Extract ELFCAR and visualize with VESTA or pymatgen
+# ELFCAR is in ELECTRONIC_JOBS/Ba2N_s001/SPE/ELFCAR
+
+# Using VESTA (GUI)
+vesta ELECTRONIC_JOBS/Ba2N_s001/SPE/ELFCAR
+
+# Or extract isosurface data
+python3 -c "
+from pymatgen.io.vasp import VolumetricData
+elf = VolumetricData.from_file('ELECTRONIC_JOBS/Ba2N_s001/SPE/ELFCAR')
+# Process ELF data...
+"
+```
+
+#### PARCHG Visualization
+
+```bash
+# Extract PARCHG files from archive
+cd ELECTRONIC_JOBS/Ba2N_s001/SPE/
+tar -xzf PARCHG.tar.gz
+
+# Visualize with VESTA
+vesta PARCHG-e0025
+vesta PARCHG-band0
+```
+
+### Performance and Resources
+
+**Per Structure**:
+- **SPE job**: ~30-60 minutes (depends on system size and PARCHG calculations)
+- **BAND job**: ~15-30 minutes
+- **PDOS job**: ~15-30 minutes
+- **Total time**: ~1-2 hours per structure
+- **Disk space**: ~200-500 MB per structure (with PARCHG compression)
+
+**For 50 structures with 10 concurrent**:
+- **Wall time**: ~5-10 hours (5 batches × 1-2 hours/batch)
+- **Total core-hours**: 50 × 1.5 × 16 × 3 jobs = 3,600 core-hours
+- **Disk usage**: 50 × 300 MB = 15 GB
+
+### Troubleshooting
+
+**"CONTCAR not found for structure"**
+```bash
+# Ensure structure completed refined relaxation
+grep "structure_id" REFINE_VASP_JOBS/workflow.json | grep RELAX_DONE
+
+# Check CONTCAR exists
+ls -lh REFINE_VASP_JOBS/*/structure_id/Relax/CONTCAR
+```
+
+**"SC calculation failed"**
+```bash
+# Check VASP error
+cat ELECTRONIC_JOBS/Ba2N_s001/SPE/vasp_*.err
+
+# Check electronic convergence
+grep "reaching required accuracy" ELECTRONIC_JOBS/Ba2N_s001/SPE/OUTCAR
+```
+
+**"PARCHG generation failed"**
+```bash
+# Check if vasprun.xml-SC is valid
+grep "finalpos" ELECTRONIC_JOBS/Ba2N_s001/SPE/vasprun.xml-SC
+
+# Check generate_parchg_incars.py output
+cat ELECTRONIC_JOBS/Ba2N_s001/SPE/vasp_*.out | grep "PARCHG"
+```
+
+**"Band structure calculation stalled"**
+```bash
+# Check if POSCAR exists (primitive cell)
+ls -lh ELECTRONIC_JOBS/Ba2N_s001/BAND/POSCAR
+
+# Verify k-path was generated
+cat ELECTRONIC_JOBS/Ba2N_s001/BAND/KPOINTS
+```
+
+**"ICHARG error in BAND/DOS"**
+```bash
+# This should not happen if ICHARG=2 is set correctly
+# Check INCAR
+grep "ICHARG" ELECTRONIC_JOBS/Ba2N_s001/BAND/INCAR
+# Should show: ICHARG = 2
+```
+
+### Resume Workflow
+
+If interrupted, simply re-run the same command:
+
+```bash
+# The workflow manager will:
+# - Load existing workflow.json database
+# - Resume from current states
+# - Skip completed structures
+# - Continue monitoring running jobs
+
+bash run_electronic_flow.sh \
+    --refine-jobs ./REFINE_VASP_JOBS \
+    --output-dir ./ELECTRONIC_JOBS
+```
+
+### Prerequisites
+
+1. **Completed refined relaxation** with structures in `RELAX_DONE` state
+2. **VASP modules** and conda environment (`vaspflow`)
+3. **Disk space**: ~300-500 MB per structure
+4. **Computational resources**: CPU nodes (Orion, Apus)
+
+### Best Practices
+
+1. **Test first**: Start with 5-10 structures to verify settings
+2. **Monitor disk**: PARCHG files are large before compression
+3. **Check convergence**: Verify first completed structure before processing all
+4. **Backup database**: Copy `workflow.json` regularly
+
+---
+
 ## Integration with Original Workflow
 
 ### Workflow Pipeline
@@ -807,23 +1302,28 @@ cp workflow.json workflow_backup_$(date +%Y%m%d).json
    → electride_candidates.db
    → electride_candidates.csv
    
-4. Refined Relaxation (refine_electrideflow.py)  ← THIS WORKFLOW
+4. Refined Relaxation (refine_electrideflow.py)
    → REFINE_VASP_JOBS/
    
-5. MatterSim Validation (compute_mattersim_e_hull.py)
+5. Electronic Structure Analysis (electronic_flow_manager.py)
+   → ELECTRONIC_JOBS/ (SCF/PARCHG/ELF/BAND/PDOS)
+   
+6. MatterSim Validation (compute_mattersim_e_hull.py)
    → REFINE_VASP_JOBS/mattersim_stability_results.json
    
-6. DFT Hull Comparison (compute_dft_e_hull.py)
+7. DFT Hull Comparison (compute_dft_e_hull.py)
    → REFINE_VASP_JOBS/dft_stability_results.json
    → REFINE_VASP_JOBS/hull_comparison.json + plots
    
-7. Extract Stable Electrides (get_stable_ele_db.py)
+8. Extract Stable Electrides (get_stable_ele_db.py)
    → REFINE_VASP_JOBS/stable_electrides.csv
    → REFINE_VASP_JOBS/stable_electrides.db
    
-8. Final Analysis
+9. Final Analysis
    - Analyze stable_electrides.csv/db for publication
-   - Re-run ELF/PARCHG on stable structures (if needed)
+   - Electronic structure analysis from ELECTRONIC_JOBS/
+   - Band structure and DOS plots
+   - ELF and PARCHG visualization
    - Compare with initial screening results
 ```
 
@@ -840,6 +1340,15 @@ Original CIFs → Initial Relax → SC/PARCHG/ELF → Analysis → Filtering
                          (using VASP_JOBS POSCARs)
                                       ↓
                         High-quality refined structures
+                              (REFINE_VASP_JOBS/)
+                                      ↓
+                    ┌─────────────────┴─────────────────┐
+                    ↓                                   ↓
+          Electronic Structure              Stability Validation
+          (ELECTRONIC_JOBS/)                (MatterSim + DFT)
+          - SCF/PARCHG/ELF                           ↓
+          - Band Structure                  Stable Electrides
+          - PDOS                            Database + Analysis
 ```
 
 ---
@@ -914,7 +1423,7 @@ export MP_API_KEY="your_32_character_api_key"
 
 # Submit MatterSim job (uses GPU by default)
 bash run_mattersim_e_hull.sh \
-    --refine-jobs ../REFINE_VASP_JOBS
+    --refine-jobs ./REFINE_VASP_JOBS
 
 # For CPU mode (not recommended, 3x slower)
 # bash run_mattersim_e_hull.sh --device cpu
@@ -1060,7 +1569,7 @@ cat REFINE_VASP_JOBS/hull_comparison.json
 # 6. Extract stable electride candidates (both MatterSim and DFT stable)
 cd refined_relaxflow/
 bash run_get_stable_db.sh \
-    --refine-jobs ../REFINE_VASP_JOBS \
+    --refine-jobs ./REFINE_VASP_JOBS \
     --electride-csv ../electride_candidates.csv
 
 # This:
@@ -1113,7 +1622,7 @@ bash run_get_stable_db.sh
 
 # Custom settings
 bash run_get_stable_db.sh \
-    --refine-jobs ../REFINE_VASP_JOBS \
+    --refine-jobs ./REFINE_VASP_JOBS \
     --electride-csv ../electride_candidates.csv \
     --threshold 0.005
 ```
