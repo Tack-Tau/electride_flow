@@ -20,6 +20,7 @@ import zipfile
 import warnings
 import subprocess
 import shutil
+import numpy as np
 from pathlib import Path
 from io import StringIO
 from datetime import datetime
@@ -28,6 +29,7 @@ from pymatgen.core import Structure
 from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.sets import MPRelaxSet, MPStaticSet
 from pymatgen.io.vasp.outputs import Vasprun
+from pymatgen.electronic_structure.core import Spin
 from pymatgen.io.ase import AseAtomsAdaptor
 
 try:
@@ -77,13 +79,35 @@ def parse_band_gap_from_vasprun(vasprun_path):
             print(f"    Warning: Electronic SCF not converged")
             return None, False
         
-        if vr.efermi is None:
-            print(f"    Warning: Fermi energy (e_fermi) not found in vasprun.xml")
-            print(f"      This usually means the SC calculation didn't complete properly")
-            print(f"      Check: {vasprun_path.parent}/OUTCAR for errors")
-            return None, False
+        # For semiconductors/insulators with ISMEAR=0, efermi is None
+        # Calculate it manually from eigenvalues
+        efermi = vr.efermi
+        if efermi is None:
+            eigenvalues = vr.eigenvalues
+            spin = Spin.up if Spin.up in eigenvalues else list(eigenvalues.keys())[0]
+            eigs = eigenvalues[spin]
+            
+            energies = eigs[:, :, 0]
+            occupations = eigs[:, :, 1]
+            
+            max_occ_per_band = occupations.max(axis=0)
+            occupied_bands = max_occ_per_band > 0.5
+            
+            if not occupied_bands.any():
+                print(f"    Warning: No occupied bands found")
+                return None, False
+            
+            vbm_idx = np.where(occupied_bands)[0][-1]
+            vbm = energies[:, vbm_idx].max()
+            
+            if vbm_idx + 1 < energies.shape[1]:
+                cbm_idx = vbm_idx + 1
+                cbm = energies[:, cbm_idx].min()
+                efermi = (vbm + cbm) / 2
+            else:
+                efermi = vbm
         
-        band_structure = vr.get_band_structure(line_mode=False, efermi=vr.efermi)
+        band_structure = vr.get_band_structure(line_mode=False, efermi=efermi)
         
         if band_structure is None:
             print(f"    Warning: Band structure not available")
@@ -98,7 +122,11 @@ def parse_band_gap_from_vasprun(vasprun_path):
         band_gap = band_gap_dict['energy']
         is_semiconductor = not band_structure.is_metal()
         
-        print(f"    e_fermi = {vr.efermi:.4f} eV, band_gap = {band_gap:.4f} eV, is_metal = {band_structure.is_metal()}")
+        # Display efermi info
+        if vr.efermi is not None:
+            print(f"    e_fermi = {vr.efermi:.4f} eV, band_gap = {band_gap:.4f} eV, is_metal = {band_structure.is_metal()}")
+        else:
+            print(f"    e_fermi = {efermi:.4f} eV (calculated), band_gap = {band_gap:.4f} eV, is_metal = {band_structure.is_metal()}")
         return band_gap, is_semiconductor
         
     except Exception as e:
@@ -963,8 +991,15 @@ fi
             
             # Check for stage completion marker
             if (spe_dir / 'SC_DONE').exists():
-                # SC stage completed, transition to PARCHG_RUNNING (same job continues)
-                self.db.update_state(struct_id, 'PARCHG_RUNNING')
+                # SC stage completed, parse band gap before transition to PARCHG_RUNNING
+                vasprun_sc = spe_dir / 'vasprun.xml-SC'
+                if vasprun_sc.exists():
+                    band_gap, is_semiconductor = parse_band_gap_from_vasprun(vasprun_sc)
+                    self.db.update_state(struct_id, 'PARCHG_RUNNING', 
+                                       band_gap=band_gap, 
+                                       is_semiconductor=is_semiconductor)
+                else:
+                    self.db.update_state(struct_id, 'PARCHG_RUNNING')
                 print(f"  {struct_id}: SC completed, PARCHG stage starting")
             elif (spe_dir / 'VASP_FAILED').exists():
                 error_msg = (spe_dir / 'VASP_FAILED').read_text().strip()

@@ -29,6 +29,7 @@ import argparse
 import warnings
 import subprocess
 import shutil
+import numpy as np
 from pathlib import Path
 from datetime import datetime
 
@@ -38,6 +39,8 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.symmetry.bandstructure import HighSymmKpath
 from pymatgen.io.vasp.inputs import Kpoints
+from pymatgen.io.vasp.outputs import Vasprun
+from pymatgen.electronic_structure.core import Spin
 
 try:
     from pyxtal import pyxtal
@@ -48,6 +51,77 @@ except ImportError:
 
 warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data with symbol.*')
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
+
+
+def parse_band_gap_from_vasprun(vasprun_path):
+    """
+    Parse band gap from vasprun.xml using pymatgen's vasprun parser.
+    
+    Returns:
+        tuple: (band_gap, is_semiconductor)
+    """
+    try:
+        vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=True)
+        
+        if not vr.converged_electronic:
+            print(f"    Warning: Electronic SCF not converged")
+            return None, False
+        
+        # For semiconductors/insulators with ISMEAR=0, efermi is None
+        # Calculate it manually from eigenvalues
+        efermi = vr.efermi
+        if efermi is None:
+            eigenvalues = vr.eigenvalues
+            spin = Spin.up if Spin.up in eigenvalues else list(eigenvalues.keys())[0]
+            eigs = eigenvalues[spin]
+            
+            energies = eigs[:, :, 0]
+            occupations = eigs[:, :, 1]
+            
+            max_occ_per_band = occupations.max(axis=0)
+            occupied_bands = max_occ_per_band > 0.5
+            
+            if not occupied_bands.any():
+                print(f"    Warning: No occupied bands found")
+                return None, False
+            
+            vbm_idx = np.where(occupied_bands)[0][-1]
+            vbm = energies[:, vbm_idx].max()
+            
+            if vbm_idx + 1 < energies.shape[1]:
+                cbm_idx = vbm_idx + 1
+                cbm = energies[:, cbm_idx].min()
+                efermi = (vbm + cbm) / 2
+            else:
+                efermi = vbm
+        
+        band_structure = vr.get_band_structure(line_mode=False, efermi=efermi)
+        
+        if band_structure is None:
+            print(f"    Warning: Band structure not available")
+            print(f"      VASP finished but didn't calculate eigenvalues properly")
+            return None, False
+        
+        band_gap_dict = band_structure.get_band_gap()
+        if band_gap_dict is None or 'energy' not in band_gap_dict:
+            print(f"    Warning: Band gap data not available in band structure")
+            return None, False
+        
+        band_gap = band_gap_dict['energy']
+        is_semiconductor = not band_structure.is_metal()
+        
+        # Display efermi info
+        if vr.efermi is not None:
+            print(f"    e_fermi = {vr.efermi:.4f} eV, band_gap = {band_gap:.4f} eV, is_metal = {band_structure.is_metal()}")
+        else:
+            print(f"    e_fermi = {efermi:.4f} eV (calculated), band_gap = {band_gap:.4f} eV, is_metal = {band_structure.is_metal()}")
+        return band_gap, is_semiconductor
+        
+    except Exception as e:
+        error_msg = str(e).split('\n')[0]
+        print(f"    Warning: Could not parse vasprun.xml: {error_msg}")
+        print(f"      File: {vasprun_path}")
+        return None, False
 
 
 def load_structure_from_contcar(contcar_path):
@@ -121,6 +195,8 @@ class WorkflowDatabase:
             'spe_job_id': None,
             'band_job_id': None,
             'dos_job_id': None,
+            'band_gap': None,
+            'is_semiconductor': None,
             'spe_dir': str(base_dir / struct_id / 'SPE'),
             'band_dir': str(base_dir / struct_id / 'BAND'),
             'dos_dir': str(base_dir / struct_id / 'DOS'),
@@ -584,7 +660,7 @@ echo "========================================"
 #SBATCH --partition=Apus,Orion
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --time=06:00:00
 #SBATCH --output={band_dir}/vasp_%j.out
 #SBATCH --error={band_dir}/vasp_%j.err
@@ -952,7 +1028,15 @@ echo "End time: $(date)"
                 print(f"  {struct_id}: ELF FAILED")
             # Handle stage transitions (only if different from current state)
             elif local_status == 'PARCHG_RUNNING' and state != 'PARCHG_RUNNING':
-                self.db.update_state(struct_id, 'PARCHG_RUNNING')
+                # Parse band gap from SC vasprun.xml
+                vasprun_sc = spe_dir / 'vasprun.xml-SC'
+                if vasprun_sc.exists():
+                    band_gap, is_semiconductor = parse_band_gap_from_vasprun(vasprun_sc)
+                    self.db.update_state(struct_id, 'PARCHG_RUNNING', 
+                                       band_gap=band_gap, 
+                                       is_semiconductor=is_semiconductor)
+                else:
+                    self.db.update_state(struct_id, 'PARCHG_RUNNING')
                 print(f"  {struct_id}: SC completed, PARCHG running")
             elif local_status == 'ELF_RUNNING' and state != 'ELF_RUNNING':
                 self.db.update_state(struct_id, 'ELF_RUNNING')
