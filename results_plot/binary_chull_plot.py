@@ -565,7 +565,8 @@ def plot_binary_hull_combined(
                      new_meta_positions=zoom_new_meta_positions)
     
     # Set single title at top
-    fig.suptitle(f'{system} Binary Phase Diagram', fontsize=24, fontweight='bold', y=0.98)
+    fig.suptitle(f'{system} System ($E_{{\\mathrm{{hull}}}} \\leq {e_hull_max:.2f}$)', 
+                fontsize=24, fontweight='bold', y=0.99)
     
     # Remove individual subplot titles
     ax_full.set_title('')

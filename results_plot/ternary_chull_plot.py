@@ -648,7 +648,8 @@ def plot_ternary_hull(
     # Configure plot
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title(f'{system} Ternary Phase Diagram', fontsize=24, fontweight='bold', pad=25)
+    ax.set_title(f'{system} System ($E_{{\\mathrm{{hull}}}} \\leq {e_hull_max:.2f}$)', 
+                fontsize=24, fontweight='bold', pad=25)
     ax.legend(loc='upper left', fontsize=18, framealpha=0.0, edgecolor='none')
     
     # Save figure
