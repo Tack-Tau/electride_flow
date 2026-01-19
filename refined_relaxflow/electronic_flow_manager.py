@@ -57,6 +57,8 @@ def parse_band_gap_from_vasprun(vasprun_path):
     """
     Parse band gap from vasprun.xml using pymatgen's vasprun parser.
     
+    Handles both semiconductors and metals with ISMEAR=0 where efermi is None.
+    
     Returns:
         tuple: (band_gap, is_semiconductor)
     """
@@ -67,8 +69,7 @@ def parse_band_gap_from_vasprun(vasprun_path):
             print(f"    Warning: Electronic SCF not converged")
             return None, False
         
-        # For semiconductors/insulators with ISMEAR=0, efermi is None
-        # Calculate it manually from eigenvalues
+        # For systems with ISMEAR=0, efermi is None
         efermi = vr.efermi
         if efermi is None:
             eigenvalues = vr.eigenvalues
@@ -78,22 +79,35 @@ def parse_band_gap_from_vasprun(vasprun_path):
             energies = eigs[:, :, 0]
             occupations = eigs[:, :, 1]
             
-            max_occ_per_band = occupations.max(axis=0)
-            occupied_bands = max_occ_per_band > 0.5
+            flat_energies = energies.flatten()
+            flat_occupations = occupations.flatten()
+            sort_idx = np.argsort(flat_energies)
+            sorted_energies = flat_energies[sort_idx]
+            sorted_occupations = flat_occupations[sort_idx]
             
-            if not occupied_bands.any():
-                print(f"    Warning: No occupied bands found")
-                return None, False
+            # Find Fermi level: energy where occupation drops below threshold
+            # For semiconductors: clear jump from 1.0 to 0.0
+            # For metals: gradual decrease through partial occupations
+            occ_threshold = 0.5
+            fermi_idx = np.where(sorted_occupations < occ_threshold)[0]
             
-            vbm_idx = np.where(occupied_bands)[0][-1]
-            vbm = energies[:, vbm_idx].max()
-            
-            if vbm_idx + 1 < energies.shape[1]:
-                cbm_idx = vbm_idx + 1
-                cbm = energies[:, cbm_idx].min()
-                efermi = (vbm + cbm) / 2
+            if len(fermi_idx) == 0:
+                efermi = sorted_energies[-1]
+            elif fermi_idx[0] == 0:
+                efermi = sorted_energies[0]
             else:
-                efermi = vbm
+                last_occ_idx = fermi_idx[0] - 1
+                first_unocc_idx = fermi_idx[0]
+                
+                e_below = sorted_energies[last_occ_idx]
+                e_above = sorted_energies[first_unocc_idx]
+                occ_below = sorted_occupations[last_occ_idx]
+                occ_above = sorted_occupations[first_unocc_idx]
+                
+                if occ_below > occ_above:
+                    efermi = (e_below + e_above) / 2
+                else:
+                    efermi = e_below
         
         band_structure = vr.get_band_structure(line_mode=False, efermi=efermi)
         
