@@ -14,24 +14,102 @@ Usage:
 
 import argparse
 import warnings
+import re
 from pathlib import Path
 from typing import Dict, List
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter, MaxNLocator
 from vasprun import vasprun
+
+
+# Valence electrons for excess electron calculation
+VALENCE_ELECTRONS = {
+    'H': 1, 'Li': 1, 'Na': 1, 'K': 1, 'Rb': 1, 'Cs': 1,
+    'Be': 2, 'Mg': 2, 'Ca': 2, 'Sr': 2, 'Ba': 2,
+    'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
+    'Sc': 3, 'Y': 3,
+    'C': 4, 'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
+    'N': 3, 'P': 3, 'As': 3, 'Sb': 3, 'Bi': 3,
+    'O': 2, 'S': 2, 'Se': 2, 'Te': 2, 'Po': 2,
+    'F': 1, 'Cl': 1, 'Br': 1, 'I': 1, 'At': 1,
+}
+
+ELECTRONEGATIVE_ELEMENTS = {'N', 'P', 'As', 'Sb', 'Bi', 'O', 'S', 'Se', 'Te', 'Po', 'F', 'Cl', 'Br', 'I', 'At'}
+
+
+def parse_composition(formula: str) -> Dict[str, float]:
+    """
+    Parse chemical formula into element-count dictionary.
+    
+    Examples:
+        Ca3P1 -> {'Ca': 3, 'P': 1}
+        Y9N8 -> {'Y': 9, 'N': 8}
+        K6BO4 -> {'K': 6, 'B': 1, 'O': 4}
+    """
+    pattern = r'([A-Z][a-z]?)(\d*)'
+    composition = {}
+    
+    for match in re.finditer(pattern, formula):
+        element = match.group(1)
+        count_str = match.group(2)
+        count = int(count_str) if count_str else 1
+        
+        if element:
+            composition[element] = composition.get(element, 0) + count
+    
+    return composition
+
+
+def calculate_excess_electrons(composition: str) -> int:
+    """
+    Calculate excess valence electrons in a composition.
+    
+    - Sum valence electrons from electropositive elements (Groups I, II, III)
+    - Subtract valence electrons needed by electronegative elements (Groups V, VI, VII)
+    
+    Returns:
+        Excess electrons (should be 0 < N_excess <= 4 for electride candidates)
+    """
+    comp = parse_composition(composition)
+    
+    excess = 0.0
+    for elem_symbol, amount in comp.items():
+        if elem_symbol in VALENCE_ELECTRONS:
+            val = VALENCE_ELECTRONS[elem_symbol]
+            
+            # Electronegative elements subtract electrons
+            if elem_symbol in ELECTRONEGATIVE_ELEMENTS:
+                excess -= abs(val) * amount
+            else:
+                # Electropositive elements contribute electrons
+                excess += val * amount
+    
+    return int(round(excess))
 
 
 def formula_to_latex(formula: str) -> str:
     """Convert chemical formula to LaTeX format with subscripts.
     
+    Ignores subscript 1 (e.g., Al1 -> Al, not Al$_{1}$).
+    
     Examples:
         Ca5P3 -> Ca$_{5}$P$_{3}$
+        Ca7Al1P5 -> Ca$_{7}$AlP$_{5}$
         K6BO4 -> K$_{6}$BO$_{4}$
     """
-    import re
     pattern = r'([A-Z][a-z]?)(\d+)'
-    return re.sub(pattern, lambda m: f'{m.group(1)}$_{{{m.group(2)}}}$', formula)
+    
+    def replace_func(m):
+        element = m.group(1)
+        count = m.group(2)
+        if count == '1':
+            return element
+        else:
+            return f'{element}$_{{{count}}}$'
+    
+    return re.sub(pattern, replace_func, formula)
 
 
 def get_pearson_symbols_from_db(db_path: Path, structure_ids: List[str]) -> Dict[str, str]:
@@ -123,7 +201,8 @@ def format_kpoint_label(label: str) -> str:
 def parse_kpoints_file(kpoints_path: Path):
     """Parse KPOINTS file to extract high-symmetry point labels and positions.
     
-    Handles overlapping k-points (end of one segment = start of next segment).
+    Handles overlapping k-points (end of one segment = start of next segment)
+    and disconnected segments (labeled with " | " separator).
     
     Returns:
         labels: List of formatted k-point labels (with LaTeX)
@@ -148,9 +227,7 @@ def parse_kpoints_file(kpoints_path: Path):
             label = line.split('!')[-1].strip()
             all_labels.append(label)
     
-    # Build k-path with labels and positions
-    # In line mode KPOINTS, pairs of lines define segments: start -> end
-    # Track (position, label) pairs to handle overlaps
+    # Build k-path with labels and positions, detecting disconnected segments
     kpoint_map = {}  # position -> label
     
     current_pos = 0
@@ -161,8 +238,15 @@ def parse_kpoints_file(kpoints_path: Path):
         label_start = all_labels[i]
         label_end = all_labels[i + 1]
         
-        # Add start point
-        if current_pos not in kpoint_map:
+        # Check if this segment is disconnected from previous one
+        if current_pos in kpoint_map:
+            # Position already has a label - check if it's the same or disconnected
+            existing_label = kpoint_map[current_pos]
+            if existing_label != label_start:
+                # Disconnected segment! Merge labels with " | "
+                kpoint_map[current_pos] = f"{existing_label} | {label_start}"
+        else:
+            # First time at this position
             kpoint_map[current_pos] = label_start
         
         # Move to end of segment
@@ -172,9 +256,19 @@ def parse_kpoints_file(kpoints_path: Path):
         if current_pos not in kpoint_map:
             kpoint_map[current_pos] = label_end
     
-    # Convert to sorted lists
+    # Convert to sorted lists and format labels
     sorted_positions = sorted(kpoint_map.keys())
-    labels = [format_kpoint_label(kpoint_map[pos]) for pos in sorted_positions]
+    labels = []
+    for pos in sorted_positions:
+        label_str = kpoint_map[pos]
+        # Handle merged labels (with " | ")
+        if ' | ' in label_str:
+            parts = label_str.split(' | ')
+            formatted_parts = [format_kpoint_label(part) for part in parts]
+            labels.append(' | '.join(formatted_parts))
+        else:
+            labels.append(format_kpoint_label(label_str))
+    
     positions = sorted_positions
     
     return labels, positions
@@ -216,7 +310,7 @@ def plot_band_dos(
     dos_dir: Path,
     output_dir: Path,
     pearson_symbol: str = '',
-    energy_range: tuple = (-5, 5)
+    energy_range: tuple = (-4, 2)
 ):
     """Plot band structure and DOS for a structure.
     
@@ -262,11 +356,14 @@ def plot_band_dos(
     composition = structure_id.split('_')[0] if '_' in structure_id else structure_id
     composition_latex = formula_to_latex(composition)
     
+    # Calculate N_excess
+    n_excess = calculate_excess_electrons(composition)
+    
     # Create title
     if pearson_symbol:
-        title = f'{pearson_symbol}-{composition_latex} Band Structure and PDOS'
+        title = f'{pearson_symbol}-{composition_latex} ($N_{{\\mathrm{{excess}}}}={n_excess}$)'
     else:
-        title = f'{composition_latex} Band Structure and PDOS'
+        title = f'{composition_latex} ($N_{{\\mathrm{{excess}}}}={n_excess}$)'
     
     # Get Fermi energy
     efermi = band_run.values['calculation']['efermi']
@@ -277,7 +374,6 @@ def plot_band_dos(
     eigenvalues = np.array(band_run.values['calculation']['eband_eigenvalues'])
     n_kpts, n_bands, _ = eigenvalues.shape
     bands = eigenvalues[:, :, 0]  # Extract energies
-    occupations = eigenvalues[:, :, 1]  # Extract occupations
     
     print(f"  Band structure: {n_kpts} k-points, {n_bands} bands")
     
@@ -342,7 +438,7 @@ def plot_band_dos(
     
     # Create figure with two subplots
     fig = plt.figure(figsize=(16, 10))
-    gs = GridSpec(1, 2, figure=fig, width_ratios=[2, 1], wspace=0.05)
+    gs = GridSpec(1, 2, figure=fig, width_ratios=[2, 1], wspace=0.08)
     ax_band = fig.add_subplot(gs[0])
     ax_dos = fig.add_subplot(gs[1], sharey=ax_band)
     
@@ -358,7 +454,7 @@ def plot_band_dos(
     # Set high-symmetry k-point labels
     if kpt_labels and kpt_positions:
         ax_band.set_xticks(kpt_positions)
-        ax_band.set_xticklabels(kpt_labels, fontsize=18)
+        ax_band.set_xticklabels(kpt_labels, fontsize=20)
         
         # Add vertical lines at high-symmetry points (black solid lines)
         for pos in kpt_positions:
@@ -366,10 +462,15 @@ def plot_band_dos(
                           linewidth=2, alpha=0.8, zorder=1)
     
     # Configure band structure axes
-    ax_band.set_ylabel('Energy (eV)', fontsize=20, fontweight='bold')
+    ax_band.set_ylabel('Energy (eV)', fontsize=24, fontweight='bold', labelpad=10)
     ax_band.set_ylim(energy_range[0], energy_range[1])
     # Add small padding to ensure first and last k-point labels are visible
     ax_band.set_xlim(-0.001 * n_kpts, n_kpts * 1.001)
+    
+    # Set major tick interval to 1.0 eV
+    ax_band.yaxis.set_major_locator(MultipleLocator(1.0))
+    # Format y-axis tick labels to always show 1 decimal place
+    ax_band.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
     
     # Add horizontal gray dashed lines at major y-ticks (excluding y=0 where Fermi level is)
     ax_band.grid(False)  # Disable automatic grid
@@ -383,20 +484,20 @@ def plot_band_dos(
         spine.set_edgecolor('black')
         spine.set_linewidth(1.5)
     
-    ax_band.legend(loc='upper right', fontsize=18, framealpha=0.9, edgecolor='none', facecolor='white')
-    ax_band.tick_params(axis='both', which='major', labelsize=16)
+    ax_band.legend(loc='upper right', fontsize=20, framealpha=0.8, edgecolor='none', facecolor='white')
+    ax_band.tick_params(axis='both', which='major', labelsize=20)
     ax_band.tick_params(axis='x', which='both', bottom=False, top=False)  # Hide x-ticks
     ax_band.tick_params(axis='y', which='major', labelleft=True)  # Ensure y-tick labels are visible
     
     # Plot total DOS
-    ax_dos.plot(total_dos, dos_energies, color='black', linewidth=2.5, 
+    ax_dos.plot(total_dos, dos_energies, color='black', linewidth=1.5, 
                label='Total', alpha=0.8, zorder=3)
     ax_dos.fill_betweenx(dos_energies, 0, total_dos, color='gray', 
                          alpha=0.2, zorder=1)
     
     # Plot projected DOS by element
     if element_pdos:
-        colors = plt.cm.Dark2(np.linspace(0, 1, len(element_pdos)))
+        colors = plt.cm.Dark2(np.arange(0, 0.2 * len(element_pdos), 0.2))
         for idx, (element, pdos) in enumerate(element_pdos.items()):
             ax_dos.plot(pdos, dos_energies, linewidth=2.5, 
                        label=element, alpha=0.8, color=colors[idx], zorder=2)
@@ -405,19 +506,18 @@ def plot_band_dos(
     ax_dos.axhline(y=0, color='red', linestyle='--', linewidth=2.5, zorder=5)
     
     # Calculate dynamic x-axis upper limit for DOS
-    # Find maximum DOS value within the energy range
+    # Use median of total DOS within the energy range
     energy_mask = (dos_energies >= energy_range[0]) & (dos_energies <= energy_range[1])
+    mean_dos_in_range = np.mean(total_dos[energy_mask])
     max_dos_in_range = total_dos[energy_mask].max()
-    if element_pdos:
-        for pdos in element_pdos.values():
-            max_dos_in_range = max(max_dos_in_range, pdos[energy_mask].max())
-    
-    # Set upper limit with 10% padding
-    dos_xlim_max = max_dos_in_range * 1.1
+    dos_xlim_max = mean_dos_in_range * 2.0
     
     # Configure DOS axes
-    ax_dos.set_xlabel('DOS (states/eV)', fontsize=20, fontweight='bold')
+    ax_dos.set_xlabel('DOS (states/eV)', fontsize=24, fontweight='bold')
     ax_dos.set_xlim(0, dos_xlim_max)
+    
+    # Set consistent number of x-axis ticks to ensure uniform plot width across all structures
+    ax_dos.xaxis.set_major_locator(MaxNLocator(nbins=5, min_n_ticks=4))
     
     # Sync y-ticks with band structure plot but hide labels (do this before setting ylim)
     ax_dos.set_yticks(ax_band.get_yticks())
@@ -446,23 +546,28 @@ def plot_band_dos(
         spine.set_edgecolor('black')
         spine.set_linewidth(1.5)
     
-    ax_dos.legend(loc='upper right', fontsize=18, framealpha=0.9, edgecolor='none', facecolor='white')
-    ax_dos.tick_params(axis='x', which='major', labelsize=16)
+    ax_dos.legend(loc='upper right', fontsize=20, framealpha=0.8, edgecolor='none', facecolor='white')
+    # Format x-axis tick labels to always show 1 decimal place
+    ax_dos.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+    ax_dos.tick_params(axis='x', which='major', labelsize=20)
     
     # Set main title
-    fig.suptitle(title, fontsize=24, fontweight='bold', y=0.96)
+    fig.suptitle(title, fontsize=28, fontweight='bold', y=0.98)
+    
+    # Use fixed subplot margins to ensure consistent plot dimensions across all structures
+    fig.subplots_adjust(left=0.08, right=0.97, bottom=0.08, top=0.92)
     
     # Save figure
     output_png = output_dir / f'{structure_id}_band_dos.png'
     output_pdf = output_dir / f'{structure_id}_band_dos.pdf'
     
-    # Suppress tight_layout warning (plots render correctly despite warning)
+    # Suppress tight_layout warning
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='This figure includes Axes that are not compatible with tight_layout')
-        fig.savefig(output_png, dpi=300, bbox_inches='tight')
+        fig.savefig(output_png, dpi=300)
         print(f"  Saved: {output_png}")
         
-        fig.savefig(output_pdf, bbox_inches='tight')
+        fig.savefig(output_pdf)
         print(f"  Saved: {output_pdf}")
     
     plt.close(fig)
@@ -488,8 +593,8 @@ def main():
     parser.add_argument('--output-dir', type=Path, default=Path('band_dos_plots'),
                        help='Output directory for plots (default: band_dos_plots)')
     
-    parser.add_argument('--energy-range', type=float, nargs=2, default=(-5, 5),
-                       help='Energy range relative to Fermi level (min max) in eV (default: -5 5)')
+    parser.add_argument('--energy-range', type=float, nargs=2, default=(-4, 2),
+                       help='Energy range relative to Fermi level (min max) in eV (default: -4 2)')
     
     parser.add_argument('--base-dir', type=Path, default=None,
                        help='Base directory to search for structure data (default: current directory)')
