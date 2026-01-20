@@ -35,16 +35,167 @@ from pymatgen.entries.computed_entries import ComputedEntry
 from pymatgen.analysis.phase_diagram import PhaseDiagram
 
 
+# Valence electrons for excess electron calculation
+VALENCE_ELECTRONS = {
+    'H': 1, 'Li': 1, 'Na': 1, 'K': 1, 'Rb': 1, 'Cs': 1,
+    'Be': 2, 'Mg': 2, 'Ca': 2, 'Sr': 2, 'Ba': 2,
+    'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
+    'Sc': 3, 'Y': 3,
+    'C': 4, 'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
+    'N': 3, 'P': 3, 'As': 3, 'Sb': 3, 'Bi': 3,
+    'O': 2, 'S': 2, 'Se': 2, 'Te': 2, 'Po': 2,
+    'F': 1, 'Cl': 1, 'Br': 1, 'I': 1, 'At': 1,
+}
+
+# Element groups matching search_ternary_electrides.py
+GROUP_I_II_III = ['Li', 'Na', 'K', 'Rb', 'Cs', 'Mg', 'Ca', 'Sr', 'Ba', 'Sc', 'Y']
+GROUP_III_IV = ['B', 'Al', 'Ga', 'In', 'C', 'Si', 'Ge', 'Sn', 'Pb']
+GROUP_V_VI_VII = ['N', 'P', 'As', 'Sb', 'O', 'S', 'Se', 'Te', 'F', 'Cl', 'Br', 'I']
+
+
+def reorder_elements_for_boundary(elements: List[str]) -> Tuple[List[str], List[int]]:
+    """
+    Reorder elements to match search_ternary_electrides.py convention:
+    A (Group I/II/III metals) - B (Group III/IV semi-metals) - C (Group V/VI/VII non-metals)
+    
+    This ensures the N_excess boundary calculation matches the search script logic.
+    
+    Args:
+        elements: List of 3 elements in any order (usually alphabetical)
+    
+    Returns:
+        (reordered_elements, index_mapping): 
+            - reordered_elements: [A, B, C] in chemical group order
+            - index_mapping: Indices to convert from chemical order back to original order
+    """
+    elem_groups = []
+    for elem in elements:
+        if elem in GROUP_I_II_III:
+            elem_groups.append((0, elem))  # Group A
+        elif elem in GROUP_III_IV:
+            elem_groups.append((1, elem))  # Group B
+        elif elem in GROUP_V_VI_VII:
+            elem_groups.append((2, elem))  # Group C
+        else:
+            # Fallback for elements not in defined groups
+            elem_groups.append((3, elem))
+    
+    # Sort by group
+    elem_groups_sorted = sorted(elem_groups, key=lambda x: x[0])
+    reordered = [elem for _, elem in elem_groups_sorted]
+    
+    # Create index mapping: reordered[i] corresponds to elements[index_mapping[i]]
+    index_mapping = [elements.index(elem) for elem in reordered]
+    
+    return reordered, index_mapping
+
+ELECTRONEGATIVE_ELEMENTS = {'N', 'P', 'As', 'Sb', 'Bi', 'O', 'S', 'Se', 'Te', 'Po', 'F', 'Cl', 'Br', 'I', 'At'}
+
+
 def formula_to_latex(formula: str) -> str:
     """Convert chemical formula to LaTeX format with subscripts.
     
+    Ignores subscript 1 (e.g., Al1 -> Al, not Al$_{1}$).
+    
     Examples:
-        Ca5P3 -> Ca$_{5}$P$_{3}$
+        Ca7Al1P5 -> Ca$_{7}$AlP$_{5}$
         K6BO4 -> K$_{6}$BO$_{4}$
     """
     import re
     pattern = r'([A-Z][a-z]?)(\d+)'
-    return re.sub(pattern, lambda m: f'{m.group(1)}$_{{{m.group(2)}}}$', formula)
+    
+    def replace_func(m):
+        element = m.group(1)
+        count = m.group(2)
+        if count == '1':
+            return element
+        else:
+            return f'{element}$_{{{count}}}$'
+    
+    return re.sub(pattern, replace_func, formula)
+
+
+def calculate_nexcess_boundaries_ternary(elem_A: str, elem_B: str, elem_C: str, 
+                                         n_excess_max: float = 2.0, max_atoms: int = 15) -> Tuple[List[Tuple], List[Tuple]]:
+    """
+    Calculate exact composition boundaries for N_excess region in ternary A-B-C system.
+    This matches exactly the logic in search_ternary_electrides.py.
+    
+    Iterates through all reduced integer combinations (l, m, n) with l+m+n <= max_atoms
+    and finds compositions where 0 < N_excess <= n_excess_max, then computes the 
+    convex hull of these valid compositions to get the boundary polygon.
+    
+    For ternary system A_l B_m C_n:
+    - N_excess = val_A * l + val_B * m - val_C * n
+    - x_A = l / (l + m + n), x_B = m / (l + m + n)
+    
+    Args:
+        elem_A: Symbol of element A (vertex at bottom-left)
+        elem_B: Symbol of element B (vertex at top)
+        elem_C: Symbol of element C (vertex at bottom-right)
+        n_excess_max: Maximum excess electrons (default 2 for ternary)
+        max_atoms: Maximum total atoms in formula (default 15 for ternary)
+    
+    Returns:
+        (boundary_points, None): List of (x_A, x_B) coordinates defining boundary polygon
+    """
+    from math import gcd
+    from functools import reduce
+    
+    def gcd_multiple(numbers):
+        """Calculate GCD of multiple numbers."""
+        return reduce(gcd, numbers)
+    
+    if elem_A not in VALENCE_ELECTRONS or elem_B not in VALENCE_ELECTRONS or elem_C not in VALENCE_ELECTRONS:
+        return None, None
+    
+    val_A = VALENCE_ELECTRONS[elem_A]
+    val_B = VALENCE_ELECTRONS[elem_B]
+    val_C = VALENCE_ELECTRONS[elem_C]
+    
+    valid_points = []
+    
+    # Iterate through all possible stoichiometries
+    for l in range(1, max_atoms):
+        for m in range(1, max_atoms):
+            for n in range(1, max_atoms):
+                if l + m + n > max_atoms:
+                    continue
+                
+                # Reduce to smallest integer ratio
+                g = gcd_multiple([l, m, n])
+                l_p, m_p, n_p = l // g, m // g, n // g
+                
+                # Skip if not reduced form
+                if (l_p, m_p, n_p) != (l, m, n):
+                    continue
+                
+                # Calculate excess electrons
+                n_excess = val_A * l_p + val_B * m_p - val_C * n_p
+                
+                # Check if in valid range
+                if 0 < n_excess <= n_excess_max:
+                    x_A = l_p / (l_p + m_p + n_p)
+                    x_B = m_p / (l_p + m_p + n_p)
+                    valid_points.append((x_A, x_B))
+    
+    if not valid_points:
+        return None, None
+    
+    # Compute convex hull to get boundary polygon
+    from scipy.spatial import ConvexHull
+    try:
+        hull = ConvexHull(valid_points)
+        boundary_points = [valid_points[i] for i in hull.vertices]
+        # Sort points by angle for proper polygon plotting
+        center = np.mean(boundary_points, axis=0)
+        angles = [np.arctan2(p[1] - center[1], p[0] - center[0]) for p in boundary_points]
+        sorted_indices = np.argsort(angles)
+        boundary_points = [boundary_points[i] for i in sorted_indices]
+        return boundary_points, None
+    except:
+        # If convex hull fails (e.g., all points are collinear), return all points
+        return valid_points, None
 
 
 def prompt_for_confirmed_electrides(
@@ -520,6 +671,36 @@ def plot_ternary_hull(
     # Draw ternary axes with black color
     draw_ternary_axes(ax, elements, 'black')
     
+    # Reorder elements to match search script convention for boundary calculation
+    reordered_elems, index_mapping = reorder_elements_for_boundary(elements)
+    boundary_points, _ = calculate_nexcess_boundaries_ternary(
+        reordered_elems[0], reordered_elems[1], reordered_elems[2], 
+        n_excess_max=2.0, 
+        max_atoms=20
+    )
+    if boundary_points is not None and len(boundary_points) >= 3:
+        # Convert barycentric coordinates to Cartesian
+        # boundary_points are in reordered (chemical group) order: (x_A, x_B) where A, B, C are metal, semi-metal, non-metal
+        # Need to convert to plot order (alphabetical): elements[0], elements[1], elements[2]
+        polygon_points = []
+        for x_reordered_0, x_reordered_1 in boundary_points:
+            x_reordered_2 = 1 - x_reordered_0 - x_reordered_1
+            x_reordered = [x_reordered_0, x_reordered_1, x_reordered_2]
+            
+            # Convert from reordered (chemical) to alphabetical order
+            x_plot = [0, 0, 0]
+            for i, idx in enumerate(index_mapping):
+                x_plot[idx] = x_reordered[i]
+            
+            bary = np.array(x_plot)
+            cart = bary2cart(bary)
+            polygon_points.append(cart)
+        
+        # Create and fill polygon
+        polygon = Polygon(polygon_points, alpha=0.35, facecolor='gold', 
+                        edgecolor='none', zorder=1, label='')
+        ax.add_patch(polygon)
+    
     # Draw full hull facets first (purple solid lines, lower zorder)
     draw_hull_facets(ax, pd_all, all_data, elements, linestyle='-', color=stable_purple, 
                     linewidth=2.5, alpha=0.8, label='Convex hull', zorder=2)
@@ -648,8 +829,14 @@ def plot_ternary_hull(
     # Configure plot
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title(f'{system} System ($E_{{\\mathrm{{hull}}}} \\leq {e_hull_max:.2f}$)', 
-                fontsize=24, fontweight='bold', pad=25)
+    
+    # Set title (only show energy range if there are metastable structures)
+    if new_meta:
+        title = f'{system} ($E_{{\\mathrm{{hull}}}} \\leq {e_hull_max:.2f}$ eV/atom)'
+    else:
+        title = f'{system}'
+    ax.set_title(title, fontsize=24, fontweight='bold', pad=25)
+    
     ax.legend(loc='upper left', fontsize=18, framealpha=0.0, edgecolor='none')
     
     # Save figure

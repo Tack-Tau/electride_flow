@@ -34,16 +34,102 @@ from pymatgen.entries.computed_entries import ComputedEntry
 from pymatgen.analysis.phase_diagram import PhaseDiagram
 
 
+# Valence electrons for excess electron calculation
+VALENCE_ELECTRONS = {
+    'H': 1, 'Li': 1, 'Na': 1, 'K': 1, 'Rb': 1, 'Cs': 1,
+    'Be': 2, 'Mg': 2, 'Ca': 2, 'Sr': 2, 'Ba': 2,
+    'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
+    'Sc': 3, 'Y': 3,
+    'C': 4, 'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
+    'N': 3, 'P': 3, 'As': 3, 'Sb': 3, 'Bi': 3,
+    'O': 2, 'S': 2, 'Se': 2, 'Te': 2, 'Po': 2,
+    'F': 1, 'Cl': 1, 'Br': 1, 'I': 1, 'At': 1,
+}
+
+ELECTRONEGATIVE_ELEMENTS = {'N', 'P', 'As', 'Sb', 'Bi', 'O', 'S', 'Se', 'Te', 'Po', 'F', 'Cl', 'Br', 'I', 'At'}
+
+
 def formula_to_latex(formula: str) -> str:
     """Convert chemical formula to LaTeX format with subscripts.
     
+    Ignores subscript 1 (e.g., Al1 -> Al, not Al$_{1}$).
+    
     Examples:
         Ca5P3 -> Ca$_{5}$P$_{3}$
-        K6BO4 -> K$_{6}$BO$_{4}$
+        Ca3P1 -> Ca$_{3}$P
     """
     import re
     pattern = r'([A-Z][a-z]?)(\d+)'
-    return re.sub(pattern, lambda m: f'{m.group(1)}$_{{{m.group(2)}}}$', formula)
+    
+    def replace_func(m):
+        element = m.group(1)
+        count = m.group(2)
+        if count == '1':
+            return element
+        else:
+            return f'{element}$_{{{count}}}$'
+    
+    return re.sub(pattern, replace_func, formula)
+
+
+def calculate_nexcess_boundaries_binary(elem_A: str, elem_C: str, n_excess_max: float = 4.0, max_atoms: int = 20) -> Tuple[float, float]:
+    """
+    Calculate exact composition boundaries for N_excess region in binary A-C system.
+    This matches exactly the logic in search_binary_electrides.py.
+    
+    Iterates through all reduced integer combinations (l, n) with l+n <= max_atoms
+    and finds compositions where 0 < N_excess <= n_excess_max.
+    
+    For binary system A_l C_n:
+    - N_excess = val_A * l - val_C * n
+    - x_C = n / (l + n) (fraction of element C)
+    
+    Args:
+        elem_A: Symbol of element A (electropositive, usually metal)
+        elem_C: Symbol of element C (electronegative, usually non-metal)
+        n_excess_max: Maximum excess electrons (default 4 for binary)
+        max_atoms: Maximum total atoms in formula (default 20 for binary)
+    
+    Returns:
+        (x_C_min, x_C_max): Composition fraction boundaries for element C
+    """
+    from math import gcd
+    
+    if elem_A not in VALENCE_ELECTRONS or elem_C not in VALENCE_ELECTRONS:
+        return None, None
+    
+    val_A = VALENCE_ELECTRONS[elem_A]
+    val_C = VALENCE_ELECTRONS[elem_C]
+    
+    valid_x_C = []
+    
+    # Iterate through all possible stoichiometries
+    for l in range(1, max_atoms):
+        for n in range(1, max_atoms):
+            if l + n > max_atoms:
+                continue
+            
+            # Reduce to smallest integer ratio
+            g = gcd(l, n)
+            l_p, n_p = l // g, n // g
+            
+            # Skip if not reduced form
+            if (l_p, n_p) != (l, n):
+                continue
+            
+            # Calculate excess electrons
+            n_excess = val_A * l_p - val_C * n_p
+            
+            # Check if in valid range
+            if 0 < n_excess <= n_excess_max:
+                x_C = n_p / (l_p + n_p)
+                valid_x_C.append(x_C)
+    
+    if not valid_x_C:
+        return None, None
+    
+    # Return the envelope (min and max x_C values)
+    return min(valid_x_C), max(valid_x_C)
 
 
 def prompt_for_confirmed_electrides(
@@ -564,9 +650,12 @@ def plot_binary_hull_combined(
                      new_stable_positions=zoom_new_stable_positions,
                      new_meta_positions=zoom_new_meta_positions)
     
-    # Set single title at top
-    fig.suptitle(f'{system} System ($E_{{\\mathrm{{hull}}}} \\leq {e_hull_max:.2f}$)', 
-                fontsize=24, fontweight='bold', y=0.99)
+    # Set single title at top (only show energy range if there are metastable structures)
+    if zoom_new_meta:
+        title = f'{system} ($E_{{\\mathrm{{hull}}}} \\leq {e_hull_max:.2f}$ eV/atom)'
+    else:
+        title = f'{system}'
+    fig.suptitle(title, fontsize=24, fontweight='bold', y=0.99)
     
     # Remove individual subplot titles
     ax_full.set_title('')
@@ -838,6 +927,17 @@ def _plot_single_hull(
     metastable_phases = [d for d in all_data if not d['on_hull'] and d['e_above_hull'] <= e_hull_max]
     new_stable = [d for d in hull_phases if d['is_electride']]
     new_meta = [d for d in metastable_phases if d['is_electride']]
+    
+    # Highlight N_excess region (only in full hull plot)
+    if plot_full_hull:
+        x_C_lower, x_C_upper = calculate_nexcess_boundaries_binary(
+            elements[0], elements[1], 
+            n_excess_max=4.0, 
+            max_atoms=20
+        )
+        if x_C_lower is not None and x_C_upper is not None and x_C_lower < x_C_upper:
+            ax.axvspan(x_C_lower, x_C_upper, alpha=0.35, color='gold', zorder=0, 
+                      label='')
     
     # Plot MP-only convex hull (gray dashed line)
     mp_hull_data = [d for d in all_data if d['on_mp_hull']]
