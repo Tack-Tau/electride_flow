@@ -95,16 +95,29 @@ ELECTRONEGATIVE_ELEMENTS = {'N', 'P', 'As', 'Sb', 'Bi', 'O', 'S', 'Se', 'Te', 'P
 def formula_to_latex(formula: str) -> str:
     """Convert chemical formula to LaTeX format with subscripts.
     
-    Ignores subscript 1 (e.g., Al1 -> Al, not Al$_{1}$).
+    Handles both simple subscripts (Ca3 -> Ca$_{3}$) and 
+    parentheses subscripts (Ca3(AlP2)2 -> Ca$_{3}$(AlP$_{2}$)$_{2}$).
+    Ignores subscript 1.
     
     Examples:
         Ca7Al1P5 -> Ca$_{7}$AlP$_{5}$
         K6BO4 -> K$_{6}$BO$_{4}$
+        Ca3(AlP2)2 -> Ca$_{3}$(AlP$_{2}$)$_{2}$
     """
     import re
-    pattern = r'([A-Z][a-z]?)(\d+)'
     
-    def replace_func(m):
+    # First, handle closing parenthesis followed by number: )2 -> )$_{2}$
+    def replace_paren(m):
+        count = m.group(1)
+        if count == '1':
+            return ')'
+        else:
+            return f')$_{{{count}}}$'
+    
+    result = re.sub(r'\)(\d+)', replace_paren, formula)
+    
+    # Then handle element followed by number: Ca2 -> Ca$_{2}$
+    def replace_elem(m):
         element = m.group(1)
         count = m.group(2)
         if count == '1':
@@ -112,7 +125,9 @@ def formula_to_latex(formula: str) -> str:
         else:
             return f'{element}$_{{{count}}}$'
     
-    return re.sub(pattern, replace_func, formula)
+    result = re.sub(r'([A-Z][a-z]?)(\d+)', replace_elem, result)
+    
+    return result
 
 
 def calculate_nexcess_boundaries_ternary(elem_A: str, elem_B: str, elem_C: str, 

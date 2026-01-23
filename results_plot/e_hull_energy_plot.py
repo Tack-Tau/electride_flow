@@ -24,6 +24,7 @@ from pymatgen.core import Composition
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.ticker import MultipleLocator
 from scipy.stats import gaussian_kde
 
 mpl.use('Agg')
@@ -83,8 +84,27 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     """
     print("\nGenerating combined hull energy comparison plots...")
     
-    # ===== PREPARE DATA FOR HULL COMPARISON =====
+    # ===== DETERMINE SYSTEM TYPE (BINARY OR TERNARY) =====
+    # Read composition from first structure to determine element count
+    system_type = "binary"  # default
+    
+    # Try to get composition from hull_comparison data
     matched_hull = hull_comparison_data.get('matched_structures', [])
+    if matched_hull:
+        first_comp = Composition(matched_hull[0].get('composition', ''))
+        n_elements = len(first_comp.elements)
+        system_type = "ternary" if n_elements == 3 else "binary"
+    else:
+        # Try prescreening data
+        prescreen_results = prescreen_data.get('results', [])
+        if prescreen_results:
+            first_comp = Composition(prescreen_results[0].get('composition', ''))
+            n_elements = len(first_comp.elements)
+            system_type = "ternary" if n_elements == 3 else "binary"
+    
+    print(f"  Detected system type: {system_type}")
+    
+    # ===== PREPARE DATA FOR HULL COMPARISON =====
     stats_hull = hull_comparison_data.get('summary', {})
     
     if not matched_hull:
@@ -141,6 +161,9 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     # Use FIXED figure dimensions and subplot positions for consistent LaTeX embedding
     fig = plt.figure(figsize=(24, 10))
     
+    # Add single title at the top
+    fig.suptitle(f'Energy comparison for {system_type} structures', fontsize=32, fontweight='bold', y=0.98)
+    
     # Calculate data ranges for axis limits
     # LEFT plot data
     x1 = dft_vals_hull
@@ -160,8 +183,8 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     plot_min2, plot_max2 = val_min2 - margin2, val_max2 + margin2
     
     # FIXED subplot positions [left, bottom, width, height]
-    ax1 = fig.add_axes([0.06, 0.1, 0.525, 0.85])
-    ax2 = fig.add_axes([0.635, 0.1, 0.355, 0.85])
+    ax1 = fig.add_axes([0.063, 0.1, 0.525, 0.82])
+    ax2 = fig.add_axes([0.635, 0.1, 0.355, 0.82])
     
     # ===== LEFT: Hull Comparison Scatter =====
     xy1 = np.vstack([x1, y1])
@@ -175,38 +198,36 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     x1_sorted, y1_sorted, z1_sorted = x1[idx1], y1[idx1], z1[idx1]
     
     scatter1 = ax1.scatter(x1_sorted, y1_sorted, c=z1_sorted, cmap=cmap, 
-                          norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                          norm=mpl.colors.LogNorm(), s=50, marker='s', 
                           edgecolors='none')
     
     ax1.plot([plot_min1, plot_max1], [plot_min1, plot_max1], 'r--', 
-            linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
-    ax1.axhline(y=threshold, color='green', linestyle=':', linewidth=2, 
-               alpha=0.6, label=f'Stability threshold ({threshold} eV/atom)')
+            linewidth=2.5, alpha=0.7, label='Perfect agreement')
+    ax1.axhline(y=threshold, color='green', linestyle=':', linewidth=2, alpha=0.6)
     ax1.axvline(x=threshold, color='green', linestyle=':', linewidth=2, alpha=0.6)
     
-    ax1.set_xlabel('VASP E_hull (eV/atom)', fontsize=22, fontweight='bold')
-    ax1.set_ylabel('MatterSim E_hull (eV/atom)', fontsize=22, fontweight='bold')
-    ax1.set_title('DFT E_hull Comparison', fontsize=24, fontweight='bold')
+    ax1.set_xlabel(r'E$_{\mathrm{ref\text{-}hull\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
+    ax1.set_ylabel(r'E$_{\mathrm{ref\text{-}hull\text{-}MLP}}$ (eV/atom)', fontsize=26, fontweight='bold')
     
     correlation1 = np.corrcoef(mattersim_vals_hull, dft_vals_hull)[0, 1]
     mae1 = np.mean(np.abs(mattersim_vals_hull - dft_vals_hull))
     
     stats_text1 = (
-        f"N = {len(matched_hull)}\n"
+        # f"N = {len(matched_hull)}\n"
         f"R = {correlation1:.4f}\n"
         f"MAE = {mae1:.4f} eV/atom"
     )
-    ax1.text(0.02, 0.98, stats_text1, transform=ax1.transAxes, fontsize=18,
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    ax1.text(0.02, 0.98, stats_text1, transform=ax1.transAxes, fontsize=22,
+            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.0))
     
     ax1.grid(True, alpha=0.3, linestyle='--')
     ax1.minorticks_on()
     ax1.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax1.legend(loc='lower right', fontsize=18)
+    ax1.legend(loc='lower right', fontsize=22, framealpha=0.0, edgecolor='none')
     
     ax1.set_xlim(plot_min1, plot_max1)
     ax1.set_ylim(plot_min1, threshold)
-    ax1.tick_params(axis='both', which='major', labelsize=18)
+    ax1.tick_params(axis='both', which='major', labelsize=22)
     
     # ===== RIGHT: Generated Structures Scatter =====
     xy2 = np.vstack([x2, y2])
@@ -217,32 +238,41 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     x2_sorted, y2_sorted, z2_sorted = x2[idx2], y2[idx2], z2[idx2]
     
     scatter2 = ax2.scatter(x2_sorted, y2_sorted, c=z2_sorted, cmap=cmap, 
-                          norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                          norm=mpl.colors.LogNorm(), s=50, marker='s', 
                           edgecolors='none')
     
     ax2.plot([plot_min2, plot_max2], [plot_min2, plot_max2], 'r--',
-            linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
+            linewidth=2.5, alpha=0.7, label='Perfect agreement')
     
-    ax2.set_xlabel('VASP Energy (eV/atom)', fontsize=22, fontweight='bold')
-    ax2.set_ylabel('MatterSim Energy (eV/atom)', fontsize=22, fontweight='bold')
-    ax2.set_title('DFT Energy Comparison', fontsize=24, fontweight='bold')
+    ax2.set_xlabel(r'E$_{\mathrm{abs\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
+    ax2.set_ylabel(r'E$_{\mathrm{abs\text{-}MLP}}$ (eV/atom)', fontsize=26, fontweight='bold')
     
     correlation2 = np.corrcoef(ms_vals_gen, vasp_vals_gen)[0, 1]
     mae2 = np.mean(np.abs(ms_vals_gen - vasp_vals_gen))
     
     stats_text2 = (
-        f"N = {len(matched_gen_filtered)}\n"
+        # f"N = {len(matched_gen_filtered)}\n"
         f"R = {correlation2:.4f}\n"
         f"MAE = {mae2:.4f} eV/atom"
     )
-    ax2.text(0.02, 0.98, stats_text2, transform=ax2.transAxes, fontsize=18,
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    ax2.text(0.02, 0.98, stats_text2, transform=ax2.transAxes, fontsize=22,
+            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.0))
     
     ax2.grid(True, alpha=0.3, linestyle='--')
-    ax2.legend(loc='lower right', fontsize=18)
+    ax2.legend(loc='lower right', fontsize=22, framealpha=0.0, edgecolor='none')
     ax2.set_xlim(plot_min2, plot_max2)
     ax2.set_ylim(plot_min2, plot_max2)
-    ax2.tick_params(axis='both', which='major', labelsize=18)
+    
+    # Set custom tick spacing
+    ax2.xaxis.set_major_locator(MultipleLocator(2.0))
+    ax2.xaxis.set_minor_locator(MultipleLocator(0.5))
+    ax2.yaxis.set_major_locator(MultipleLocator(2.0))
+    ax2.yaxis.set_minor_locator(MultipleLocator(0.5))
+    
+    ax2.tick_params(axis='both', which='major', labelsize=22)
+    ax2.tick_params(axis='both', which='minor', length=4)
+    ax2.minorticks_on()
+    ax2.grid(True, which='minor', alpha=0.15, linestyle=':')
     
     save_figure(fig, output_dir, "hull_energy_comparison_scatter")
     plt.close()
@@ -253,9 +283,12 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     # Use FIXED figure dimensions and subplot positions for consistent LaTeX embedding
     fig = plt.figure(figsize=(24, 12))
     
+    # Add single title at the top
+    fig.suptitle(f'Energy comparison for {system_type} structures', fontsize=32, fontweight='bold', y=0.98)
+    
     # FIXED subplot positions [left, bottom, width, height]
-    ax1 = fig.add_axes([0.06, 0.1, 0.425, 0.85])
-    ax2 = fig.add_axes([0.555, 0.1, 0.425, 0.85])
+    ax1 = fig.add_axes([0.06, 0.1, 0.425, 0.82])
+    ax2 = fig.add_axes([0.555, 0.1, 0.425, 0.82])
     
     # ===== LEFT: Hull Comparison Residuals =====
     residuals1 = mattersim_vals_hull - dft_vals_hull
@@ -273,34 +306,33 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     x_res1_sorted, y_res1_sorted, z_res1_sorted = x_res1[idx_res1], y_res1[idx_res1], z_res1[idx_res1]
     
     scatter_res1 = ax1.scatter(x_res1_sorted, y_res1_sorted, c=z_res1_sorted, cmap=cmap_res, 
-                              norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                              norm=mpl.colors.LogNorm(), s=50, marker='s', 
                               edgecolors='none')
     
-    ax1.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7, 
+    ax1.axhline(y=0, color='r', linestyle='--', linewidth=2.5, alpha=0.7, 
                label='Zero residual')
     
     mean_residual1 = np.mean(residuals1)
-    ax1.axhline(y=mean_residual1, color='orange', linestyle='-', linewidth=2, 
+    ax1.axhline(y=mean_residual1, color='orange', linestyle='-', linewidth=2.5, 
                alpha=0.7, label=f'Mean = {mean_residual1:+.4f} eV/atom')
     
     ax1.axhline(y=0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6, 
                label='±0.05 eV/atom')
     ax1.axhline(y=-0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6)
     
-    ax1.set_xlabel('VASP E_hull (eV/atom)', fontsize=22, fontweight='bold')
-    ax1.set_ylabel(r'E_hull$_{\mathrm{MatterSim}}$ - E_hull$_{\mathrm{VASP}}$ (eV/atom)', fontsize=22, fontweight='bold')
-    ax1.set_title('DFT E_hull Residuals', fontsize=24, fontweight='bold')
+    ax1.set_xlabel(r'E$_{\mathrm{ref\text{-}hull\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
+    ax1.set_ylabel(r'E$_{\mathrm{ref\text{-}hull\text{-}MLP}}$ - E$_{\mathrm{ref\text{-}hull\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
     
     residual_range1 = max(abs(residuals1.min()), abs(residuals1.max()))
     y_limit1 = max(0.2, residual_range1 * 1.5)
     
     ax1.set_xlim(plot_min1, plot_max1)
     
-    ax1.tick_params(axis='both', which='major', labelsize=18)
+    ax1.tick_params(axis='both', which='major', labelsize=22)
     ax1.grid(True, alpha=0.3, linestyle='--')
     ax1.minorticks_on()
     ax1.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax1.legend(loc='lower right', fontsize=18)
+    ax1.legend(loc='lower right', fontsize=22, framealpha=0.0, edgecolor='none')
     
     # ===== RIGHT: Generated Structures Residuals =====
     residuals2 = ms_vals_gen - vasp_vals_gen
@@ -315,20 +347,19 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     x_res2_sorted, y_res2_sorted, z_res2_sorted = x_res2[idx_res2], y_res2[idx_res2], z_res2[idx_res2]
     
     scatter_res2 = ax2.scatter(x_res2_sorted, y_res2_sorted, c=z_res2_sorted, cmap=cmap_res, 
-                              norm=mpl.colors.LogNorm(), s=20, marker='s', 
+                              norm=mpl.colors.LogNorm(), s=50, marker='s', 
                               edgecolors='none')
     
-    ax2.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
+    ax2.axhline(y=0, color='r', linestyle='--', linewidth=2.5, alpha=0.7,
               label='Zero residual')
     
     mean_residual2 = np.mean(residuals2)
     ax2.axhline(y=mean_residual2, color='orange', linestyle='-',
-              linewidth=2, alpha=0.7,
+              linewidth=2.5, alpha=0.7,
               label=f'Mean = {mean_residual2:+.4f} eV/atom')
     
-    ax2.set_xlabel('VASP Energy (eV/atom)', fontsize=22, fontweight='bold')
-    ax2.set_ylabel(r'E$_{\mathrm{MatterSim}}$ - E$_{\mathrm{VASP}}$ (eV/atom)', fontsize=22, fontweight='bold')
-    ax2.set_title('DFT Energy Residuals', fontsize=24, fontweight='bold')
+    ax2.set_xlabel(r'E$_{\mathrm{abs\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
+    ax2.set_ylabel(r'E$_{\mathrm{abs\text{-}MLP}}$ - E$_{\mathrm{abs\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
     
     residual_range2 = max(abs(residuals2.min()), abs(residuals2.max()))
     y_limit2 = max(0.2, residual_range2 * 1.5)
@@ -340,9 +371,9 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     
     ax2.set_xlim(plot_min2, plot_max2)
     
-    ax2.tick_params(axis='both', which='major', labelsize=18)
+    ax2.tick_params(axis='both', which='major', labelsize=22)
     ax2.grid(True, alpha=0.3, linestyle='--')
-    ax2.legend(loc='lower right', fontsize=18)
+    ax2.legend(loc='lower right', fontsize=22, framealpha=0.0, edgecolor='none')
     
     save_figure(fig, output_dir, "hull_energy_comparison_residuals")
     plt.close()
@@ -426,12 +457,15 @@ def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir):
     # Use FIXED figure dimensions and subplot positions for consistent LaTeX embedding
     fig = plt.figure(figsize=(24, 12))
     
+    # Add single title at the top
+    fig.suptitle('Energy comparison for MP reference phases', fontsize=32, fontweight='bold', y=0.98)
+    
     # FIXED subplot positions [left, bottom, width, height]
-    ax1 = fig.add_axes([0.06, 0.1, 0.425, 0.85])
-    ax2 = fig.add_axes([0.555, 0.1, 0.425, 0.85])
+    ax1 = fig.add_axes([0.06, 0.1, 0.425, 0.82])
+    ax2 = fig.add_axes([0.555, 0.1, 0.425, 0.82])
     
     # ===== LEFT: Scatter Plot =====
-    ax1.scatter(dft_per_atom, ms_per_atom, alpha=0.6, s=50, 
+    ax1.scatter(dft_per_atom, ms_per_atom, alpha=0.6, s=80, 
               c='forestgreen', edgecolors='none')
     
     all_vals = np.concatenate([ms_per_atom, dft_per_atom])
@@ -440,47 +474,45 @@ def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir):
     plot_min, plot_max = val_min - margin, val_max + margin
     
     ax1.plot([plot_min, plot_max], [plot_min, plot_max], 'r--', 
-            linewidth=2, alpha=0.7, label='Perfect agreement (y=x)')
+            linewidth=2.5, alpha=0.7, label='Perfect agreement')
     
-    ax1.set_xlabel('MP Raw DFT Energy (eV/atom)', fontsize=22, fontweight='bold')
-    ax1.set_ylabel('MatterSim Energy (eV/atom)', fontsize=22, fontweight='bold')
-    ax1.set_title('Energy Comparison', fontsize=24, fontweight='bold')
+    ax1.set_xlabel(r'E$_{\mathrm{abs\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
+    ax1.set_ylabel(r'E$_{\mathrm{abs\text{-}MLP}}$ (eV/atom)', fontsize=26, fontweight='bold')
     
     stats_text = (
-        f"N = {len(matched)}\n"
+        # f"N = {len(matched)}\n"
         f"R = {correlation:.4f}\n"
         f"MAE = {mae:.4f} eV/atom"
     )
-    ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes, fontsize=18,
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes, fontsize=22,
+            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.0))
     
     ax1.grid(True, alpha=0.3, linestyle='--')
-    ax1.legend(loc='lower right', fontsize=18)
+    ax1.legend(loc='lower right', fontsize=22, framealpha=0.0, edgecolor='none')
     ax1.set_xlim(plot_min, plot_max)
     ax1.set_ylim(plot_min, plot_max)
     ax1.set_aspect('equal', adjustable='box')
-    ax1.tick_params(axis='both', which='major', labelsize=18)
+    ax1.tick_params(axis='both', which='major', labelsize=22)
     
     # ===== RIGHT: Residual Plot =====
     residuals = ms_per_atom - dft_per_atom
     mean_diff = np.mean(residuals)
     
-    ax2.scatter(dft_per_atom, residuals, alpha=0.6, s=50,
+    ax2.scatter(dft_per_atom, residuals, alpha=0.6, s=80,
               c='forestgreen', edgecolors='none')
     
-    ax2.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
+    ax2.axhline(y=0, color='r', linestyle='--', linewidth=2.5, alpha=0.7,
               label='Zero residual')
     ax2.axhline(y=mean_diff, color='orange', linestyle='-',
-              linewidth=2, alpha=0.7, 
+              linewidth=2.5, alpha=0.7, 
               label=f'Mean = {mean_diff:+.4f} eV/atom')
     
-    ax2.set_xlabel('MP Raw DFT Energy (eV/atom)', fontsize=22, fontweight='bold')
-    ax2.set_ylabel(r'E$_{\mathrm{MatterSim}}$ - E$_{\mathrm{MP}}$ (eV/atom)', fontsize=22, fontweight='bold')
-    ax2.set_title('Energy Residuals', fontsize=24, fontweight='bold')
+    ax2.set_xlabel(r'E$_{\mathrm{abs\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
+    ax2.set_ylabel(r'E$_{\mathrm{abs\text{-}MLP}}$ - E$_{\mathrm{abs\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
     
-    ax2.tick_params(axis='both', which='major', labelsize=18)
+    ax2.tick_params(axis='both', which='major', labelsize=22)
     ax2.grid(True, alpha=0.3, linestyle='--')
-    ax2.legend(loc='lower right', fontsize=18)
+    ax2.legend(loc='lower right', fontsize=22, framealpha=0.0, edgecolor='none')
     
     save_figure(fig, output_dir, "mp_phases_comparison")
     plt.close()

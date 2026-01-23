@@ -52,16 +52,29 @@ ELECTRONEGATIVE_ELEMENTS = {'N', 'P', 'As', 'Sb', 'Bi', 'O', 'S', 'Se', 'Te', 'P
 def formula_to_latex(formula: str) -> str:
     """Convert chemical formula to LaTeX format with subscripts.
     
-    Ignores subscript 1 (e.g., Al1 -> Al, not Al$_{1}$).
+    Handles both simple subscripts (Ca3 -> Ca$_{3}$) and 
+    parentheses subscripts (Ca3(AlP2)2 -> Ca$_{3}$(AlP$_{2}$)$_{2}$).
+    Ignores subscript 1.
     
     Examples:
         Ca5P3 -> Ca$_{5}$P$_{3}$
         Ca3P1 -> Ca$_{3}$P
+        Ca3(AlP2)2 -> Ca$_{3}$(AlP$_{2}$)$_{2}$
     """
     import re
-    pattern = r'([A-Z][a-z]?)(\d+)'
     
-    def replace_func(m):
+    # First, handle closing parenthesis followed by number: )2 -> )$_{2}$
+    def replace_paren(m):
+        count = m.group(1)
+        if count == '1':
+            return ')'
+        else:
+            return f')$_{{{count}}}$'
+    
+    result = re.sub(r'\)(\d+)', replace_paren, formula)
+    
+    # Then handle element followed by number: Ca2 -> Ca$_{2}$
+    def replace_elem(m):
         element = m.group(1)
         count = m.group(2)
         if count == '1':
@@ -69,7 +82,9 @@ def formula_to_latex(formula: str) -> str:
         else:
             return f'{element}$_{{{count}}}$'
     
-    return re.sub(pattern, replace_func, formula)
+    result = re.sub(r'([A-Z][a-z]?)(\d+)', replace_elem, result)
+    
+    return result
 
 
 def calculate_nexcess_boundaries_binary(elem_A: str, elem_C: str, n_excess_max: float = 4.0, max_atoms: int = 20) -> Tuple[float, float]:
@@ -1082,7 +1097,7 @@ def _plot_single_hull(
     y_min = min([d['y'] for d in all_data])
     y_max_data = max([d['y'] for d in all_data if d['on_hull'] or d['e_above_hull'] <= e_hull_max])
     y_range = y_max_data - y_min
-    ax.set_ylim(y_min - 0.2 * y_range, y_max + 0.2 * y_range)
+    ax.set_ylim(y_min - 0.2 * y_range, min(y_max, y_max_data) + 0.2 * y_range)
 
 
 def main():
