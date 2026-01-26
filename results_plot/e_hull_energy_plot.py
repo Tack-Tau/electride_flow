@@ -159,10 +159,10 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     # COMBINED SCATTER PLOT: Hull E_hull (left) + Generated Structures (right)
     # ===========================================================================================
     # Use FIXED figure dimensions and subplot positions for consistent LaTeX embedding
-    fig = plt.figure(figsize=(24, 10))
+    fig = plt.figure(figsize=(28, 12))
     
     # Add single title at the top
-    fig.suptitle(f'Energy comparison for {system_type} structures', fontsize=32, fontweight='bold', y=0.98)
+    fig.suptitle(f'Energy comparison for {system_type} structures', fontsize=38, fontweight='bold', y=0.98)
     
     # Calculate data ranges for axis limits
     # LEFT plot data
@@ -183,10 +183,10 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     plot_min2, plot_max2 = val_min2 - margin2, val_max2 + margin2
     
     # FIXED subplot positions [left, bottom, width, height]
-    ax1 = fig.add_axes([0.063, 0.1, 0.525, 0.82])
-    ax2 = fig.add_axes([0.635, 0.1, 0.355, 0.82])
+    ax1 = fig.add_axes([0.47, 0.1, 0.515, 0.82])  # Hull comparison
+    ax2 = fig.add_axes([0.05, 0.1, 0.343, 0.82])  # Energy comparison
     
-    # ===== LEFT: Hull Comparison Scatter =====
+    # ===== RIGHT: Hull Comparison Scatter =====
     xy1 = np.vstack([x1, y1])
     z1 = gaussian_kde(xy1)(xy1)
     z1 = z1 * len(x1)
@@ -198,7 +198,7 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     x1_sorted, y1_sorted, z1_sorted = x1[idx1], y1[idx1], z1[idx1]
     
     scatter1 = ax1.scatter(x1_sorted, y1_sorted, c=z1_sorted, cmap=cmap, 
-                          norm=mpl.colors.LogNorm(), s=50, marker='s', 
+                          norm=mpl.colors.LogNorm(), s=70, marker='s', 
                           edgecolors='none')
     
     ax1.plot([plot_min1, plot_max1], [plot_min1, plot_max1], 'r--', 
@@ -206,8 +206,8 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     ax1.axhline(y=threshold, color='green', linestyle=':', linewidth=2, alpha=0.6)
     ax1.axvline(x=threshold, color='green', linestyle=':', linewidth=2, alpha=0.6)
     
-    ax1.set_xlabel(r'E$_{\mathrm{ref\text{-}hull\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
-    ax1.set_ylabel(r'E$_{\mathrm{ref\text{-}hull\text{-}MLP}}$ (eV/atom)', fontsize=26, fontweight='bold')
+    ax1.set_xlabel(r'E$_{\mathrm{ref\text{-}hull\text{-}DFT}}$ (eV/atom)', fontsize=34, fontweight='bold')
+    ax1.set_ylabel(r'E$_{\mathrm{ref\text{-}hull\text{-}MLP}}$ (eV/atom)', fontsize=34, fontweight='bold')
     
     correlation1 = np.corrcoef(mattersim_vals_hull, dft_vals_hull)[0, 1]
     mae1 = np.mean(np.abs(mattersim_vals_hull - dft_vals_hull))
@@ -215,21 +215,21 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     stats_text1 = (
         # f"N = {len(matched_hull)}\n"
         f"R = {correlation1:.4f}\n"
-        f"MAE = {mae1:.4f} eV/atom"
+        f"MAE = {mae1:.3f} eV/atom"
     )
-    ax1.text(0.02, 0.98, stats_text1, transform=ax1.transAxes, fontsize=22,
+    ax1.text(0.02, 0.98, stats_text1, transform=ax1.transAxes, fontsize=32,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.0))
     
     ax1.grid(True, alpha=0.3, linestyle='--')
     ax1.minorticks_on()
     ax1.grid(True, which='minor', alpha=0.15, linestyle=':')
-    ax1.legend(loc='lower right', fontsize=22, framealpha=0.0, edgecolor='none')
+    ax1.legend(loc='lower right', fontsize=32, framealpha=0.0, edgecolor='none')
     
     ax1.set_xlim(plot_min1, plot_max1)
     ax1.set_ylim(plot_min1, threshold)
-    ax1.tick_params(axis='both', which='major', labelsize=22)
+    ax1.tick_params(axis='both', which='major', labelsize=28)
     
-    # ===== RIGHT: Generated Structures Scatter =====
+    # ===== LEFT: Energy Comparison Scatter =====
     xy2 = np.vstack([x2, y2])
     z2 = gaussian_kde(xy2)(xy2)
     z2 = z2 * len(x2)
@@ -238,14 +238,14 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     x2_sorted, y2_sorted, z2_sorted = x2[idx2], y2[idx2], z2[idx2]
     
     scatter2 = ax2.scatter(x2_sorted, y2_sorted, c=z2_sorted, cmap=cmap, 
-                          norm=mpl.colors.LogNorm(), s=50, marker='s', 
+                          norm=mpl.colors.LogNorm(), s=70, marker='s', 
                           edgecolors='none')
     
     ax2.plot([plot_min2, plot_max2], [plot_min2, plot_max2], 'r--',
             linewidth=2.5, alpha=0.7, label='Perfect agreement')
     
-    ax2.set_xlabel(r'E$_{\mathrm{abs\text{-}DFT}}$ (eV/atom)', fontsize=26, fontweight='bold')
-    ax2.set_ylabel(r'E$_{\mathrm{abs\text{-}MLP}}$ (eV/atom)', fontsize=26, fontweight='bold')
+    ax2.set_xlabel(r'E$_{\mathrm{abs\text{-}DFT}}$ (eV/atom)', fontsize=34, fontweight='bold')
+    ax2.set_ylabel(r'E$_{\mathrm{abs\text{-}MLP}}$ (eV/atom)', fontsize=34, fontweight='bold')
     
     correlation2 = np.corrcoef(ms_vals_gen, vasp_vals_gen)[0, 1]
     mae2 = np.mean(np.abs(ms_vals_gen - vasp_vals_gen))
@@ -253,13 +253,13 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     stats_text2 = (
         # f"N = {len(matched_gen_filtered)}\n"
         f"R = {correlation2:.4f}\n"
-        f"MAE = {mae2:.4f} eV/atom"
+        f"MAE = {mae2:.3f} eV/atom"
     )
-    ax2.text(0.02, 0.98, stats_text2, transform=ax2.transAxes, fontsize=22,
+    ax2.text(0.02, 0.98, stats_text2, transform=ax2.transAxes, fontsize=32,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.0))
     
     ax2.grid(True, alpha=0.3, linestyle='--')
-    ax2.legend(loc='lower right', fontsize=22, framealpha=0.0, edgecolor='none')
+    ax2.legend(loc='lower right', fontsize=32, framealpha=0.0, edgecolor='none')
     ax2.set_xlim(plot_min2, plot_max2)
     ax2.set_ylim(plot_min2, plot_max2)
     
@@ -269,7 +269,7 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     ax2.yaxis.set_major_locator(MultipleLocator(2.0))
     ax2.yaxis.set_minor_locator(MultipleLocator(0.5))
     
-    ax2.tick_params(axis='both', which='major', labelsize=22)
+    ax2.tick_params(axis='both', which='major', labelsize=28)
     ax2.tick_params(axis='both', which='minor', length=4)
     ax2.minorticks_on()
     ax2.grid(True, which='minor', alpha=0.15, linestyle=':')
@@ -482,7 +482,7 @@ def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir):
     stats_text = (
         # f"N = {len(matched)}\n"
         f"R = {correlation:.4f}\n"
-        f"MAE = {mae:.4f} eV/atom"
+        f"MAE = {mae:.3f} eV/atom"
     )
     ax1.text(0.02, 0.98, stats_text, transform=ax1.transAxes, fontsize=22,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.0))
