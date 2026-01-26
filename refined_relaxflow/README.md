@@ -29,18 +29,25 @@ bash run_electronic_flow.sh \
     --refine-jobs REFINE_VASP_JOBS/ \
     --output-dir ELECTRONIC_JOBS/ \
     --max-concurrent 10
+
+# 6. (Optional) Run phonon calculations (auto supercell by default)
+bash run_phonon_flow.sh \
+    --refine-jobs REFINE_VASP_JOBS/ \
+    --structure-ids Ba2N_s001 Ca5P3_s021 \
+    --max-concurrent 20
 ```
 
 ---
 
 ## Overview
 
-The **Refined Electride Workflow** is a high-precision DFT pipeline designed to perform careful structure optimization and electronic structure analysis on electride candidates. It consists of two main components:
+The **Refined Electride Workflow** is a high-precision DFT pipeline designed to perform careful structure optimization, electronic structure analysis, and phonon calculations on electride candidates. It consists of three main components:
 
 1. **Refined Relaxation** (`refine_electrideflow.py`): Progressive 3-step structure optimization with tight convergence
 2. **Electronic Structure Analysis** (`electronic_flow_manager.py`): SCF/PARCHG/ELF/BAND/PDOS calculations for detailed electronic properties
+3. **Phonon Calculations** (`phonon_flow_manager.py`): Phonopy finite displacement method for vibrational properties and dynamical stability
 
-The workflow starts from relaxed structures (from the initial screening) and applies progressive relaxation with strict electronic convergence checks, followed by optional detailed electronic structure calculations.
+The workflow starts from relaxed structures (from the initial screening) and applies progressive relaxation with strict electronic convergence checks, followed by optional detailed electronic structure and phonon calculations.
 
 ### Relationship to Original Workflow
 
@@ -104,6 +111,30 @@ The workflow starts from relaxed structures (from the initial screening) and app
 │      → Projected density of states (NEDOS=3000)                     │
 │                                                                      │
 │  Output: Detailed electronic structure in ELECTRONIC_JOBS/         │
+└─────────────────────────────────────────────────────────────────────┘
+                                ↓ (optional)
+┌─────────────────────────────────────────────────────────────────────┐
+│                   PHONON CALCULATION WORKFLOW                       │
+│  (phonon_flow_manager.py - Phonopy Finite Displacement Method)    │
+├─────────────────────────────────────────────────────────────────────┤
+│  Load: Refined CONTCARs from REFINE_VASP_JOBS/*/Relax/CONTCAR     │
+│  Method: Phonopy finite displacement method                        │
+│                                                                      │
+│  Phonon Workflow:                                                   │
+│    1. Generate supercell with phonopy Python API                   │
+│       - Auto-calculate dimensions from k-point mesh (default)      │
+│       - Or manual specification (--supercell-dim N1 N2 N3)         │
+│    2. Create displaced structures (POSCAR-001, POSCAR-002, ...)   │
+│    3. Run VASP static calculations for each displacement           │
+│       - High-precision: EDIFF=1e-8, IBRION=-1, NSW=0              │
+│       - Parallel execution with --max-concurrent control           │
+│       - Electronic convergence check for each displacement         │
+│    4. Collect results for phonopy post-processing                  │
+│       - Phonon band structure                                       │
+│       - Phonon DOS                                                  │
+│       - Thermal properties                                          │
+│                                                                      │
+│  Output: Phonon calculations in PHONON_JOBS/                       │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1283,6 +1314,652 @@ bash run_electronic_flow.sh \
 2. **Monitor disk**: PARCHG files are large before compression
 3. **Check convergence**: Verify first completed structure before processing all
 4. **Backup database**: Copy `workflow.json` regularly
+
+---
+
+## Phonon Calculation Workflow
+
+After completing the refined relaxation workflow, you can perform phonon calculations using the phonopy finite displacement method to analyze vibrational properties and dynamical stability.
+
+### Purpose
+
+Phonon calculations provide:
+- **Phonon band structure**: Dispersion relations along high-symmetry k-paths
+- **Phonon density of states**: Vibrational density of states
+- **Thermal properties**: Heat capacity, entropy, free energy
+- **Dynamical stability**: Imaginary modes indicate instability
+
+**Key Features**:
+- **Phonopy Python API**: Direct integration (no subprocess calls)
+- **Automatic supercell dimensions**: Default behavior calculates from k-point mesh for consistency
+- **Parallel displacement calculations**: Multiple displacements run simultaneously
+- **Electronic convergence verification**: Checks each displacement for converged SCF
+- **Individual displacement tracking**: Clear progress and error isolation
+- **High-precision forces**: EDIFF=1e-8 for accurate phonon frequencies
+- **Unit conversion from constants**: Uses `phonopy.units.VaspToTHz`
+
+### Method: Finite Displacement
+
+1. **Generate supercell** with phonopy
+2. **Create displaced structures** (atomic displacements of 0.01 Å)
+3. **Run VASP static calculations** for each displacement
+4. **Collect forces** from vasprun.xml files
+5. **Post-process** with phonopy to get phonon properties
+
+### Scripts
+
+1. **`phonon_flow_manager.py`** - Python workflow manager
+   - Uses phonopy Python API for supercell generation
+   - Creates displaced structures (POSCAR-001, POSCAR-002, ...)
+   - Generates VASP inputs for each displacement
+   - Submits individual SLURM jobs per displacement
+   - Monitors completion with electronic convergence checks
+   - Configurable concurrency with `--max-concurrent`
+
+2. **`run_phonon_flow.sh`** - User-facing wrapper
+   - Validates input paths and structure IDs
+   - Exports configuration
+   - Submits workflow manager as SLURM job
+
+3. **`submit_phonon_flow.sh`** - SLURM job script
+   - Runs workflow manager with 15-day time limit
+   - Activates conda environment
+   - Monitors displacement calculations
+
+### Usage
+
+#### Basic Usage
+
+```bash
+cd refined_relaxflow/
+
+# Default: Auto-calculate supercell from k-point mesh
+bash run_phonon_flow.sh \
+    --refine-jobs ./REFINE_VASP_JOBS \
+    --structure-ids Ba2N_s001 Ca5P3_s021 \
+    --max-concurrent 20
+
+# Manual supercell dimensions (overrides auto-calculation)
+bash run_phonon_flow.sh \
+    --refine-jobs ./REFINE_VASP_JOBS \
+    --structure-ids Ba2N_s001 \
+    --supercell-dim 2 2 2 \
+    --max-concurrent 20
+
+# Custom 3x3x3 supercell
+bash run_phonon_flow.sh \
+    --refine-jobs ./REFINE_VASP_JOBS \
+    --structure-ids Ba2N_s001 \
+    --supercell-dim 3 3 3 \
+    --max-concurrent 10
+```
+
+#### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--refine-jobs` | Path to REFINE_VASP_JOBS directory | `./REFINE_VASP_JOBS` |
+| `--output-dir` | Output directory for phonon jobs | `./PHONON_JOBS` |
+| `--structure-ids` | Structure IDs to process (required) | None |
+| `--max-concurrent` | Max concurrent displacement jobs | 20 |
+| `--check-interval` | Status check interval (seconds) | 60 |
+| `--supercell-dim N1 N2 N3` | Manual supercell dimensions (e.g., `2 2 2`) | AUTO from k-mesh |
+| `--conda-env` | Conda environment name | `vaspflow` |
+
+**Supercell Dimension Behavior:**
+- **Default (no flag)**: Automatically calculates supercell dimensions from the k-point mesh (reciprocal_density=250) used in refined relaxation. This ensures the phonon q-point mesh matches the electronic k-point mesh for consistency.
+- **`--supercell-dim N1 N2 N3`**: Manually specify supercell dimensions to override automatic calculation (e.g., `--supercell-dim 2 2 2` or `--supercell-dim 3 3 3`).
+
+### Directory Structure
+
+Individual displacement directories for parallel execution:
+
+```
+PHONON_JOBS/
+├── Ba2N/
+│   └── Ba2N_s001/
+│       └── PHON/
+│           ├── POSCAR              # Original unit cell
+│           ├── SPOSCAR             # Supercell from phonopy
+│           ├── phonopy_disp.yaml   # Displacement info
+│           ├── POSCAR-001          # Displaced structure 1
+│           ├── POSCAR-002          # Displaced structure 2
+│           ├── ...
+│           ├── 001/                # Displacement 1 calculation
+│           │   ├── INCAR
+│           │   ├── POSCAR          # Copy of POSCAR-001
+│           │   ├── KPOINTS
+│           │   ├── POTCAR
+│           │   ├── job.sh          # SLURM script
+│           │   ├── vasprun.xml
+│           │   ├── OUTCAR
+│           │   ├── vasp_*.out/err
+│           │   └── VASP_DONE       # Completion marker
+│           ├── 002/                # Displacement 2 calculation
+│           │   └── ...
+│           └── ...
+└── workflow.json                    # Progress tracking database
+```
+
+### Workflow States
+
+```
+PENDING → INITIALIZED → PHON_RUNNING → PHON_DONE
+            ↓              ↓              ↓
+        INIT_FAILED    (monitoring)   PHON_FAILED
+```
+
+**State Descriptions**:
+
+| State | Description |
+|-------|-------------|
+| `PENDING` | Structure loaded, waiting for initialization |
+| `INITIALIZED` | Supercell generated, displacement jobs created |
+| `PHON_RUNNING` | Displacement calculations running |
+| `PHON_DONE` | All displacements completed successfully (all electronically converged) |
+| `INIT_FAILED` | Phonopy supercell generation failed |
+| `PHON_FAILED` | One or more displacement calculations failed convergence |
+
+### VASP Input Settings
+
+High-precision static calculations for accurate forces:
+
+```python
+INCAR:
+  PREC = Accurate
+  ALGO = Normal
+  ADDGRID = True
+  EDIFF = 1e-8          # Tight convergence for forces
+  IBRION = -1           # Static calculation
+  NSW = 0               # No ionic steps
+  ISMEAR = 0            # Gaussian smearing
+  SIGMA = 0.05
+  ISPIN = 1             # Non-spin-polarized
+  LWAVE = False
+  LCHARG = False
+
+KPOINTS:
+  reciprocal_density = 250  # High k-point density (same as refined relax)
+```
+
+### Electronic Convergence Verification
+
+Each displacement calculation is verified for electronic convergence (similar to refined relaxation workflow):
+
+```python
+from pymatgen.io.vasp.outputs import Vasprun
+
+vr = Vasprun('vasprun.xml', parse_dos=False, parse_eigen=False)
+if not vr.converged_electronic:
+    # Mark displacement as FAILED
+```
+
+**Why check electronic convergence?**
+- Phonon calculations require accurate forces
+- Unconverged electronic structure → inaccurate forces → wrong phonon frequencies
+- Provides clear error messages: which displacements failed convergence
+
+### Physical Units and Constants
+
+The workflow uses proper constants from phonopy:
+
+```python
+from phonopy.physical_units import get_physical_units
+VaspToTHz = get_physical_units().DefaultToTHz  # ~15.633302 THz
+
+phonon = Phonopy(
+    unitcell,
+    supercell_matrix=supercell_matrix,
+    factor=VaspToTHz  # eV/Å²/amu -> THz conversion
+)
+```
+
+**Displacement distance**: 0.01 Å (phonopy's default, consistent with `phonopy -d` command)
+
+### Monitoring Progress
+
+#### Real-time Output
+
+```bash
+# View workflow manager log
+tail -f phonon_workflow_*.out
+
+# Example output:
+# [2026-01-23 14:30:15] Checking status...
+# Currently running displacement jobs: 18/20
+#   Ba2N_s001: Submitting displacement jobs...
+#     Submitted 10 jobs...
+#     Submitted 20 jobs...
+#     Total submitted: 24 displacement jobs
+#
+# Statistics:
+#   PENDING: 1
+#   PHON_RUNNING: 2
+#   PHON_DONE: 0
+```
+
+#### Check Progress
+
+```bash
+# Check workflow status
+python3 ../workflow_status.py PHONON_JOBS/workflow.json
+
+# Count completed displacements
+ls PHONON_JOBS/Ba2N/Ba2N_s001/PHON/*/VASP_DONE | wc -l
+
+# Check individual displacement output
+tail -f PHONON_JOBS/Ba2N/Ba2N_s001/PHON/001/vasp_*.out
+```
+
+### Post-Processing with Phonopy
+
+After all displacements complete (`PHON_DONE`), calculate phonon properties:
+
+#### Create Force Constants
+
+```bash
+cd PHONON_JOBS/Ba2N/Ba2N_s001/PHON
+
+# Create force constants from vasprun.xml files
+phonopy --fc vasprun.xml
+
+# This reads forces from 001/vasprun.xml, 002/vasprun.xml, etc.
+```
+
+#### Calculate Phonon Band Structure
+
+Create `band.conf`:
+```
+DIM = 2 2 2
+PA = AUTO
+BAND = AUTO
+BAND_POINTS = 101
+```
+
+Run phonopy:
+```bash
+phonopy --dim="2 2 2" --pa="auto" -c POSCAR -p band.conf
+```
+
+#### Calculate Phonon DOS
+
+Create `mesh.conf`:
+```
+DIM = 2 2 2
+PA = AUTO
+MP = 20 20 20
+```
+
+Run phonopy:
+```bash
+phonopy --dim="2 2 2" --pa="auto" -c POSCAR -p mesh.conf
+```
+
+#### Calculate Thermal Properties
+
+```bash
+phonopy --dim="2 2 2" --pa="auto" -c POSCAR -t
+```
+
+This creates `thermal_properties.yaml` with:
+- Heat capacity at constant volume
+- Entropy
+- Helmholtz free energy
+
+#### Check Dynamical Stability
+
+```bash
+# Check for imaginary modes (negative frequencies)
+grep "f =" phonopy.yaml | awk '$3 < 0 {print}'
+
+# If imaginary modes exist, structure may be dynamically unstable
+```
+
+### Supercell Dimension Guidelines
+
+#### Automatic Calculation (Default)
+
+The workflow **automatically** determines supercell dimensions based on the k-point mesh:
+- Ensures consistency between electronic and phonon calculations
+- Phonon q-point mesh = electronic k-point mesh
+- Similar to approach used in [DopeFlow](https://github.com/Tack-Tau/DopeFlow)
+- No flag needed - this is the default behavior
+
+#### Manual Override
+
+| System Size | Supercell | Typical Displacements | Time Estimate |
+|-------------|-----------|----------------------|---------------|
+| Small (< 10 atoms) | 3×3×3 | 30-50 | 3-6 hours |
+| Medium (10-20 atoms) | 2×2×2 | 20-40 | 2-4 hours |
+| Large (> 20 atoms) | 2×2×2 | 40-80 | 4-8 hours |
+
+**Recommendation**: Use the default automatic calculation for optimal consistency. Only use `--supercell-dim` if you have specific requirements.
+
+### Performance and Resources
+
+**Per Displacement**:
+- **Time**: ~30-60 minutes (depends on system size)
+- **Cores**: 16
+- **Memory**: 32 GB
+- **Wall time**: 6 hours
+
+**Per Structure** (typical 2×2×2 supercell):
+- **Displacements**: ~10-30 (depends on structure)
+- **Total time**: ~1-5 hours with 20 concurrent jobs
+- **Disk space**: ~50-200 MB per displacement
+
+**Example: Ba2N (12 atoms, 2×2×2 supercell = 96 atoms)**:
+- **Displacements**: ~24
+- **With 20 concurrent**: ~2 batches × 1 hour = 2 hours total
+- **Core-hours**: 24 × 1 hour × 16 cores = 384 core-hours
+- **Disk**: 24 × 100 MB = 2.4 GB
+
+### Troubleshooting
+
+**"ModuleNotFoundError: No module named 'phonopy'"**
+```bash
+conda activate vaspflow
+conda install -c conda-forge phonopy
+
+# Verify installation
+python3 -c "import phonopy; print(phonopy.__version__)"
+```
+
+**"No displaced structures generated"**
+```bash
+# Check phonopy output
+cd PHONON_JOBS/Ba2N/Ba2N_s001/PHON
+cat phonopy_disp.yaml
+
+# Check if POSCAR files exist
+ls -lh POSCAR-*
+```
+
+**"Displacement calculation failed"**
+```bash
+# Check VASP error
+cat PHONON_JOBS/Ba2N/Ba2N_s001/PHON/001/vasp_*.err
+
+# Check electronic convergence
+grep "reached required accuracy" PHONON_JOBS/Ba2N/Ba2N_s001/PHON/001/OUTCAR
+
+# Check if electronically converged
+python3 -c "
+from pymatgen.io.vasp.outputs import Vasprun
+vr = Vasprun('PHONON_JOBS/Ba2N/Ba2N_s001/PHON/001/vasprun.xml')
+print('Electronic converged:', vr.converged_electronic)
+"
+```
+
+**"vasprun.xml incomplete"**
+```bash
+# Check if calculation finished
+tail PHONON_JOBS/Ba2N/Ba2N_s001/PHON/001/OUTCAR
+
+# Verify vasprun.xml
+grep "</modeling>" PHONON_JOBS/Ba2N/Ba2N_s001/PHON/001/vasprun.xml
+```
+
+**"Too many jobs in queue"**
+```bash
+# Reduce max-concurrent
+# Edit and resubmit with lower concurrency
+bash run_phonon_flow.sh \
+    --structure-ids Ba2N_s001 \
+    --max-concurrent 10
+```
+
+### Prerequisites
+
+1. **Completed refined relaxation** with structures in `RELAX_DONE` state
+2. **phonopy installed** in conda environment:
+   ```bash
+   conda install -c conda-forge phonopy
+   ```
+3. **VASP modules** and conda environment (`vaspflow`)
+4. **Sufficient disk space**: ~200 MB per displacement
+
+### Resume Workflow
+
+If interrupted, simply re-run the same command:
+
+```bash
+# The workflow manager will:
+# - Load existing workflow.json database
+# - Resume from current states
+# - Continue monitoring running jobs
+# - Submit remaining displacement calculations
+
+bash run_phonon_flow.sh \
+    --refine-jobs REFINE_VASP_JOBS \
+    --structure-ids Ba2N_s001 Ca5P3_s021
+```
+
+### Best Practices
+
+1. **Start with test**: Run 1-2 structures first to verify settings
+2. **Use default auto supercell**: The automatic calculation ensures consistency with electronic calculations
+3. **Check phonopy output**: Verify supercell generation before submitting all jobs
+4. **Monitor disk usage**: Each displacement stores ~100 MB
+5. **Adjust concurrency**: Larger supercells need lower concurrency
+6. **Backup database**: Copy `workflow.json` regularly
+
+---
+
+## Phonon Post-Processing
+
+After completing phonon calculations (all displacements in `PHON_DONE` state), use the post-processing scripts to analyze phonon properties and generate publication-quality plots.
+
+### Purpose
+
+The post-processing automatically:
+- **Creates force constants** using phonopy from VASP forces
+- **Calculates phonon band structure** along high-symmetry paths
+- **Computes phonon density of states** (total and element-projected)
+- **Generates thermal properties** (heat capacity, entropy, free energy)
+- **Creates publication plots** with proper Pearson symbol notation
+- **Detects imaginary frequencies** (dynamical instability)
+
+### Output Files
+
+For each `PHON_DONE` structure, creates in `PHONON_JOBS/$composition/$structure_id/PHON/`:
+
+| File | Description |
+|------|-------------|
+| `phonopy_params.yaml` | Force constants in phonopy format |
+| `phonon_band_dos.png` | Combined band structure + DOS plot (red bands) |
+| `phonon_band_dos.pdf` | Combined band structure + DOS plot (vector format) |
+| `phonon_band.dat` | Band structure data (gnuplot-friendly format) |
+| `thermal.dat` | Thermal properties (0-1000 K) |
+| `phonon_postproc_summary.json` | Processing summary with warnings |
+
+### Scripts
+
+1. **`postproc_phonon.py`** - Main post-processing script
+   - Reads forces from all displacement vasprun.xml files
+   - Uses phonopy and pymatgen APIs (no CLI calls)
+   - Creates force constants and calculates phonon properties
+   - Generates plots with Pearson symbol titles
+   - Handles element-projected DOS and thermal properties
+
+2. **`submit_pp_phon.sh`** - SLURM submission script
+   - Runs post-processing on compute nodes
+   - Uses 8 CPU cores for parallel operations
+   - Sets threading for numpy/scipy/MKL
+
+### Usage
+
+#### Basic Usage
+
+```bash
+cd refined_relaxflow/
+
+# Post-process all PHON_DONE structures
+python3 postproc_phonon.py --phonon-jobs ./PHONON_JOBS
+
+# Process specific structures
+python3 postproc_phonon.py \
+    --phonon-jobs ./PHONON_JOBS \
+    --structure-ids Cs6Al2S5_s013 Ca7Al1P5_s007
+
+# Submit to SLURM
+sbatch submit_pp_phon.sh
+```
+
+#### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--phonon-jobs` | Path to PHONON_JOBS directory | `./PHONON_JOBS` |
+| `--structure-ids` | Specific structure IDs to process | All `PHON_DONE` |
+| `--output-summary` | Summary JSON filename | `phonon_postproc_summary.json` |
+
+#### Using SLURM Script
+
+```bash
+# Set environment variables (optional)
+export PHONON_JOBS="./PHONON_JOBS"
+export STRUCTURE_IDS="Cs6Al2S5_s013 Ca7Al1P5_s007"
+export CONDA_ENV="vaspflow"
+
+# Submit to SLURM
+sbatch submit_pp_phon.sh
+```
+
+### Finding PHON_DONE Structures
+
+```bash
+# List all PHON_DONE structures
+jq -r '.structures | to_entries[] | select(.value.state == "PHON_DONE") | .key' \
+    PHONON_JOBS/workflow.json
+
+# Count PHON_DONE structures
+jq '[.structures | to_entries[] | select(.value.state == "PHON_DONE")] | length' \
+    PHONON_JOBS/workflow.json
+
+# Get composition for PHON_DONE structures
+jq -r '.structures | to_entries[] | 
+    select(.value.state == "PHON_DONE") | 
+    "\(.key): \(.value.composition)"' \
+    PHONON_JOBS/workflow.json
+```
+
+### Plot Features
+
+**Phonon Band Structure (Left Panel)**:
+- **Red lines** for easy visualization
+- **High-symmetry labels** with proper formatting (Γ, Σ, etc.)
+- **Discontinuity labels** (e.g., `F₁|H₁`, `N|M`) for path breaks
+- **Duplicate labels** at segment boundaries
+- **Zero-frequency line** (dashed) to identify acoustic modes
+
+**Phonon DOS (Right Panel)**:
+- **Total DOS** (black line)
+- **Element-projected DOS** (colored lines)
+- **Legend at top right**
+- **Aligned y-axis** with band structure
+
+**Title Format**: `{Pearson}-{Composition} Phonon Band Structure`
+- Example: `mS26-Cs6Al2S5 Phonon Band Structure`
+- Pearson symbols: `oI14` (orthorhombic body-centered, 14 atoms), `mS26` (monoclinic side-centered, 26 atoms)
+
+### Thermal Properties
+
+The `thermal.dat` file contains (0-1000 K, 10 K steps):
+
+```
+# T: Temperature (K)
+# F: Helmholtz free energy (kJ/mol)
+# S: Entropy (J/K/mol)
+# Cv: Heat capacity at constant volume (J/K/mol)
+# U: Internal energy (kJ/mol)
+
+     T (K)      F (kJ/mol)     S (J/K/mol)    Cv (J/K/mol)      U (kJ/mol)
+       0.0       10.866020        0.000000        0.000000       10.866020
+      10.0       10.862646        1.468585        4.531196       10.877332
+     ...
+```
+
+### Interpreting Results
+
+**1. Check for Imaginary Frequencies**
+
+Imaginary frequencies (negative values after accounting for numerical noise ~0.1 THz) indicate **dynamical instability**:
+
+```bash
+# Post-processing will print warnings:
+WARNING: Imaginary frequencies detected!
+Minimum frequency: -0.259 THz
+Maximum imaginary: 0.259 THz
+```
+
+**Structures with imaginary modes are dynamically unstable** and may:
+- Undergo structural phase transitions
+- Not be stable at 0 K
+- Require further relaxation or different structures
+
+**2. Phonon Band Structure**
+
+- **Acoustic branches**: Should go to zero at Γ (3 branches)
+- **Optical branches**: Gap above acoustic modes
+- **Flat bands**: Localized vibrations
+- **Dispersive bands**: Delocalized phonons (good for thermal conductivity)
+
+**3. Phonon DOS**
+
+- **Low frequency**: Dominated by heavy atoms (e.g., Cs, Ba)
+- **High frequency**: Light atoms and stiff bonds (e.g., N, O in strong bonds)
+- **Peaks**: Van Hove singularities at band edges
+- **Gaps**: Forbidden frequency regions
+
+**4. Thermal Properties**
+
+- **Heat capacity (Cv)**: Increases with T, approaches Dulong-Petit limit (3NkB)
+- **Entropy (S)**: Increases with T (more accessible states)
+- **Free energy (F)**: Decreases with T (T·S contribution)
+
+### Example Workflow
+
+```bash
+# 1. Check PHON_DONE structures
+jq -r '.structures | to_entries[] | select(.value.state == "PHON_DONE") | .key' \
+    PHONON_JOBS/workflow.json
+
+# Output:
+# Cs6Al2S5_s013
+# Ca7Al1P5_s007
+# Cs2Al2S3_s013
+
+# 2. Post-process all
+python3 postproc_phonon.py --phonon-jobs ./PHONON_JOBS
+
+# 3. Check results
+ls PHONON_JOBS/Cs6Al2S5/Cs6Al2S5_s013/PHON/
+# phonon_band_dos.png    (raster plot)
+# phonon_band_dos.pdf    (vector plot)
+# phonon_band.dat        (data)
+# thermal.dat            (thermal properties)
+# phonopy_params.yaml    (force constants)
+
+# 4. Check summary
+jq . PHONON_JOBS/phonon_postproc_summary.json
+```
+
+### Performance
+
+- **Processing time**: ~30-60 seconds per structure
+- **Memory usage**: ~2-4 GB per structure
+- **CPU cores**: Uses 8 cores (numpy/scipy parallelism)
+- **Disk space**: ~1-2 MB per structure (plots + data)
+
+### Prerequisites
+
+1. **Completed phonon workflow** with structures in `PHON_DONE` state
+2. **All vasprun.xml files** in displacement directories
+3. **Python packages**:
+   ```bash
+   conda install -c conda-forge phonopy pymatgen matplotlib numpy
+   ```
 
 ---
 
