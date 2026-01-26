@@ -501,11 +501,11 @@ def plot_band_structure_and_dos(
         
         for band_idx in range(n_bands):
             band_frequencies = freqs_array[band_idx]  # shape: (n_qpoints,)
-            ax1.plot(distances, band_frequencies, 'r-', linewidth=1.0)  # Red lines
+            ax1.plot(distances, band_frequencies, 'r-', linewidth=1.0, zorder=2)
     
     # Add high-symmetry point markers and labels
     for distance in bs_data['ticks']['distance']:
-        ax1.axvline(x=distance, color='k', linewidth=0.5, linestyle='-', alpha=0.5)
+        ax1.axvline(x=distance, color='black', linestyle='-', linewidth=0.5, zorder=1)
     
     # Clean up tick labels (remove double $$)
     clean_labels = []
@@ -519,22 +519,23 @@ def plot_band_structure_and_dos(
     ax1.set_xticklabels(clean_labels, fontsize=14)
     ax1.set_xlabel('Wave vector', fontsize=16, fontweight='bold')
     ax1.set_ylabel('Frequency (THz)', fontsize=16, fontweight='bold')
-    ax1.axhline(y=0, color='k', linestyle='--', linewidth=0.5, alpha=0.5)
+    ax1.axhline(y=0, color='black', linestyle='--', linewidth=0.5, alpha=0.5, zorder=5)
     ax1.set_xlim(bs_data['distances'][0][0], bs_data['distances'][-1][-1])
     ax1.tick_params(axis='y', which='major', labelsize=14)
     
     # Plot DOS on right (ax2)
-    ax2.plot(total_dos.densities, total_dos.frequencies, 'k-', linewidth=1.5, label='Total')
+    ax2.plot(total_dos.densities, total_dos.frequencies, 'k-', linewidth=1.0, 
+             label='Total', alpha=0.8, zorder=3)
     
     # Plot element-projected DOS with different colors
     if element_dos:
-        colors = plt.cm.tab10(np.linspace(0, 1, len(element_dos)))
-        for (element, el_dos), color in zip(element_dos.items(), colors):
+        colors = plt.cm.tab10(np.arange(0, 0.2 * len(element_dos), 0.2))
+        for idx, (element, el_dos) in enumerate(element_dos.items()):
             ax2.plot(el_dos.densities, el_dos.frequencies, 
-                    linewidth=1.0, label=str(element), color=color)
+                    linewidth=1.5, label=str(element), alpha=0.8, color=colors[idx], zorder=2)
     
     ax2.set_xlabel('DOS', fontsize=16, fontweight='bold')
-    ax2.axhline(y=0, color='k', linestyle='--', linewidth=0.5, alpha=0.5)
+    ax2.axhline(y=0, color='black', linestyle='--', linewidth=0.5, alpha=0.5, zorder=5)
     ax2.legend(fontsize=14, frameon=False, loc='upper right')
     ax2.set_xlim(left=0)
     ax2.tick_params(axis='x', which='major', labelsize=14)
