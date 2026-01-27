@@ -13,6 +13,7 @@ CONDA_ENV="mattersim"
 MP_API_KEY="${MP_API_KEY:-}"
 HULL_THRESHOLD=0.1
 DEVICE="cuda"
+BATCH_SIZE=32
 PURE_PBE=""
 
 # Colors
@@ -57,6 +58,10 @@ while [[ $# -gt 0 ]]; do
             DEVICE="$2"
             shift 2
             ;;
+        --batch-size)
+            BATCH_SIZE="$2"
+            shift 2
+            ;;
         --conda-env)
             CONDA_ENV="$2"
             shift 2
@@ -80,6 +85,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --hull-threshold FLOAT     Energy above hull threshold in eV/atom (default: 0.1)"
             echo "  --device DEVICE            MatterSim device: cpu or cuda (default: cuda)"
             echo "                             Note: GPU is HIGHLY RECOMMENDED (10-50x faster than CPU)"
+            echo "  --batch-size N             Batch size for MatterSim predictions (default: 32)"
             echo "  --conda-env NAME           Conda environment name (default: mattersim)"
             echo "  --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)"
             echo "                             Default: accept both PBE and PBE+U (recommended)"
@@ -131,6 +137,7 @@ echo "  Max compositions:     ${MAX_COMPOSITIONS:-all}"
 echo "  Max structures:       ${MAX_STRUCTURES} (0 = all)"
 echo "  Hull threshold:       ${HULL_THRESHOLD} eV/atom"
 echo "  Device:               $DEVICE"
+echo "  Batch size:           $BATCH_SIZE"
 echo "  Conda environment:    $CONDA_ENV"
 echo "  MP API key:           ${MP_API_KEY:+[SET]}${MP_API_KEY:-[NOT SET]}"
 echo "  Functional filter:    ${PURE_PBE:+Pure PBE only}${PURE_PBE:-Mixed PBE/PBE+U (default)}"
@@ -161,6 +168,7 @@ export CONDA_ENV
 export MP_API_KEY
 export HULL_THRESHOLD
 export DEVICE
+export BATCH_SIZE
 export PURE_PBE
 
 JOB_ID=$(sbatch submit_prescreen.sh | awk '{print $NF}')

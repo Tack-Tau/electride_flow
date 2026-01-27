@@ -24,6 +24,7 @@ CONDA_ENV=${CONDA_ENV:-"mattersim"}
 MP_API_KEY=${MP_API_KEY:-""}
 HULL_THRESHOLD=${HULL_THRESHOLD:-0.1}
 DEVICE=${DEVICE:-"cuda"}
+BATCH_SIZE=${BATCH_SIZE:-32}
 PURE_PBE=${PURE_PBE:-""}
 
 echo "========================================================================"
@@ -132,6 +133,7 @@ CMD="$CMD --output-dir $OUTPUT_DIR"
 CMD="$CMD --max-structures $MAX_STRUCTURES"
 CMD="$CMD --hull-threshold $HULL_THRESHOLD"
 CMD="$CMD --device $DEVICE"
+CMD="$CMD --batch-size $BATCH_SIZE"
 
 if [ -n "$MAX_COMPOSITIONS" ]; then
     CMD="$CMD --max-compositions $MAX_COMPOSITIONS"
@@ -153,6 +155,7 @@ echo "  Max structures: $MAX_STRUCTURES"
 echo "  Max compositions: ${MAX_COMPOSITIONS:-all}"
 echo "  Hull threshold: ${HULL_THRESHOLD} eV/atom"
 echo "  Device: $DEVICE"
+echo "  Batch size: $BATCH_SIZE"
 if [ -n "$PURE_PBE" ]; then
     echo "  Functional filtering: Pure GGA-PBE only"
 else
