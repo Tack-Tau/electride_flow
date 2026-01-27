@@ -19,6 +19,7 @@ Usage:
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator, MaxNLocator
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import sys
@@ -246,9 +247,8 @@ def plot_phonon_band_dos(
     plt.rcParams['font.family'] = 'DejaVu Sans'
     
     # Create figure with two subplots (band structure and DOS)
-    # sharey=True ensures aligned y-axes, wspace=0.05 minimizes gap
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), sharey=True,
-                                     gridspec_kw={'width_ratios': [3, 1], 'wspace': 0.05})
+                                     gridspec_kw={'width_ratios': [3, 1], 'wspace': 0.08})
     
     # Extract data
     distances = band_data['distances']
@@ -276,8 +276,14 @@ def plot_phonon_band_dos(
     ax1.set_xlabel('Wave vector', fontsize=16, fontweight='bold')
     ax1.set_ylabel('Frequency (THz)', fontsize=16, fontweight='bold')
     ax1.axhline(y=0, color='black', linestyle='--', linewidth=0.5, alpha=0.5, zorder=5)
-    ax1.set_xlim(distances[0], distances[-1])
+    ax1.set_xlim(distances[0] - 0.0001, distances[-1] + 0.0001)
+    
+    # Set y-axis limits and ticks
+    ax1.set_ylim(-2, 14)
+    ax1.yaxis.set_major_locator(MultipleLocator(2.0))
+    ax1.yaxis.set_minor_locator(MultipleLocator(1.0))
     ax1.tick_params(axis='y', which='major', labelsize=14)
+    ax1.tick_params(axis='y', which='minor', length=3)
     
     # Plot DOS on right (ax2)
     ax2.plot(total_dos, dos_freqs, 'k-', linewidth=1.0, 
@@ -290,24 +296,27 @@ def plot_phonon_band_dos(
             ax2.plot(projected_dos[element], dos_freqs, 
                     linewidth=1.5, label=str(element), alpha=0.8, color=colors[idx], zorder=2)
     
+    dos_mean = np.mean(total_dos)
+    dos_xlim_max = dos_mean * 2.0
+    
     ax2.set_xlabel('DOS', fontsize=16, fontweight='bold')
     ax2.axhline(y=0, color='black', linestyle='--', linewidth=0.5, alpha=0.5, zorder=5)
-    ax2.legend(fontsize=14, frameon=False, loc='upper right')
-    ax2.set_xlim(left=0)
+    ax2.legend(loc='upper right', fontsize=14, framealpha=0.8, edgecolor='none', facecolor='white')
+    ax2.set_xlim(0, dos_xlim_max)
+    
+    # Set consistent number of x-axis ticks (4-5 ticks)
+    ax2.xaxis.set_major_locator(MaxNLocator(nbins=5, min_n_ticks=4))
     ax2.tick_params(axis='x', which='major', labelsize=14)
     
-    # Set y-axis limits to match
-    ymin = min(ax1.get_ylim()[0], ax2.get_ylim()[0])
-    ymax = max(ax1.get_ylim()[1], ax2.get_ylim()[1])
-    ax1.set_ylim(ymin, ymax)
-    ax2.set_ylim(ymin, ymax)
+    # Set y-axis limits to match band structure
+    ax2.set_ylim(-2, 14)
     
     # Add title
     if title:
         fig.suptitle(title, fontsize=22, fontweight='bold', y=0.98)
     
     # Use fixed subplot margins to ensure consistent plot dimensions across all structures
-    fig.subplots_adjust(left=0.09, right=0.98, bottom=0.12, top=0.92)
+    fig.subplots_adjust(left=0.07, right=0.98, bottom=0.12, top=0.92)
     
     # Save both PNG and PDF
     fig.savefig(str(output_png), dpi=300)

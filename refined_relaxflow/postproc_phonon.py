@@ -491,7 +491,7 @@ def plot_band_structure_and_dos(
     
     # Create combined plot
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), sharey=True,
-                                     gridspec_kw={'width_ratios': [3, 1], 'wspace': 0.05})
+                                     gridspec_kw={'width_ratios': [3, 1], 'wspace': 0.08})
     
     # Plot band structure on left (ax1)
     all_distances = np.concatenate(bs_data['distances'])
@@ -520,7 +520,7 @@ def plot_band_structure_and_dos(
     ax1.set_xlabel('Wave vector', fontsize=16, fontweight='bold')
     ax1.set_ylabel('Frequency (THz)', fontsize=16, fontweight='bold')
     ax1.axhline(y=0, color='black', linestyle='--', linewidth=0.5, alpha=0.5, zorder=5)
-    ax1.set_xlim(all_distances[0], all_distances[-1])
+    ax1.set_xlim(all_distances[0] - 0.0001, all_distances[-1] + 0.0001)
     ax1.tick_params(axis='y', which='major', labelsize=14)
     
     # Plot DOS on right (ax2)
@@ -536,7 +536,7 @@ def plot_band_structure_and_dos(
     
     ax2.set_xlabel('DOS', fontsize=16, fontweight='bold')
     ax2.axhline(y=0, color='black', linestyle='--', linewidth=0.5, alpha=0.5, zorder=5)
-    ax2.legend(fontsize=14, frameon=False, loc='upper right')
+    ax2.legend(loc='upper right', fontsize=14, framealpha=0.8, edgecolor='none', facecolor='white')
     ax2.set_xlim(left=0)
     ax2.tick_params(axis='x', which='major', labelsize=14)
     
@@ -551,7 +551,7 @@ def plot_band_structure_and_dos(
         fig.suptitle(title, fontsize=22, fontweight='bold', y=0.98)
     
     # Use fixed subplot margins to ensure consistent plot dimensions across all structures
-    fig.subplots_adjust(left=0.09, right=0.98, bottom=0.12, top=0.92)
+    fig.subplots_adjust(left=0.07, right=0.98, bottom=0.12, top=0.92)
     
     # Save both PNG and PDF
     output_png = output_path
