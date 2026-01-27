@@ -649,7 +649,7 @@ Examples:
             print(f"    {plot_base}.png")
             print(f"    {plot_base}.pdf")
         else:
-            print(f"  ✗ {plot_base} (not generated)")
+            print(f"  {plot_base} (not generated)")
     
     print("\n" + "="*70)
     print(f"\nTo view plots:")
