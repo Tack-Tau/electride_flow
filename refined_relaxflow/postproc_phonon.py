@@ -494,14 +494,14 @@ def plot_band_structure_and_dos(
                                      gridspec_kw={'width_ratios': [3, 1], 'wspace': 0.05})
     
     # Plot band structure on left (ax1)
-    for distances, freqs in zip(bs_data['distances'], bs_data['frequency']):
-        # freqs shape: (n_bands, n_qpoints)
-        freqs_array = np.array(freqs)
-        n_bands = freqs_array.shape[0]
-        
-        for band_idx in range(n_bands):
-            band_frequencies = freqs_array[band_idx]  # shape: (n_qpoints,)
-            ax1.plot(distances, band_frequencies, 'r-', linewidth=1.0, zorder=2)
+    all_distances = np.concatenate(bs_data['distances'])
+    all_frequencies = np.concatenate([np.array(freqs).T for freqs in bs_data['frequency']], axis=0) # Shape (n_qpoints_total, n_bands)
+    
+    n_bands = all_frequencies.shape[1]
+    
+    for band_idx in range(n_bands):
+        band_frequencies = all_frequencies[:, band_idx]
+        ax1.plot(all_distances, band_frequencies, 'r-', linewidth=1.0, zorder=2)
     
     # Add high-symmetry point markers and labels
     for distance in bs_data['ticks']['distance']:
@@ -520,7 +520,7 @@ def plot_band_structure_and_dos(
     ax1.set_xlabel('Wave vector', fontsize=16, fontweight='bold')
     ax1.set_ylabel('Frequency (THz)', fontsize=16, fontweight='bold')
     ax1.axhline(y=0, color='black', linestyle='--', linewidth=0.5, alpha=0.5, zorder=5)
-    ax1.set_xlim(bs_data['distances'][0][0], bs_data['distances'][-1][-1])
+    ax1.set_xlim(all_distances[0], all_distances[-1])
     ax1.tick_params(axis='y', which='major', labelsize=14)
     
     # Plot DOS on right (ax2)
@@ -572,14 +572,88 @@ def save_band_structure_data(bs: PhononBandStructureSymmLine, output_path: Path)
     qpoints = bs.qpoints
     frequencies = bs.bands  # Shape: (n_bands, n_qpoints)
     
-    # Calculate distances along the path
-    distances = [0.0]
-    for i in range(1, len(qpoints)):
-        dist = np.linalg.norm(qpoints[i].frac_coords - qpoints[i-1].frac_coords)
-        distances.append(distances[-1] + dist)
-    distances = np.array(distances)
+    # Get high-symmetry labels and segment structure
+    bs_plotter = PhononBSPlotter(bs)
+    bs_data = bs_plotter.bs_plot_data()
     
-    # Write data
+    # Calculate distances
+    distances = np.zeros(len(qpoints))
+    current_idx = 0
+    for segment_distances in bs_data['distances']:
+        segment_length = len(segment_distances)
+        distances[current_idx:current_idx + segment_length] = segment_distances
+        current_idx += segment_length
+    
+    # Clean and format labels
+    tick_labels = []
+    for label in bs_data['ticks']['label']:
+        label = label.replace('$$', '$')
+        
+        if '|' in label:
+            parts = label.split('|')
+            formatted_parts = []
+            for part in parts:
+                part = part.strip()
+                if not part.startswith('$'):
+                    part = f'${part}$'
+                formatted_parts.append(part)
+            label = '|'.join(formatted_parts)
+        else:
+            if not label.startswith('$'):
+                label = f'${label}$'
+        
+        tick_labels.append(label)
+    
+    tick_distances = bs_data['ticks']['distance']
+    
+    lattice = bs.structure.lattice
+    lattice_matrix = lattice.matrix
+    
+    # Get fractional coordinates
+    tick_qpoint_indices = []
+    for tick_dist in tick_distances:
+        idx = np.argmin(np.abs(distances - tick_dist))
+        tick_qpoint_indices.append(idx)
+    
+    # Save k-path metadata
+    kpath_file = output_path.parent / 'band_kpath.dat'
+    with open(kpath_file, 'w') as f:
+        f.write("# K-path metadata for phonon band structure\n")
+        f.write("# Contains lattice, segment structure, and high-symmetry point labels\n")
+        f.write("#\n")
+        f.write("# LATTICE VECTORS (Angstrom):\n")
+        f.write("# Format: LATTICE_A/B/C  x  y  z\n")
+        f.write("#\n")
+        f.write(f"LATTICE_A  {lattice_matrix[0, 0]:12.8f}  {lattice_matrix[0, 1]:12.8f}  {lattice_matrix[0, 2]:12.8f}\n")
+        f.write(f"LATTICE_B  {lattice_matrix[1, 0]:12.8f}  {lattice_matrix[1, 1]:12.8f}  {lattice_matrix[1, 2]:12.8f}\n")
+        f.write(f"LATTICE_C  {lattice_matrix[2, 0]:12.8f}  {lattice_matrix[2, 1]:12.8f}  {lattice_matrix[2, 2]:12.8f}\n")
+        f.write("#\n")
+        f.write("# SEGMENT STRUCTURE:\n")
+        f.write("# Format: SEGMENT  seg_idx  start_qidx  end_qidx  n_points\n")
+        f.write("#\n")
+        
+        # Write segment
+        current_idx = 0
+        for seg_idx, segment_distances in enumerate(bs_data['distances']):
+            n_points = len(segment_distances)
+            start_qidx = current_idx
+            end_qidx = current_idx + n_points - 1
+            f.write(f"SEGMENT  {seg_idx:3d}  {start_qidx:6d}  {end_qidx:6d}  {n_points:6d}\n")
+            current_idx += n_points
+        
+        f.write("#\n")
+        f.write("# HIGH-SYMMETRY POINTS:\n")
+        f.write("# Format: TICK  distance  qx  qy  qz  label\n")
+        f.write("# Distance is along the path, coordinates are fractional (reciprocal lattice units)\n")
+        f.write("#\n")
+        
+        # Write tick information
+        for tick_dist, idx, label in zip(tick_distances, tick_qpoint_indices, tick_labels):
+            qpt = qpoints[idx]
+            frac = qpt.frac_coords
+            f.write(f"TICK     {tick_dist:12.8f}  {frac[0]:12.8f}  {frac[1]:12.8f}  {frac[2]:12.8f}  {label}\n")
+    
+    # Write band data
     with open(output_path, 'w') as f:
         # Header
         f.write("# Phonon band structure\n")
@@ -601,6 +675,40 @@ def save_band_structure_data(bs: PhononBandStructureSymmLine, output_path: Path)
             f.write("\n")
     
     print(f"    Saved band structure data: {output_path.name}")
+    print(f"    Saved k-path metadata: {kpath_file.name}")
+
+
+def save_dos_data(total_dos: PhononDos, element_dos: dict, output_path: Path):
+    """Save phonon DOS data in gnuplot-friendly format."""
+    frequencies = total_dos.frequencies
+    total_densities = total_dos.densities
+    
+    with open(output_path, 'w') as f:
+        # Header
+        f.write("# Phonon Density of States (DOS)\n")
+        f.write("# Column 1: Frequency (THz)\n")
+        f.write("# Column 2: Total DOS\n")
+        if element_dos:
+            for idx, element in enumerate(element_dos.keys()):
+                f.write(f"# Column {idx+3}: {element} projected DOS\n")
+        f.write("#\n")
+        
+        # Column headers
+        f.write(f"{'Frequency':>12}  {'Total':>12}")
+        if element_dos:
+            for element in element_dos.keys():
+                f.write(f"  {str(element):>12}")
+        f.write("\n")
+        
+        # Data
+        for i, freq in enumerate(frequencies):
+            f.write(f"  {freq:12.6f}  {total_densities[i]:12.6f}")
+            if element_dos:
+                for el_dos in element_dos.values():
+                    f.write(f"  {el_dos.densities[i]:12.6f}")
+            f.write("\n")
+    
+    print(f"    Saved DOS data: {output_path.name}")
 
 
 def calculate_thermal_properties(dos: PhononDos, structure: Structure, output_path: Path):
@@ -751,6 +859,11 @@ def process_structure(
     
     # Plot combined band structure and DOS
     if total_dos:
+        # Save DOS data
+        dos_data_path = phon_dir / 'phonon_dos.dat'
+        save_dos_data(total_dos, element_dos, dos_data_path)
+        
+        # Plot combined band structure and DOS
         combined_plot_path = phon_dir / 'phonon_band_dos.png'
         composition_latex = formula_to_latex(composition)
         plot_title = f"{pearson_symbol}-{composition_latex} Phonon"

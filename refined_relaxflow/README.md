@@ -1770,6 +1770,8 @@ For each `PHON_DONE` structure, creates in `PHONON_JOBS/$composition/$structure_
 | `phonon_band_dos.png` | Combined band structure + DOS plot (red bands) |
 | `phonon_band_dos.pdf` | Combined band structure + DOS plot (vector format) |
 | `phonon_band.dat` | Band structure data (gnuplot-friendly format) |
+| `band_kpath.dat` | K-path metadata: lattice, segments, high-symmetry q-points (fractional coords) |
+| `phonon_dos.dat` | DOS data: total + element-projected (gnuplot-friendly format) |
 | `thermal.dat` | Thermal properties (0-1000 K) |
 | `phonon_postproc_summary.json` | Processing summary with warnings |
 
@@ -1937,7 +1939,9 @@ python3 postproc_phonon.py --phonon-jobs ./PHONON_JOBS
 ls PHONON_JOBS/Cs6Al2S5/Cs6Al2S5_s013/PHON/
 # phonon_band_dos.png    (raster plot)
 # phonon_band_dos.pdf    (vector plot)
-# phonon_band.dat        (data)
+# phonon_band.dat        (band structure data)
+# band_kpath.dat         (k-path metadata: segments + labels)
+# phonon_dos.dat         (DOS data: total + projected)
 # thermal.dat            (thermal properties)
 # phonopy_params.yaml    (force constants)
 
