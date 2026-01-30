@@ -9,11 +9,13 @@ Requirements:
     - phonon_band.dat: Band structure data (REQUIRED)
     - phonon_dos.dat: DOS data (REQUIRED)
     - band_kpath.dat: K-path metadata with lattice, segments, and q-points (REQUIRED)
-    - stable_electrides.db: ASE database (optional, for Pearson symbols)
+    - stable_electrides.db: ASE database (optional, for Pearson symbols with --db)
+    - POSCAR: Structure file (optional, for Pearson symbols with --poscar)
 
 Usage:
     python3 phonon_band_dos_plot.py --results-dir Bin-Ele-HT/candidates/ --db Bin-Ele-HT/stable_electrides.db --structure-ids Ba2P1_s001 Ca5P3_s021
     python3 phonon_band_dos_plot.py --results-dir Ter-Ele-HT/candidates/ --db Ter-Ele-HT/stable_electrides.db --structure-ids K6B1O4_s013 --output-dir ./phonon_plots
+    python3 phonon_band_dos_plot.py --results-dir Bin-Ele-HT/candidates/ --structure-ids Ba2P1_s001 --poscar  # Use POSCAR for Pearson symbol
 """
 
 import argparse
@@ -57,6 +59,82 @@ def get_pearson_symbols_from_db(db_path: Path, structure_ids: List[str]) -> Dict
             pearson_map[sid] = ''
     
     return pearson_map
+
+
+def get_pearson_symbol(structure) -> str:
+    """
+    Get full Pearson symbol from structure (e.g., oI14, mS26).
+    
+    Args:
+        structure: Pymatgen Structure
+    
+    Returns:
+        Pearson symbol with number of atoms (e.g., 'oI14', 'mS26', 'cF8')
+    """
+    from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+    
+    try:
+        sga = SpacegroupAnalyzer(structure)
+        
+        # Get conventional standard structure
+        conv_structure = sga.get_conventional_standard_structure()
+        n_atoms = len(conv_structure)
+        
+        crystal_system = sga.get_crystal_system()
+        
+        # Get space group symbol for centering
+        spg_symbol = sga.get_space_group_symbol()
+        
+        # Map crystal system to Pearson letter
+        system_map = {
+            'triclinic': 'a',
+            'monoclinic': 'm',
+            'orthorhombic': 'o',
+            'tetragonal': 't',
+            'trigonal': 'h',  # hexagonal setting
+            'hexagonal': 'h',
+            'cubic': 'c'
+        }
+        
+        # Get centering from space group symbol
+        # Pearson notation for centering (note: monoclinic C -> S)
+        centering_map = {
+            'P': 'P',  # Primitive
+            'A': 'S',  # Base-centered (A-face) -> S in Pearson
+            'B': 'S',  # Base-centered (B-face) -> S in Pearson  
+            'C': 'S',  # Base-centered (C-face) -> S in Pearson (for monoclinic)
+            'I': 'I',  # Body-centered
+            'F': 'F',  # Face-centered
+            'R': 'R',  # Rhombohedral
+        }
+        
+        system_letter = system_map.get(crystal_system.lower(), 'a')
+        
+        # Extract centering from space group symbol
+        centering = 'P'  # default
+        spg_first_letter = spg_symbol[0]
+        
+        # Special handling for monoclinic: A, B, C all map to S
+        if crystal_system.lower() == 'monoclinic':
+            centering = centering_map.get(spg_first_letter, 'P')
+        else:
+            # For non-monoclinic, use standard mapping but keep A as A, etc.
+            if spg_first_letter in ['P', 'I', 'F', 'R']:
+                centering = spg_first_letter
+            elif spg_first_letter in ['A', 'B', 'C']:
+                # For orthorhombic, keep the specific face centering
+                if crystal_system.lower() == 'orthorhombic':
+                    centering = spg_first_letter
+                else:
+                    centering = 'S'
+        
+        # Full Pearson symbol: crystal system + centering + number of atoms
+        pearson = f"{system_letter}{centering}{n_atoms}"
+        return pearson
+    
+    except Exception as e:
+        print(f"    Warning: Could not determine Pearson symbol: {e}")
+        return None
 
 
 def formula_to_latex(formula: str) -> str:
@@ -279,7 +357,7 @@ def plot_phonon_band_dos(
     ax1.set_xlim(distances[0] - 0.0001, distances[-1] + 0.0001)
     
     # Set y-axis limits and ticks
-    ax1.set_ylim(-2, 14)
+    ax1.set_ylim(-2, 12)
     ax1.yaxis.set_major_locator(MultipleLocator(2.0))
     ax1.yaxis.set_minor_locator(MultipleLocator(1.0))
     ax1.tick_params(axis='y', which='major', labelsize=14)
@@ -297,7 +375,7 @@ def plot_phonon_band_dos(
                     linewidth=1.5, label=str(element), alpha=0.8, color=colors[idx], zorder=2)
     
     dos_mean = np.mean(total_dos)
-    dos_xlim_max = dos_mean * 2.0
+    dos_xlim_max = dos_mean * 4.0
     
     ax2.set_xlabel('DOS', fontsize=16, fontweight='bold')
     ax2.axhline(y=0, color='black', linestyle='--', linewidth=0.5, alpha=0.5, zorder=5)
@@ -309,7 +387,7 @@ def plot_phonon_band_dos(
     ax2.tick_params(axis='x', which='major', labelsize=14)
     
     # Set y-axis limits to match band structure
-    ax2.set_ylim(-2, 14)
+    ax2.set_ylim(-2, 12)
     
     # Add title
     if title:
@@ -339,10 +417,18 @@ def process_structure(
     structure_id: str,
     results_dir: Path,
     output_dir: Path,
-    pearson_symbol: Optional[str] = None
+    pearson_symbol: Optional[str] = None,
+    use_poscar: bool = False
 ) -> bool:
     """
     Process a single structure and create plots.
+    
+    Args:
+        structure_id: Structure identifier
+        results_dir: Directory containing structure data
+        output_dir: Output directory for plots
+        pearson_symbol: Pearson symbol (if already known from database)
+        use_poscar: If True, read POSCAR to determine Pearson symbol
     
     Returns:
         True if successful, False otherwise
@@ -392,6 +478,23 @@ def process_structure(
     except Exception as e:
         print(f"  Error parsing DOS data: {e}")
         return False
+    
+    # Get Pearson symbol from POSCAR if requested and not already provided
+    if use_poscar and pearson_symbol is None:
+        poscar_file = data_dir / "POSCAR"
+        if poscar_file.exists():
+            print("  Reading POSCAR to determine Pearson symbol...")
+            try:
+                from pymatgen.core import Structure
+                structure = Structure.from_file(poscar_file)
+                pearson_symbol = get_pearson_symbol(structure)
+                if pearson_symbol:
+                    print(f"    Pearson symbol: {pearson_symbol}")
+            except Exception as e:
+                print(f"    Warning: Could not read POSCAR: {e}")
+                pearson_symbol = None
+        else:
+            print(f"    Warning: POSCAR not found in {data_dir}")
     
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -445,11 +548,15 @@ Examples:
   
   # Plot all structures in directory
   python3 phonon_band_dos_plot.py --results-dir Bin-Ele-HT/candidates/ --db Bin-Ele-HT/stable_electrides.db --all
+  
+  # Use POSCAR for Pearson symbol (instead of database)
+  python3 phonon_band_dos_plot.py --results-dir Bin-Ele-HT/candidates/ --structure-ids Ba2P1_s001 --poscar
 
 Directory structure expected:
   {results_dir}/{structure_id}_PHON/phonon_band.dat          (REQUIRED)
   {results_dir}/{structure_id}_PHON/phonon_dos.dat           (REQUIRED)
   {results_dir}/{structure_id}_PHON/band_kpath.dat           (REQUIRED)
+  {results_dir}/{structure_id}_PHON/POSCAR                   (optional, for --poscar flag)
   
 Database file:
   stable_electrides.db - ASE database with pearson_symbol field (optional)
@@ -457,6 +564,11 @@ Database file:
 Note: The .dat files are auto-generated by postproc_phonon.py.
       band_kpath.dat contains k-path segment structure and high-symmetry labels.
       If missing, re-run postproc_phonon.py to generate them.
+      
+Pearson symbol options:
+  - Use --db to load Pearson symbols from ASE database
+  - Use --poscar to determine Pearson symbols from POSCAR files
+  - Use neither for plots without Pearson symbols in titles
         """
     )
     
@@ -471,6 +583,12 @@ Note: The .dat files are auto-generated by postproc_phonon.py.
         '--db',
         type=str,
         help='Path to stable_electrides.db for Pearson symbols (optional)'
+    )
+    
+    parser.add_argument(
+        '--poscar',
+        action='store_true',
+        help='Read POSCAR files to determine Pearson symbols (alternative to --db)'
     )
     
     parser.add_argument(
@@ -531,8 +649,10 @@ Note: The .dat files are auto-generated by postproc_phonon.py.
         print(f"\nLoading Pearson symbols from database: {args.db}")
         pearson_dict = get_pearson_symbols_from_db(db_path, structure_ids)
         print(f"  Loaded Pearson symbols for {len([v for v in pearson_dict.values() if v])} structures")
+    elif args.poscar:
+        print("\nPearson symbols will be determined from POSCAR files")
     else:
-        print("\nNo database provided, Pearson symbols will not be shown in titles")
+        print("\nNo database or POSCAR flag provided, Pearson symbols will not be shown in titles")
     
     print("=" * 80)
     print("Phonon Band Structure and DOS Plotting")
@@ -542,6 +662,8 @@ Note: The .dat files are auto-generated by postproc_phonon.py.
     print(f"Structures to plot: {len(structure_ids)}")
     if args.db:
         print(f"Database: {args.db}")
+    elif args.poscar:
+        print(f"Pearson source: POSCAR files")
     print("=" * 80)
     
     # Process each structure
@@ -549,8 +671,8 @@ Note: The .dat files are auto-generated by postproc_phonon.py.
     failed = 0
     
     for struct_id in structure_ids:
-        pearson = pearson_dict.get(struct_id, '')
-        success = process_structure(struct_id, results_dir, output_dir, pearson)
+        pearson = pearson_dict.get(struct_id, '') if args.db else None
+        success = process_structure(struct_id, results_dir, output_dir, pearson, use_poscar=args.poscar)
         
         if success:
             successful += 1
