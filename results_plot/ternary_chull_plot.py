@@ -401,6 +401,57 @@ def get_pearson_symbols_from_db(db_path: Path, structure_ids: List[str]) -> Dict
     return pearson_map
 
 
+def prompt_for_pearson_symbols_by_ids(
+    structure_ids: List[str],
+    entry_metadata: Dict[str, Dict],
+    pearson_map: Dict[str, str]
+) -> Dict[str, str]:
+    """Prompt user to manually input Pearson symbols for specific structure IDs.
+    
+    Args:
+        structure_ids: List of structure IDs to prompt for
+        entry_metadata: Metadata dict with composition info
+        pearson_map: Existing pearson_symbol mapping
+    
+    Returns:
+        Updated pearson_map with manually input values
+    """
+    # Find structures without Pearson symbols
+    missing_pearson = []
+    for sid in structure_ids:
+        if sid not in pearson_map or not pearson_map.get(sid, '').strip():
+            metadata = entry_metadata.get(sid, {})
+            formula = metadata.get('formula', metadata.get('composition', sid))
+            missing_pearson.append((sid, formula))
+    
+    if not missing_pearson:
+        return pearson_map
+    
+    print("\n" + "="*70)
+    print("MANUAL PEARSON SYMBOL INPUT")
+    print("="*70)
+    print(f"\n{len(missing_pearson)} structure(s) within E_hull threshold are missing Pearson symbols.")
+    print("You can manually input Pearson symbols now (or press Enter to skip).")
+    print("="*70 + "\n")
+    
+    updated_map = pearson_map.copy()
+    
+    for sid, formula in missing_pearson:
+        print(f"Structure: {sid:30s} ({formula})")
+        print(f"  Enter Pearson symbol (e.g., oI26, hP4) or press Enter to skip:")
+        user_input = input("> ").strip()
+        
+        if user_input:
+            updated_map[sid] = user_input
+            print(f"  Set Pearson symbol: {user_input}")
+        else:
+            print(f"  Skipped")
+        print()
+    
+    print("="*70 + "\n")
+    return updated_map
+
+
 def load_mp_phases(json_path: Path) -> List[Dict]:
     """Load MP reference phases."""
     with open(json_path, 'r') as f:
@@ -1026,6 +1077,10 @@ def main():
     parser.add_argument('--e-above-hull-max', type=float, default=0.05,
                        help='Maximum energy above hull to display (eV/atom, default: 0.05)')
     
+    # Manual Pearson symbol input
+    parser.add_argument('--manual-pearson', action='store_true',
+                       help='Enable manual input for missing Pearson symbols')
+    
     args = parser.parse_args()
     
     # Create output directory
@@ -1036,21 +1091,29 @@ def main():
     if args.csv:
         electride_candidates = load_electride_candidates_csv(args.csv, args.systems, args.e_above_hull_max)
         print(f"  Loaded {len(electride_candidates)} electride candidates from CSV")
-        # Get Pearson symbols from database if it exists
-        db_path = args.csv.parent / 'stable_electrides.db'
-        if db_path.exists():
-            structure_ids = [row['structure_id'] for row in electride_candidates]
-            pearson_map = get_pearson_symbols_from_db(db_path, structure_ids)
-            print(f"  Loaded Pearson symbols for {len(pearson_map)} structures from database")
-        else:
-            pearson_map = {}
     else:
         electride_candidates = load_electride_candidates_db(args.db, args.systems, args.e_above_hull_max)
         print(f"  Loaded {len(electride_candidates)} electride candidates from database")
-        # Get Pearson symbols from database
-        structure_ids = [row['structure_id'] for row in electride_candidates]
-        pearson_map = get_pearson_symbols_from_db(args.db, structure_ids)
-        print(f"  Loaded Pearson symbols for {len(pearson_map)} structures")
+    
+    # Get Pearson symbols: either from database or manual input
+    if args.manual_pearson:
+        # Manual mode: start with empty map, will prompt per-system for structures within threshold
+        print("  Manual Pearson symbol mode enabled - you will be prompted per system")
+        pearson_map = {}
+    else:
+        # Auto mode: load from database
+        if args.csv:
+            db_path = args.csv.parent / 'stable_electrides.db'
+            if db_path.exists():
+                structure_ids = [row['structure_id'] for row in electride_candidates]
+                pearson_map = get_pearson_symbols_from_db(db_path, structure_ids)
+                print(f"  Loaded Pearson symbols for {len(pearson_map)} structures from database")
+            else:
+                pearson_map = {}
+        else:
+            structure_ids = [row['structure_id'] for row in electride_candidates]
+            pearson_map = get_pearson_symbols_from_db(args.db, structure_ids)
+            print(f"  Loaded Pearson symbols for {len(pearson_map)} structures")
     
     # Load DFT results
     print("\nLoading DFT results...")
@@ -1123,6 +1186,15 @@ def main():
                 if d['e_above_hull'] < comp_groups[comp_key]['e_above_hull']:
                     comp_groups[comp_key] = d
         new_meta = list(comp_groups.values())
+        
+        # Prompt for manual Pearson symbols if enabled (only for structures within threshold)
+        if args.manual_pearson:
+            structure_ids_to_prompt = [d['entry_id'] for d in new_stable + new_meta]
+            pearson_map = prompt_for_pearson_symbols_by_ids(structure_ids_to_prompt, entry_metadata, pearson_map)
+            # Update metadata with new Pearson symbols
+            for entry_id in structure_ids_to_prompt:
+                if entry_id in pearson_map and pearson_map[entry_id]:
+                    entry_metadata[entry_id]['pearson_symbol'] = pearson_map[entry_id]
         
         # Prompt user for confirmed electrides (only once)
         confirmed_ids = prompt_for_confirmed_electrides(new_stable, new_meta)

@@ -185,6 +185,57 @@ def get_pearson_symbols_from_db(db_path: Path, structure_ids: List[str]) -> Dict
     return pearson_map
 
 
+def prompt_for_pearson_symbols_by_ids(
+    structure_ids: List[str],
+    entry_metadata: Dict[str, Dict],
+    pearson_map: Dict[str, str]
+) -> Dict[str, str]:
+    """Prompt user to manually input Pearson symbols for specific structure IDs.
+    
+    Args:
+        structure_ids: List of structure IDs to prompt for
+        entry_metadata: Metadata dict with composition info
+        pearson_map: Existing pearson_symbol mapping
+    
+    Returns:
+        Updated pearson_map with manually input values
+    """
+    # Find structures without Pearson symbols
+    missing_pearson = []
+    for sid in structure_ids:
+        if sid not in pearson_map or not pearson_map.get(sid, '').strip():
+            metadata = entry_metadata.get(sid, {})
+            formula = metadata.get('formula', metadata.get('composition', sid))
+            missing_pearson.append((sid, formula))
+    
+    if not missing_pearson:
+        return pearson_map
+    
+    print("\n" + "="*70)
+    print("MANUAL PEARSON SYMBOL INPUT (Stable Structures)")
+    print("="*70)
+    print(f"\n{len(missing_pearson)} stable structure(s) are missing Pearson symbols.")
+    print("You can manually input Pearson symbols now (or press Enter to skip).")
+    print("="*70 + "\n")
+    
+    updated_map = pearson_map.copy()
+    
+    for sid, formula in missing_pearson:
+        print(f"Structure: {sid:30s} ({formula})")
+        print(f"  Enter Pearson symbol (e.g., oI26, hP4) or press Enter to skip:")
+        user_input = input("> ").strip()
+        
+        if user_input:
+            updated_map[sid] = user_input
+            print(f"  Set Pearson symbol: {user_input}")
+        else:
+            print(f"  Skipped")
+        print()
+    
+    print("="*70 + "\n")
+    return updated_map
+
+
 def load_mp_phases(json_path: Path) -> List[Dict]:
     """Load MP reference phases."""
     with open(json_path, 'r') as f:
@@ -521,6 +572,8 @@ def main():
                        help='Output directory for plots (default: current directory)')
     parser.add_argument('--e-above-hull-max', type=float, default=0.05,
                        help='Maximum energy above hull to display (eV/atom, default: 0.05)')
+    parser.add_argument('--manual-pearson', action='store_true',
+                       help='Enable manual input for missing Pearson symbols (stable structures only)')
     
     args = parser.parse_args()
     
@@ -530,10 +583,16 @@ def main():
     electride_candidates = load_electride_candidates_db(args.db, args.systems, args.e_above_hull_max)
     print(f"  Loaded {len(electride_candidates)} electride candidates from database")
     
-    # Load Pearson symbols from database
-    structure_ids = list(electride_candidates['structure_id'])
-    pearson_map = get_pearson_symbols_from_db(args.db, structure_ids)
-    print(f"  Loaded Pearson symbols for {len(pearson_map)} structures")
+    # Get Pearson symbols from database (unless manual mode is enabled)
+    if args.manual_pearson:
+        # Manual mode: start with empty map, will prompt per-system for stable structures
+        print("  Manual Pearson symbol mode enabled - you will be prompted per system for stable structures")
+        pearson_map = {}
+    else:
+        # Auto mode: load from database
+        structure_ids = list(electride_candidates['structure_id'])
+        pearson_map = get_pearson_symbols_from_db(args.db, structure_ids)
+        print(f"  Loaded Pearson symbols for {len(pearson_map)} structures")
     
     print("\nLoading DFT results...")
     dft_results = load_dft_results(args.dft_results)
@@ -555,6 +614,22 @@ def main():
         if not entries:
             print(f"  Warning: No entries found for {system} system")
             continue
+        
+        # If manual mode, identify stable structures and prompt for Pearson symbols
+        if args.manual_pearson:
+            # Create phase diagram to identify stable structures
+            pd_all = PhaseDiagram(entries)
+            stable_electride_ids = []
+            for entry in entries:
+                metadata = entry_metadata.get(entry.entry_id, {})
+                if metadata.get('is_electride', False) and entry in pd_all.stable_entries:
+                    stable_electride_ids.append(entry.entry_id)
+            
+            if stable_electride_ids:
+                # Prompt for Pearson symbols for stable structures only
+                pearson_map = prompt_for_pearson_symbols_by_ids(
+                    stable_electride_ids, entry_metadata, pearson_map
+                )
         
         # Add Pearson symbols to metadata
         for entry_id, metadata in entry_metadata.items():
