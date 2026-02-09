@@ -14,6 +14,7 @@ MP_API_KEY="${MP_API_KEY:-}"
 HULL_THRESHOLD=0.1
 DEVICE="cuda"
 BATCH_SIZE=32
+MAX_ATOMS_GPU=2048
 PURE_PBE=""
 
 # Colors
@@ -62,6 +63,10 @@ while [[ $# -gt 0 ]]; do
             BATCH_SIZE="$2"
             shift 2
             ;;
+        --max-atoms-gpu)
+            MAX_ATOMS_GPU="$2"
+            shift 2
+            ;;
         --conda-env)
             CONDA_ENV="$2"
             shift 2
@@ -85,7 +90,10 @@ while [[ $# -gt 0 ]]; do
             echo "  --hull-threshold FLOAT     Energy above hull threshold in eV/atom (default: 0.1)"
             echo "  --device DEVICE            MatterSim device: cpu or cuda (default: cuda)"
             echo "                             Note: GPU is HIGHLY RECOMMENDED (10-50x faster than CPU)"
-            echo "  --batch-size N             Batch size for MatterSim predictions (default: 32)"
+            echo "  --batch-size N             Batch size for GPU parallel relaxation (default: 32)"
+            echo "  --max-atoms-gpu N          Max total atoms on GPU simultaneously (default: 2048)"
+            echo "                             Adjust for GPU memory: 2048 (V100 16GB), 4096 (A100 40GB),"
+            echo "                             8192 (A100 80GB / H100)"
             echo "  --conda-env NAME           Conda environment name (default: mattersim)"
             echo "  --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)"
             echo "                             Default: accept both PBE and PBE+U (recommended)"
@@ -138,6 +146,7 @@ echo "  Max structures:       ${MAX_STRUCTURES} (0 = all)"
 echo "  Hull threshold:       ${HULL_THRESHOLD} eV/atom"
 echo "  Device:               $DEVICE"
 echo "  Batch size:           $BATCH_SIZE"
+echo "  Max atoms on GPU:     $MAX_ATOMS_GPU"
 echo "  Conda environment:    $CONDA_ENV"
 echo "  MP API key:           ${MP_API_KEY:+[SET]}${MP_API_KEY:-[NOT SET]}"
 echo "  Functional filter:    ${PURE_PBE:+Pure PBE only}${PURE_PBE:-Mixed PBE/PBE+U (default)}"
@@ -169,6 +178,7 @@ export MP_API_KEY
 export HULL_THRESHOLD
 export DEVICE
 export BATCH_SIZE
+export MAX_ATOMS_GPU
 export PURE_PBE
 
 JOB_ID=$(sbatch submit_prescreen.sh | awk '{print $NF}')

@@ -12,6 +12,18 @@ IMPORTANT: Uses Legacy MPRester for Complete GGA Coverage
 - Strict filtering: only accepts entries with '-GGA' or '-GGA+U' suffix in entry_id
 - MP structures are re-relaxed with MatterSim to obtain consistent energy reference
 - Optional --pure-pbe flag to exclude PBE+U (use pure GGA-PBE only)
+
+GPU Batch Processing:
+- Uses MatterSim's BatchRelaxer for true parallel GPU relaxation
+- Multiple structures are relaxed simultaneously on GPU
+- --batch-size controls GPU parallelism (e.g., 32 structures at once)
+- --max-atoms-gpu sets memory limit (default 2048)
+
+Duplicate Detection:
+- Removes duplicate structures within each composition BEFORE relaxation
+- Uses pymatgen StructureMatcher (ltol=0.2, stol=0.2, angle_tol=5)
+- Significantly reduces computational cost by avoiding redundant relaxations
+- Only compares structures with same composition (not across compositions)
 """
 
 import os
@@ -20,8 +32,6 @@ import json
 import argparse
 import zipfile
 import warnings
-import time
-import random
 import fcntl
 import numpy as np
 from pathlib import Path
@@ -31,8 +41,7 @@ from datetime import datetime
 from pymatgen.core import Composition
 from pymatgen.io.cif import CifParser
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
-# Use legacy pymatgen MPRester for complete GGA entry retrieval
-# The new mp_api.client.MPRester misses many stable GGA phases
+
 try:
     from pymatgen.ext.matproj import MPRester
 except ImportError:
@@ -41,13 +50,12 @@ except ImportError:
     sys.exit(1)
 from pymatgen.io.ase import AseAtomsAdaptor
 
-from ase.optimize import FIRE
-from ase.filters import UnitCellFilter
 from pyxtal import pyxtal
 from pyxtal.db import database_topology
 
 try:
-    from mattersim.forcefield import MatterSimCalculator
+    from mattersim.forcefield.potential import Potential
+    from mattersim.applications.batch_relax import BatchRelaxer
     MATTERSIM_AVAILABLE = True
 except ImportError:
     MATTERSIM_AVAILABLE = False
@@ -97,111 +105,241 @@ def validate_structure(pmg_struct):
         return False, f"Validation error: {str(e)[:100]}"
 
 
-def relax_structure_mattersim(pmg_struct, calculator, structure_id=None, fmax=0.01, max_steps=500, logfile=None):
+def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=500, max_natoms_per_batch=512):
     """
-    Relax structure using MatterSim + FIRE optimizer with symmetrization and cell relaxation.
+    Batch relax multiple structures using MatterSim BatchRelaxer for efficient GPU utilization.
     
     Args:
-        pmg_struct: Pymatgen Structure object
-        calculator: MatterSimCalculator instance (reused across batch)
-        structure_id: Structure ID for error reporting (optional)
+        structures_dict: List of dicts with keys: 'id', 'structure' (pymatgen), 'composition', 'chemsys'
+        potential: MatterSim Potential instance (reused for entire batch)
         fmax: Force convergence criterion (eV/Angstrom)
-        max_steps: Maximum optimization steps
-        logfile: None to suppress FIRE optimizer log, otherwise path to log file or set to '-' for stdout
+        max_steps: Maximum optimization steps per structure
+        max_natoms_per_batch: Maximum total atoms in GPU batch (controls memory usage)
     
     Returns:
-        tuple: (relaxed_structure, energy_per_atom, error_message)
-               Returns (None, None, error_msg) if relaxation fails
+        list of dicts: Results for each structure with keys:
+            - 'structure_id': Structure ID
+            - 'relaxed_structure': Pymatgen Structure (None if failed)
+            - 'energy_per_atom': Energy per atom (None if failed)
+            - 'error': Error message (None if successful)
+            - 'composition': Original composition
+            - 'chemsys': Chemical system
     
     Note:
-        - Symmetrizes structure using PyXtal with progressive tolerance (1e-5 to 0.5)
-        - Falls back to direct conversion if all tolerances fail
-        - Uses UnitCellFilter to relax both cell and atomic positions
-        - Calculator is reused for efficiency (batch processing)
-        - Has extensive error handling for ASE calculator failures (NaN, inf, spglib crashes)
-        - Never raises exceptions - returns None values on failure
+        - Symmetrizes each structure using PyXtal before relaxation
+        - Uses BatchRelaxer for true parallel GPU processing
+        - Falls back to direct conversion if PyXtal fails
+        - Has extensive error handling for validation and relaxation failures
     """
     
-    sid_prefix = f"[{structure_id}] " if structure_id else ""
+    results = []
+    atoms_list = []
+    valid_indices = []  # Track which structures successfully converted to ASE
     
-    # Symmetrize structure using PyXtal with progressive tolerance relaxation
+    adaptor = AseAtomsAdaptor()
     tolerances = [5e-2, 1e-2, 1e-3, 1e-4, 1e-5]
-    atoms = None
     
-    for tol in tolerances:
-        try:
-            xtal = pyxtal()
-            xtal.from_seed(pmg_struct, tol=tol)
-            if not xtal.valid:
-                continue
-            if len(xtal.check_short_distances(r=0.5)) > 0:
-                continue
-            atoms = xtal.to_ase()
-            break
-        except Exception:
-            continue
-    
-    # If all tolerances failed, try direct conversion without symmetrization
-    if atoms is None:
-        try:
-            adaptor = AseAtomsAdaptor()
-            atoms = adaptor.get_atoms(pmg_struct)
-        except Exception as e:
-            return None, None, f"{sid_prefix}Structure conversion failed (PyXtal failed at all tolerances {tolerances}, direct conversion also failed): {e}"
-    
-    # Attach calculator (reused from batch)
-    atoms.calc = calculator
-    
-    # Check initial energy calculation (catches NaN/inf early)
-    try:
-        initial_energy = atoms.get_potential_energy()
-        if not np.isfinite(initial_energy):
-            return None, None, f"{sid_prefix}Initial energy is not finite: {initial_energy}"
-    except Exception as e:
-        return None, None, f"{sid_prefix}Initial energy calculation failed: {e}"
-    
-    # Relax with error handling for ASE calculator failures
-    try:
-        ecf = UnitCellFilter(atoms)
-        dyn = FIRE(ecf, a=0.1, logfile=logfile)
-        dyn.run(fmax=fmax, steps=max_steps)
+    # Convert all structures to ASE atoms with validation
+    for idx, item in enumerate(structures_dict):
+        struct_id = item['id']
+        pmg_struct = item['structure']
         
-        # Get final energy
-        energy = atoms.get_potential_energy()
-        
-        # Check for NaN/inf values
-        if not np.isfinite(energy):
-            # Clean up before returning
+        # Try PyXtal symmetrization with progressive tolerances
+        atoms = None
+        for tol in tolerances:
             try:
-                del atoms, ecf, dyn
-            except:
-                pass
-            return None, None, f"{sid_prefix}Final energy is not finite: {energy}"
+                xtal = pyxtal()
+                xtal.from_seed(pmg_struct, tol=tol)
+                if not xtal.valid:
+                    continue
+                if len(xtal.check_short_distances(r=0.5)) > 0:
+                    continue
+                atoms = xtal.to_ase()
+                break
+            except Exception:
+                continue
         
-        energy_per_atom = energy / len(atoms)
+        # If all tolerances failed, try direct conversion
+        if atoms is None:
+            try:
+                atoms = adaptor.get_atoms(pmg_struct)
+            except Exception as e:
+                results.append({
+                    'structure_id': struct_id,
+                    'relaxed_structure': None,
+                    'energy_per_atom': None,
+                    'error': f"Structure conversion failed (PyXtal failed at all tolerances {tolerances}, direct conversion also failed): {e}",
+                    'composition': item['composition'],
+                    'chemsys': item['chemsys']
+                })
+                continue
         
-        # Convert back to pymatgen structure
-        adaptor = AseAtomsAdaptor()
-        relaxed_structure = adaptor.get_structure(atoms)
+        # Store original index for mapping results back
+        atoms.info['structure_index'] = idx
+        atoms.info['structure_id'] = struct_id
+        atoms_list.append(atoms)
+        valid_indices.append(idx)
+    
+    # If all structures failed conversion, return early
+    if not atoms_list:
+        return results
+    
+    # Create BatchRelaxer and relax all structures
+    try:
+        relaxer = BatchRelaxer(
+            potential=potential,
+            optimizer="FIRE",
+            filter="ExpCellFilter",
+            fmax=fmax,
+            max_natoms_per_batch=max_natoms_per_batch,
+            max_n_steps=max_steps
+        )
         
+        trajectories = relaxer.relax(atoms_list)
+        
+        # Extract results from trajectories
+        for idx in valid_indices:
+            item = structures_dict[idx]
+            struct_id = item['id']
+            
+            if idx in trajectories:
+                trajectory = trajectories[idx]
+                relaxed_atoms = trajectory[-1]
+                
+                try:
+                    energy = relaxed_atoms.info.get('total_energy', None)
+                    
+                    # Check for NaN/inf values
+                    if energy is None or not np.isfinite(energy):
+                        results.append({
+                            'structure_id': struct_id,
+                            'relaxed_structure': None,
+                            'energy_per_atom': None,
+                            'error': f"Relaxation produced non-finite energy: {energy}",
+                            'composition': item['composition'],
+                            'chemsys': item['chemsys']
+                        })
+                        continue
+                    
+                    energy_per_atom = energy / len(relaxed_atoms)
+                    
+                    relaxed_structure = adaptor.get_structure(relaxed_atoms)
+                    
+                    results.append({
+                        'structure_id': struct_id,
+                        'relaxed_structure': relaxed_structure,
+                        'energy_per_atom': energy_per_atom,
+                        'error': None,
+                        'composition': item['composition'],
+                        'chemsys': item['chemsys']
+                    })
+                    
+                except Exception as e:
+                    results.append({
+                        'structure_id': struct_id,
+                        'relaxed_structure': None,
+                        'energy_per_atom': None,
+                        'error': f"Post-relaxation processing failed: {e}",
+                        'composition': item['composition'],
+                        'chemsys': item['chemsys']
+                    })
+            else:
+                # Structure not in trajectories (relaxation failed internally)
+                results.append({
+                    'structure_id': struct_id,
+                    'relaxed_structure': None,
+                    'energy_per_atom': None,
+                    'error': "BatchRelaxer failed to produce trajectory",
+                    'composition': item['composition'],
+                    'chemsys': item['chemsys']
+                })
+    
     except Exception as e:
-        # Clean up before returning
-        try:
-            del atoms
-            if 'ecf' in locals():
-                del ecf
-            if 'dyn' in locals():
-                del dyn
-        except:
-            pass
-        return None, None, f"{sid_prefix}Relaxation failed: {e}"
+        # Batch relaxation completely failed
+        for idx in valid_indices:
+            item = structures_dict[idx]
+            results.append({
+                'structure_id': item['id'],
+                'relaxed_structure': None,
+                'energy_per_atom': None,
+                'error': f"Batch relaxation failed: {e}",
+                'composition': item['composition'],
+                'chemsys': item['chemsys']
+            })
     
-    # Clean up atoms object (but keep calculator for reuse)
-    del atoms
-    del ecf
-    del dyn
+    return results
+
+
+def deduplicate_structures(structures_list):
+    """
+    Remove duplicate structures within each composition using StructureMatcher.
     
-    return relaxed_structure, energy_per_atom, None
+    Args:
+        structures_list: List of dicts with keys: 'id', 'composition', 'chemsys', 'structure'
+    
+    Returns:
+        tuple: (deduplicated_list, duplicate_count, duplicate_details)
+    
+    Note:
+        - Only compares structures with the same composition
+        - Uses reasonable tolerances: ltol=0.2, stol=0.2, angle_tol=5
+        - Keeps the first structure when duplicates are found
+        - Important to do this BEFORE expensive MatterSim relaxations
+    """
+    from pymatgen.analysis.structure_matcher import StructureMatcher
+    
+    # Group structures by composition
+    by_composition = {}
+    for item in structures_list:
+        comp = item['composition']
+        if comp not in by_composition:
+            by_composition[comp] = []
+        by_composition[comp].append(item)
+    
+    # Initialize matcher with reasonable tolerances
+    matcher = StructureMatcher(ltol=0.2, stol=0.2, angle_tol=5)
+    
+    deduplicated = []
+    duplicate_count = 0
+    duplicate_details = []
+    
+    # Process each composition separately
+    for comp, comp_structures in by_composition.items():
+        if len(comp_structures) == 1:
+            deduplicated.extend(comp_structures)
+            continue
+        
+        # Track which structures to keep
+        unique_structures = []
+        duplicate_of = {}
+        
+        for i, item_i in enumerate(comp_structures):
+            struct_i = item_i['structure']
+            is_duplicate = False
+            
+            for j, item_j in enumerate(unique_structures):
+                struct_j = item_j['structure']
+                
+                try:
+                    if matcher.fit(struct_i, struct_j):
+                        is_duplicate = True
+                        duplicate_of[i] = j
+                        duplicate_count += 1
+                        duplicate_details.append({
+                            'duplicate': item_i['id'],
+                            'original': item_j['id'],
+                            'composition': comp
+                        })
+                        break
+                except Exception as e:
+                    continue
+            
+            if not is_duplicate:
+                unique_structures.append(item_i)
+        
+        deduplicated.extend(unique_structures)
+    
+    return deduplicated, duplicate_count, duplicate_details
 
 
 def load_mp_cache_locked(cache_file):
@@ -273,7 +411,7 @@ def save_mp_cache_locked(cache_file, new_entries_data):
             fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
 
 
-def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, pure_pbe=False):
+def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, pure_pbe=False, max_atoms_gpu=2048):
     """
     Get MP GGA phase structures and relax with MatterSim for consistent energy reference.
     
@@ -288,16 +426,17 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
     Key optimizations:
     - Uses single SHARED global cache file (mp_mattersim.json) across all parallel batches
     - Per-chemsys locking prevents duplicate MP queries across batches
-    - Reuses calculator for efficiency
+    - Uses BatchRelaxer for efficient parallel GPU relaxation
     - Returns PDEntry objects for phase diagram analysis
     
     Args:
         chemsys: Chemical system string (e.g., 'B-Li-N')
         mp_api_key: Materials Project API key
         cache_file: Path to SHARED global cache file (mp_mattersim.json)
-        calculator: MatterSimCalculator instance (reused)
+        potential: MatterSim Potential instance (for batch relaxation)
         pure_pbe: If True, filter to GGA-PBE only (exclude PBE+U)
                   If False (default), accept both PBE and PBE+U
+        max_atoms_gpu: Maximum total atoms on GPU simultaneously (default: 2048)
     
     Returns:
         List of PDEntry objects for GGA phases in this chemical system
@@ -466,14 +605,9 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
                 else:
                     print(f"      All terminal phases present: {sorted(elements_found)}")
                 
-                print(f"    Relaxing {len(mp_phases)} phases with MatterSim...")
-                
-                new_entries_data = []
-                success_count = 0
-                failed_count = 0
-                
+                # Prepare structures for batch relaxation (skip already cached)
+                structures_to_relax = []
                 for mp_id, structure, has_U in mp_phases:
-                    # Determine chemsys for this phase
                     doc_elements = sorted([str(el) for el in structure.composition.elements])
                     doc_chemsys = '-'.join(doc_elements)
                     
@@ -483,10 +617,47 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
                     if cache_key in cached_data:
                         continue
                     
-                    # Relax GGA-optimized structure with MatterSim (using reused calculator)
-                    relaxed_struct, energy_per_atom, error_msg = relax_structure_mattersim(
-                        structure, calculator, structure_id=mp_id
-                    )
+                    structures_to_relax.append({
+                        'id': mp_id,
+                        'structure': structure,
+                        'composition': doc_chemsys,  # Store for later use
+                        'chemsys': doc_chemsys
+                    })
+                
+                if not structures_to_relax:
+                    print(f"    All {len(mp_phases)} phases already cached")
+                    return entries
+                
+                print(f"    Batch relaxing {len(structures_to_relax)} uncached phases with MatterSim...")
+                
+                # Batch relax all MP structures
+                total_atoms = sum(len(item['structure']) for item in structures_to_relax)
+                avg_atoms = total_atoms / len(structures_to_relax) if structures_to_relax else 50
+                
+                # For MP phases, allow all to run simultaneously up to memory limit
+                # MP phases are small batches (typically 10-50 structures per chemsys)
+                max_natoms = int(avg_atoms * len(structures_to_relax))
+                max_natoms = min(max_natoms, max_atoms_gpu)
+                
+                batch_results = relax_structure_mattersim(
+                    structures_to_relax,
+                    potential,
+                    fmax=0.01,
+                    max_steps=500,
+                    max_natoms_per_batch=max_natoms
+                )
+                
+                # Process batch results
+                new_entries_data = []
+                success_count = 0
+                failed_count = 0
+                
+                for result in batch_results:
+                    mp_id = result['structure_id']
+                    relaxed_struct = result['relaxed_structure']
+                    energy_per_atom = result['energy_per_atom']
+                    error_msg = result['error']
+                    doc_chemsys = result['chemsys']
                     
                     if relaxed_struct is None or energy_per_atom is None:
                         print(f"      Warning: Failed to relax {mp_id}: {error_msg}")
@@ -513,9 +684,9 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, calculator, 
                     })
                     success_count += 1
                 
-                print(f"    Successfully relaxed {success_count} GGA phases")
+                print(f"    Successfully relaxed {success_count}/{len(structures_to_relax)} GGA phases")
                 if failed_count > 0:
-                    print(f"    Failed to relax {failed_count} phases")
+                    print(f"    Failed to relax {failed_count}/{len(structures_to_relax)} phases")
                 
                 # Update cache with new entries (with file locking)
                 if new_entries_data:
@@ -638,7 +809,14 @@ def main():
         '--batch-size',
         type=int,
         default=32,
-        help="Batch size for structure processing (reuses MatterSimCalculator)"
+        help="Batch size for GPU parallel relaxation (structures relaxed simultaneously)"
+    )
+    parser.add_argument(
+        '--max-atoms-gpu',
+        type=int,
+        default=2048,
+        help="Maximum total atoms on GPU simultaneously (default: 2048 for V100). "
+             "Increase for GPUs with more VRAM: 4096 for A100"
     )
     parser.add_argument(
         '--mp-cache-dir',
@@ -738,6 +916,53 @@ def main():
     
     print(f"\nTotal structures loaded: {len(all_structures)}\n")
     
+    # Deduplicate structures within each composition
+    print("="*70)
+    print("Deduplicating Structures (StructureMatcher)")
+    print("="*70)
+    print(f"Checking for duplicates within each composition...")
+    print(f"Tolerances: ltol=0.2, stol=0.2, angle_tol=5")
+    sys.stdout.flush()
+    
+    all_structures, dup_count, dup_details = deduplicate_structures(all_structures)
+    
+    # Store duplicate information for results tracking
+    duplicate_records = []
+    if dup_count > 0:
+        print(f"\nRemoved {dup_count} duplicate structures:")
+        # Group by composition for cleaner output
+        dup_by_comp = {}
+        for dup in dup_details:
+            comp = dup['composition']
+            if comp not in dup_by_comp:
+                dup_by_comp[comp] = []
+            dup_by_comp[comp].append(dup)
+            
+            # Create result entry for each duplicate
+            duplicate_records.append({
+                'structure_id': dup['duplicate'],
+                'composition': dup['composition'],
+                'chemsys': None,
+                'mattersim_energy_per_atom': None,
+                'energy_above_hull': None,
+                'is_stable': None,
+                'passed_prescreening': False,
+                'duplicate_of': dup['original'],
+                'error': f"Duplicate of {dup['original']} (removed before relaxation)"
+            })
+        
+        for comp, dups in sorted(dup_by_comp.items()):
+            print(f"  {comp}: {len(dups)} duplicates removed")
+            for dup in dups[:5]:  # Show first 5
+                print(f"    - {dup['duplicate']} (duplicate of {dup['original']})")
+            if len(dups) > 5:
+                print(f"    ... and {len(dups) - 5} more")
+    else:
+        print("\nNo duplicates found")
+    
+    print(f"\nUnique structures after deduplication: {len(all_structures)}")
+    print("="*70 + "\n")
+    
     # Pre-fetch MP stable phases for all chemical systems
     unique_chemsys = sorted(set(s['chemsys'] for s in all_structures))
     
@@ -755,18 +980,18 @@ def main():
     print("  - MP structures are re-relaxed with MatterSim for consistent energies")
     print("="*70 + "\n")
     
-    # Create MatterSim calculator for MP phases (one-time)
-    print(f"Creating MatterSimCalculator (device={args.device})...")
+    # Create MatterSim Potential for MP phases (one-time)
+    print(f"Creating MatterSim Potential (device={args.device})...")
     try:
         import torch
         import gc
-        calc_mp = MatterSimCalculator(
-            load_path="MatterSim-v1.0.0-5M.pth",
+        potential_mp = Potential.from_checkpoint(
+            checkpoint_path="MatterSim-v1.0.0-5M.pth",
             device=args.device
         )
-        print("  Calculator created successfully\n")
+        print("  Potential created successfully\n")
     except Exception as e:
-        print(f"ERROR: Failed to create MatterSimCalculator: {e}")
+        print(f"ERROR: Failed to create MatterSim Potential: {e}")
         return 1
     
     mp_entries_cache = {}
@@ -775,7 +1000,8 @@ def main():
         sys.stdout.flush()
         try:
             mp_entries = get_mp_stable_phases_mattersim(
-                chemsys, mp_api_key, mp_cache_file, calc_mp, pure_pbe=args.pure_pbe
+                chemsys, mp_api_key, mp_cache_file, potential_mp, 
+                pure_pbe=args.pure_pbe, max_atoms_gpu=args.max_atoms_gpu
             )
             mp_entries_cache[chemsys] = mp_entries
             print(f"  → {len(mp_entries)} stable phases ready\n")
@@ -785,8 +1011,8 @@ def main():
             sys.stdout.flush()
             mp_entries_cache[chemsys] = []
     
-    # Clean up MP calculator
-    del calc_mp
+    # Clean up MP potential
+    del potential_mp
     if args.device == 'cuda':
         torch.cuda.empty_cache()
         gc.collect()
@@ -797,9 +1023,10 @@ def main():
     
     # Run pre-screening with batch processing
     print("="*70)
-    print("Running MatterSim Pre-screening (Batch Processing)")
+    print("Running MatterSim Pre-screening (True GPU Batch Processing)")
     print("="*70)
-    print(f"Processing {len(all_structures)} structures in batches of {args.batch_size}...\n")
+    print(f"Processing {len(all_structures)} structures in batches of {args.batch_size}...")
+    print(f"Using BatchRelaxer for parallel GPU relaxation within each batch\n")
     sys.stdout.flush()
     
     # Check for existing checkpoint
@@ -817,7 +1044,7 @@ def main():
             processed_ids = {r['structure_id'] for r in results}
             currently_processing = checkpoint_data.get('currently_processing', None)
         
-        print(f"Resuming: {len(results)}/{len(all_structures)} already processed")
+        print(f"Resuming: {len(results)}/{len(all_structures) + dup_count} already processed")
         
         # Detect if we crashed during a structure (segfault detection)
         if currently_processing:
@@ -865,6 +1092,15 @@ def main():
         db = database_topology(str(db_file))
         print(f"Created new database: {db_file}\n")
     
+    # Add duplicate records to results (these are already "processed")
+    if duplicate_records:
+        print(f"Adding {len(duplicate_records)} duplicate records to results...\n")
+        for dup_rec in duplicate_records:
+            if dup_rec['structure_id'] not in processed_ids:
+                results.append(dup_rec)
+                processed_ids.add(dup_rec['structure_id'])
+                failed += 1  # Count duplicates as "failed" (not proceeding to VASP)
+    
     # Filter unprocessed structures
     structures_to_process = [s for s in all_structures if s['id'] not in processed_ids]
     
@@ -903,14 +1139,14 @@ def main():
                 with open(checkpoint_file, 'w') as f:
                     json.dump(checkpoint_data_temp, f, indent=2)
             
-            # Create calculator for this batch (with error handling)
+            # Create MatterSim Potential for this batch (with error handling)
             try:
-                calc = MatterSimCalculator(
-                    load_path="MatterSim-v1.0.0-5M.pth",
+                potential = Potential.from_checkpoint(
+                    checkpoint_path="MatterSim-v1.0.0-5M.pth",
                     device=args.device
                 )
             except Exception as e:
-                print(f"ERROR creating calculator for batch {batch_idx + 1}: {e}")
+                print(f"ERROR creating Potential for batch {batch_idx + 1}: {e}")
                 print(f"Skipping entire batch of {len(batch)} structures\n")
                 sys.stdout.flush()
                 
@@ -926,7 +1162,7 @@ def main():
                         'energy_above_hull': None,
                         'is_stable': None,
                         'passed_prescreening': False,
-                        'error': f'Calculator creation failed: {str(e)}'
+                        'error': f'Potential creation failed: {str(e)}'
                     })
                 
                 # Save checkpoint and continue to next batch
@@ -943,94 +1179,119 @@ def main():
                 
                 continue
             
-            # Process structures in batch
-            for item in tqdm(batch, desc=f"Batch {batch_idx + 1}", unit="struct"):
+            # Pre-validate all structures in batch
+            valid_batch = []
+            invalid_count = 0
+            
+            print(f"Pre-validating {len(batch)} structures...")
+            for item in batch:
                 struct_id = item['id']
                 structure = item['structure']
-                chemsys = item['chemsys']
                 
-                # Mark this structure as currently processing (for segfault detection)
-                # Save immediately to detect crashes
-                checkpoint_data_temp = {
-                    'results': [{k: v for k, v in r.items() if k != 'pmg'} for r in results],
-                    'passed': passed,
-                    'failed': failed,
-                    'currently_processing': struct_id,  # Mark what we're processing
-                    'timestamp': datetime.now().isoformat()
-                }
-                with open(checkpoint_file, 'w') as f:
-                    json.dump(checkpoint_data_temp, f, indent=2)
-                
-                # Pre-validate structure to catch malformed structures early
                 is_valid, validation_error = validate_structure(structure)
                 if not is_valid:
-                    # Skip MatterSim relaxation for invalid structures
-                    tqdm.write(f"  SKIPPING {struct_id}: {validation_error}")
+                    print(f"  SKIPPING {struct_id}: {validation_error}")
+                    invalid_count += 1
                     failed += 1
                     results.append({
                         'structure_id': struct_id,
                         'pmg': None,
                         'composition': item['composition'],
-                        'chemsys': chemsys,
+                        'chemsys': item['chemsys'],
                         'mattersim_energy_per_atom': None,
                         'energy_above_hull': None,
                         'is_stable': None,
                         'passed_prescreening': False,
                         'error': f"Invalid structure: {validation_error}"
                     })
-                    continue
+                else:
+                    valid_batch.append(item)
+            
+            if invalid_count > 0:
+                print(f"  Skipped {invalid_count} invalid structures")
+            print(f"  Proceeding with {len(valid_batch)} valid structures\n")
+            
+            # Batch relax all valid structures using BatchRelaxer
+            if valid_batch:
+                print(f"Batch relaxing {len(valid_batch)} structures (true GPU parallel processing)...")
+                sys.stdout.flush()
                 
-                # Relax using batch calculator (handles errors internally)
-                relaxed_struct, energy_per_atom, relax_error = relax_structure_mattersim(
-                    structure, calc, structure_id=struct_id
+                # Calculate max_natoms dynamically based on batch size
+                total_atoms = sum(len(item['structure']) for item in valid_batch)
+                avg_atoms = total_atoms / len(valid_batch) if valid_batch else 50
+                
+                target_structures_on_gpu = min(args.batch_size, len(valid_batch))
+                max_natoms = int(avg_atoms * target_structures_on_gpu)
+                max_natoms = min(max_natoms, args.max_atoms_gpu)
+                
+                print(f"  Max atoms on GPU: {max_natoms} (~{max_natoms/avg_atoms:.0f} structures simultaneously)")
+                sys.stdout.flush()
+                
+                batch_relax_results = relax_structure_mattersim(
+                    valid_batch,
+                    potential,
+                    fmax=0.01,
+                    max_steps=500,
+                    max_natoms_per_batch=max_natoms
                 )
                 
-                # Check if relaxation failed
-                if relaxed_struct is None or energy_per_atom is None:
-                    tqdm.write(f"  ERROR on {struct_id}: {relax_error}")
-                    failed += 1
+                print(f"Batch relaxation complete. Processing results...\n")
+                sys.stdout.flush()
+                
+                # Process batch relaxation results
+                for relax_result in batch_relax_results:
+                    struct_id = relax_result['structure_id']
+                    relaxed_struct = relax_result['relaxed_structure']
+                    energy_per_atom = relax_result['energy_per_atom']
+                    relax_error = relax_result['error']
+                    chemsys = relax_result['chemsys']
+                    
+                    # Check if relaxation failed
+                    if relaxed_struct is None or energy_per_atom is None:
+                        print(f"  ERROR on {struct_id}: {relax_error}")
+                        failed += 1
+                        results.append({
+                            'structure_id': struct_id,
+                            'pmg': None,
+                            'composition': relax_result['composition'],
+                            'chemsys': chemsys,
+                            'mattersim_energy_per_atom': None,
+                            'energy_above_hull': None,
+                            'is_stable': None,
+                            'passed_prescreening': False,
+                            'error': relax_error
+                        })
+                        continue
+                    
+                    # Relaxation succeeded - compute hull distance
+                    mp_entries = mp_entries_cache.get(chemsys, [])
+                    
+                    if not mp_entries:
+                        print(f"  WARNING: No MP reference phases for {chemsys}, auto-passing {struct_id}")
+                        e_hull = None
+                        passed_prescreening = True
+                    else:
+                        e_hull = compute_energy_above_hull(relaxed_struct, energy_per_atom, mp_entries)
+                        passed_prescreening = e_hull < args.hull_threshold
+                        
+                        if passed_prescreening:
+                            passed += 1
+                        else:
+                            failed += 1
+                    
                     results.append({
                         'structure_id': struct_id,
-                        'pmg': None,
-                        'composition': item['composition'],
+                        'pmg': relaxed_struct,
+                        'composition': relax_result['composition'],
                         'chemsys': chemsys,
-                        'mattersim_energy_per_atom': None,
-                        'energy_above_hull': None,
-                        'is_stable': None,
-                        'passed_prescreening': False,
-                        'error': relax_error
+                        'mattersim_energy_per_atom': float(energy_per_atom),
+                        'energy_above_hull': float(e_hull) if e_hull is not None else None,
+                        'is_stable': e_hull < 0.001 if e_hull is not None else None,
+                        'passed_prescreening': passed_prescreening
                     })
-                    continue
-                
-                # Relaxation succeeded - compute hull distance
-                mp_entries = mp_entries_cache.get(chemsys, [])
-                
-                if not mp_entries:
-                    tqdm.write(f"  WARNING: No MP reference phases for {chemsys}, auto-passing {struct_id}")
-                    e_hull = None
-                    passed_prescreening = True
-                else:
-                    e_hull = compute_energy_above_hull(relaxed_struct, energy_per_atom, mp_entries)
-                    passed_prescreening = e_hull < args.hull_threshold
-                    
-                    if passed_prescreening:
-                        passed += 1
-                    else:
-                        failed += 1
-                
-                results.append({
-                    'structure_id': struct_id,
-                    'pmg': relaxed_struct,
-                    'composition': item['composition'],
-                    'chemsys': chemsys,
-                    'mattersim_energy_per_atom': float(energy_per_atom),
-                    'energy_above_hull': float(e_hull) if e_hull is not None else None,
-                    'is_stable': e_hull < 0.001 if e_hull is not None else None,
-                    'passed_prescreening': passed_prescreening
-                })
             
-            # Clean up calculator after batch
-            del calc
+            # Clean up potential after batch
+            del potential
             if args.device == 'cuda':
                 torch.cuda.empty_cache()
                 gc.collect()
@@ -1177,7 +1438,9 @@ def main():
     results_json = [{k: v for k, v in r.items() if k != 'pmg'} for r in results]
     output_data = {
         'summary': {
-            'total_structures': len(all_structures),
+            'total_structures_loaded': len(all_structures) + dup_count,
+            'duplicate_structures_removed': dup_count,
+            'unique_structures_processed': len(all_structures),
             'passed_prescreening': passed,
             'failed_prescreening': failed,
             'hull_threshold': args.hull_threshold,
@@ -1225,7 +1488,9 @@ def main():
     print("\n" + "="*70)
     print("Pre-screening Complete")
     print("="*70)
-    print(f"Total structures: {len(all_structures)}")
+    print(f"Total structures loaded: {len(all_structures) + dup_count}")
+    print(f"Duplicates removed: {dup_count}")
+    print(f"Unique structures processed: {len(all_structures)}")
     print(f"Passed: {passed}")
     print(f"Failed: {failed}")
     print(f"JSON: {output_file}")

@@ -90,21 +90,33 @@ def merge_batch_results(batch_results: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Sort by composition, then structure_id
     merged['results'].sort(key=lambda x: (x['composition'], x['structure_id']))
     
-    # Update summary
-    merged['summary']['total_batches'] = len(batch_results)
-    merged['summary']['total_structures'] = len(merged['results'])
-    
-    print(f"Merged {len(batch_results)} batches:")
-    print(f"  Total unique structures: {len(merged['results'])}")
-    print(f"  Duplicates skipped: {duplicate_count}")
+    # Aggregate summary statistics from all batches
+    total_loaded = sum(b['summary'].get('total_structures_loaded', 0) for b in batch_results)
+    total_duplicates = sum(b['summary'].get('duplicate_structures_removed', 0) for b in batch_results)
+    total_unique = sum(b['summary'].get('unique_structures_processed', 0) for b in batch_results)
     
     # Count structures that passed prescreening
     passed_count = sum(1 for r in merged['results'] if r.get('passed_prescreening', False))
     failed_count = len(merged['results']) - passed_count
     
+    # Count duplicates in merged results (structures with 'duplicate_of' field)
+    duplicate_records_count = sum(1 for r in merged['results'] if 'duplicate_of' in r)
+    
+    # Update summary
+    merged['summary']['total_batches'] = len(batch_results)
+    merged['summary']['total_structures_loaded'] = total_loaded
+    merged['summary']['duplicate_structures_removed'] = total_duplicates
+    merged['summary']['unique_structures_processed'] = total_unique
+    merged['summary']['total_structures'] = len(merged['results'])  # Keep for compatibility
     merged['summary']['passed_prescreening'] = passed_count
     merged['summary']['failed_prescreening'] = failed_count
     
+    print(f"Merged {len(batch_results)} batches:")
+    print(f"  Total structures loaded: {total_loaded}")
+    print(f"  Duplicates removed: {total_duplicates} ({duplicate_records_count} duplicate records in merged results)")
+    print(f"  Unique structures processed: {total_unique}")
+    print(f"  Total result records: {len(merged['results'])}")
+    print(f"  Cross-batch duplicates skipped: {duplicate_count}")
     print(f"  Passed prescreening: {passed_count}")
     print(f"  Failed prescreening: {failed_count}")
     

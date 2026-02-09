@@ -10,6 +10,7 @@ BATCH_SIZE=32
 HULL_THRESHOLD=0.1
 DEVICE="cuda"
 MAX_STRUCTURES=0
+MAX_ATOMS_GPU=2048
 PURE_PBE=""
 
 # Parse command-line arguments
@@ -43,6 +44,10 @@ while [[ $# -gt 0 ]]; do
             MAX_STRUCTURES="$2"
             shift 2
             ;;
+        --max-atoms-gpu)
+            MAX_ATOMS_GPU="$2"
+            shift 2
+            ;;
         --pure-pbe)
             PURE_PBE="--pure-pbe"
             shift
@@ -55,7 +60,9 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --results-dir DIR          Path to MatterGen results (default: ./mattergen_results/ternary_csp_electrides)"
             echo "  --output-dir DIR           Path to output directory (default: ./VASP_JOBS)"
-            echo "  --batch-size N             Structures per batch (default: 32)"
+            echo "  --batch-size N             Batch size for GPU parallel relaxation (default: 32)"
+            echo "  --max-atoms-gpu N          Max total atoms on GPU simultaneously (default: 2048)"
+            echo "                             Adjust for GPU: 2048 (V100 16GB), 4096 (A100 40GB), 8192 (A100 80GB/H100)"
             echo "  --hull-threshold FLOAT     Energy above hull threshold in eV/atom (default: 0.1)"
             echo "  --device DEVICE            Device: cpu or cuda (default: cuda)"
             echo "  --compositions-per-job N   Compositions per parallel job (default: 400)"
@@ -104,6 +111,7 @@ echo "Total compositions: $TOTAL_COMPOSITIONS"
 echo "Compositions per job: $COMPOSITIONS_PER_JOB"
 echo "Number of parallel jobs: $NUM_JOBS"
 echo "Batch size: $BATCH_SIZE"
+echo "Max atoms on GPU: $MAX_ATOMS_GPU"
 echo "Hull threshold: $HULL_THRESHOLD eV/atom"
 echo "Max structures per composition: $MAX_STRUCTURES"
 echo "Device: $DEVICE"
@@ -143,6 +151,9 @@ if [ \$? -ne 0 ]; then
     exit 1
 fi
 
+# Load CUDA module for shared libraries (required for PyTorch)
+module load cuda/11.8
+
 # Print GPU info
 nvidia-smi
 
@@ -160,6 +171,7 @@ BATCH_ID=$i
 RESULTS_DIR="$RESULTS_DIR"
 OUTPUT_DIR="$OUTPUT_DIR"
 BATCH_SIZE=$BATCH_SIZE
+MAX_ATOMS_GPU=$MAX_ATOMS_GPU
 HULL_THRESHOLD=$HULL_THRESHOLD
 MAX_STRUCTURES=$MAX_STRUCTURES
 DEVICE="$DEVICE"
@@ -179,6 +191,7 @@ echo "Composition range: $START_INDEX to $((START_INDEX + MAX_COMPS - 1))"
 echo "Results directory: $RESULTS_DIR"
 echo "Output directory: $OUTPUT_DIR"
 echo "Batch size: $BATCH_SIZE"
+echo "Max atoms on GPU: $MAX_ATOMS_GPU"
 echo "Hull threshold: $HULL_THRESHOLD eV/atom"
 echo "Max structures per composition: $MAX_STRUCTURES"
 echo "Device: $DEVICE"
@@ -191,6 +204,7 @@ python3 prescreen.py \
     --hull-threshold $HULL_THRESHOLD \
     --device $DEVICE \
     --batch-size $BATCH_SIZE \
+    --max-atoms-gpu $MAX_ATOMS_GPU \
     --start-composition $START_INDEX \
     --max-compositions $MAX_COMPS \
     --max-structures $MAX_STRUCTURES \

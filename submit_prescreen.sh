@@ -25,6 +25,7 @@ MP_API_KEY=${MP_API_KEY:-""}
 HULL_THRESHOLD=${HULL_THRESHOLD:-0.1}
 DEVICE=${DEVICE:-"cuda"}
 BATCH_SIZE=${BATCH_SIZE:-32}
+MAX_ATOMS_GPU=${MAX_ATOMS_GPU:-2048}
 PURE_PBE=${PURE_PBE:-""}
 
 echo "========================================================================"
@@ -46,6 +47,9 @@ if [ $? -ne 0 ]; then
     echo "Error: Failed to activate conda environment '$CONDA_ENV'"
     exit 1
 fi
+
+# Load CUDA module for shared libraries (required for PyTorch)
+module load cuda/11.8
 
 echo "Conda environment: $CONDA_ENV"
 echo "Python: $(which python3)"
@@ -134,6 +138,7 @@ CMD="$CMD --max-structures $MAX_STRUCTURES"
 CMD="$CMD --hull-threshold $HULL_THRESHOLD"
 CMD="$CMD --device $DEVICE"
 CMD="$CMD --batch-size $BATCH_SIZE"
+CMD="$CMD --max-atoms-gpu $MAX_ATOMS_GPU"
 
 if [ -n "$MAX_COMPOSITIONS" ]; then
     CMD="$CMD --max-compositions $MAX_COMPOSITIONS"
@@ -156,6 +161,7 @@ echo "  Max compositions: ${MAX_COMPOSITIONS:-all}"
 echo "  Hull threshold: ${HULL_THRESHOLD} eV/atom"
 echo "  Device: $DEVICE"
 echo "  Batch size: $BATCH_SIZE"
+echo "  Max atoms on GPU: $MAX_ATOMS_GPU"
 if [ -n "$PURE_PBE" ]; then
     echo "  Functional filtering: Pure GGA-PBE only"
 else
