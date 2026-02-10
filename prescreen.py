@@ -105,7 +105,7 @@ def validate_structure(pmg_struct):
         return False, f"Validation error: {str(e)[:100]}"
 
 
-def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=500, max_natoms_per_batch=512):
+def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=500, max_natoms_per_batch=2048):
     """
     Batch relax multiple structures using MatterSim BatchRelaxer for efficient GPU utilization.
     
@@ -184,6 +184,20 @@ def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=5
     if not atoms_list:
         return results
     
+    actual_atom_counts = [len(atoms) for atoms in atoms_list]
+    max_single_structure = max(actual_atom_counts)
+    total_actual_atoms = sum(actual_atom_counts)
+    avg_actual_atoms = total_actual_atoms / len(atoms_list)
+    
+    if max_natoms_per_batch < max_single_structure:
+        print(f"    Adjusting max_natoms_per_batch: {max_natoms_per_batch} -> {max_single_structure} "
+              f"(largest structure has {max_single_structure} atoms after symmetrization)")
+        max_natoms_per_batch = max_single_structure
+    
+    print(f"    Actual atoms after symmetrization: total={total_actual_atoms}, "
+          f"avg={avg_actual_atoms:.0f}, max={max_single_structure}, "
+          f"max_natoms_per_batch={max_natoms_per_batch}")
+    
     # Create BatchRelaxer and relax all structures
     try:
         relaxer = BatchRelaxer(
@@ -198,12 +212,12 @@ def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=5
         trajectories = relaxer.relax(atoms_list)
         
         # Extract results from trajectories
-        for idx in valid_indices:
-            item = structures_dict[idx]
+        for traj_pos, orig_idx in enumerate(valid_indices):
+            item = structures_dict[orig_idx]
             struct_id = item['id']
             
-            if idx in trajectories:
-                trajectory = trajectories[idx]
+            if traj_pos in trajectories:
+                trajectory = trajectories[traj_pos]
                 relaxed_atoms = trajectory[-1]
                 
                 try:
@@ -541,10 +555,15 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, p
                     try:
                         structure = mpr.get_structure_by_material_id(mp_id)
                     except Exception as e:
-                        skipped_structure_retrieval.append(f"{mp_id} ({comp_entry.composition.reduced_formula})")
+                        skipped_structure_retrieval.append(
+                            f"{mp_id} ({comp_entry.composition.reduced_formula}): {str(e).split(chr(10))[0][:120]}"
+                        )
                         continue
                     
                     if structure is None:
+                        skipped_structure_retrieval.append(
+                            f"{mp_id} ({comp_entry.composition.reduced_formula}): returned None"
+                        )
                         continue
                     
                     mp_phases.append((mp_id, structure, has_U))
@@ -588,20 +607,32 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, p
                         print(f"    Modern API fallback failed: {e}")
                 
                 if skipped_structure_retrieval:
-                    print(f"    WARNING: Could not retrieve structures for {len(skipped_structure_retrieval)} phases")
+                    print(f"    WARNING: Could not retrieve structures for {len(skipped_structure_retrieval)} phases:")
+                    for skip_msg in skipped_structure_retrieval:
+                        print(f"      - {skip_msg}")
                 
                 print(f"    Filtered to {len(mp_phases)} GGA phases (strict '-GGA'/'-GGA+U' suffix)")
                 
                 # Verify we have terminal (elemental) phases
                 elements_found = set()
+                all_elements_found = set()
                 for mp_id, structure, has_U in mp_phases:
+                    for el in structure.composition.elements:
+                        all_elements_found.add(str(el))
                     if len(structure.composition.elements) == 1:  # Pure elemental phase
                         elements_found.add(str(structure.composition.elements[0]))
                 
                 expected_elements = set(elements)
-                if elements_found != expected_elements:
-                    missing = expected_elements - elements_found
-                    print(f"    WARNING: Missing terminal phases for elements: {sorted(missing)}")
+                missing_terminal = expected_elements - elements_found
+                missing_any = expected_elements - all_elements_found
+                
+                if missing_any:
+                    print(f"    WARNING: NO phases at all for elements: {sorted(missing_any)}")
+                    print(f"      Phase diagram will be incomplete - hull computation will be skipped")
+                    print(f"      Possible causes: structure retrieval failed, or MP has no data")
+                elif missing_terminal:
+                    print(f"    WARNING: Missing terminal (elemental) phases for: {sorted(missing_terminal)}")
+                    print(f"      These elements appear in compounds but not as pure phases")
                 else:
                     print(f"      All terminal phases present: {sorted(elements_found)}")
                 
@@ -630,21 +661,12 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, p
                 
                 print(f"    Batch relaxing {len(structures_to_relax)} uncached phases with MatterSim...")
                 
-                # Batch relax all MP structures
-                total_atoms = sum(len(item['structure']) for item in structures_to_relax)
-                avg_atoms = total_atoms / len(structures_to_relax) if structures_to_relax else 50
-                
-                # For MP phases, allow all to run simultaneously up to memory limit
-                # MP phases are small batches (typically 10-50 structures per chemsys)
-                max_natoms = int(avg_atoms * len(structures_to_relax))
-                max_natoms = min(max_natoms, max_atoms_gpu)
-                
                 batch_results = relax_structure_mattersim(
                     structures_to_relax,
                     potential,
                     fmax=0.01,
                     max_steps=500,
-                    max_natoms_per_batch=max_natoms
+                    max_natoms_per_batch=max_atoms_gpu
                 )
                 
                 # Process batch results
@@ -715,10 +737,30 @@ def compute_energy_above_hull(structure, energy_per_atom, mp_entries):
         mp_entries: List of PDEntry objects for reference phases
     
     Returns:
-        float: Energy above hull (eV/atom)
+        float: Energy above hull (eV/atom), or None if phase diagram is incomplete
+    
+    Raises:
+        ValueError: If mp_entries is empty or phase diagram construction fails
     """
     composition = structure.composition
     total_energy = energy_per_atom * composition.num_atoms
+    
+    # Check that mp_entries covers all elements in the structure
+    pd_elements = set()
+    for mp_entry in mp_entries:
+        for el in mp_entry.composition.elements:
+            pd_elements.add(str(el))
+    
+    struct_elements = set(str(el) for el in composition.elements)
+    missing_elements = struct_elements - pd_elements
+    
+    if missing_elements:
+        print(f"    WARNING: MP reference phases missing elements {sorted(missing_elements)} "
+              f"for composition {composition.reduced_formula}")
+        print(f"      Phase diagram elements: {sorted(pd_elements)}")
+        print(f"      Structure elements: {sorted(struct_elements)}")
+        print(f"      Cannot compute energy above hull - returning None")
+        return None
     
     entry = PDEntry(
         composition=composition,
@@ -1216,23 +1258,12 @@ def main():
                 print(f"Batch relaxing {len(valid_batch)} structures (true GPU parallel processing)...")
                 sys.stdout.flush()
                 
-                # Calculate max_natoms dynamically based on batch size
-                total_atoms = sum(len(item['structure']) for item in valid_batch)
-                avg_atoms = total_atoms / len(valid_batch) if valid_batch else 50
-                
-                target_structures_on_gpu = min(args.batch_size, len(valid_batch))
-                max_natoms = int(avg_atoms * target_structures_on_gpu)
-                max_natoms = min(max_natoms, args.max_atoms_gpu)
-                
-                print(f"  Max atoms on GPU: {max_natoms} (~{max_natoms/avg_atoms:.0f} structures simultaneously)")
-                sys.stdout.flush()
-                
                 batch_relax_results = relax_structure_mattersim(
                     valid_batch,
                     potential,
                     fmax=0.01,
                     max_steps=500,
-                    max_natoms_per_batch=max_natoms
+                    max_natoms_per_batch=args.max_atoms_gpu
                 )
                 
                 print(f"Batch relaxation complete. Processing results...\n")
@@ -1270,13 +1301,23 @@ def main():
                         print(f"  WARNING: No MP reference phases for {chemsys}, auto-passing {struct_id}")
                         e_hull = None
                         passed_prescreening = True
+                        passed += 1
                     else:
-                        e_hull = compute_energy_above_hull(relaxed_struct, energy_per_atom, mp_entries)
-                        passed_prescreening = e_hull < args.hull_threshold
+                        try:
+                            e_hull = compute_energy_above_hull(relaxed_struct, energy_per_atom, mp_entries)
+                        except Exception as hull_err:
+                            print(f"  ERROR computing hull for {struct_id}: {hull_err}")
+                            e_hull = None
                         
-                        if passed_prescreening:
+                        if e_hull is None:
+                            print(f"  WARNING: Incomplete phase diagram for {chemsys}, auto-passing {struct_id}")
+                            passed_prescreening = True
+                            passed += 1
+                        elif e_hull < args.hull_threshold:
+                            passed_prescreening = True
                             passed += 1
                         else:
+                            passed_prescreening = False
                             failed += 1
                     
                     results.append({
