@@ -108,17 +108,44 @@ def get_vasp_energy_from_relax(relax_dir):
             print(f"    Warning: Could not parse vasprun.xml: {e}")
             print(f"    Trying OUTCAR fallback...")
     
-    # Fallback: Try OUTCAR + CONTCAR
+    # Fallback: Try OSZICAR convergence check + OUTCAR energy + CONTCAR structure
+    oszicar_path = relax_dir / 'OSZICAR'
+    incar_path = relax_dir / 'INCAR'
+    
     if outcar_path.exists():
         try:
+            # Check electronic convergence from OSZICAR (last ionic step)
             electronic_converged = False
-            with open(outcar_path, 'r') as f:
-                outcar_content = f.read()
-                if 'aborting loop because EDIFF is reached' in outcar_content:
-                    electronic_converged = True
+            if oszicar_path.exists():
+                nelm = 60
+                if incar_path.exists():
+                    try:
+                        with open(incar_path, 'r') as f:
+                            for line in f:
+                                if 'NELM' in line and '=' in line:
+                                    val = line.split('=')[1].split()[0].strip()
+                                    nelm = int(val)
+                                    break
+                    except Exception:
+                        pass
+                
+                with open(oszicar_path, 'r') as f:
+                    lines = [l.rstrip() for l in f.readlines() if l.strip()]
+                
+                if len(lines) >= 2:
+                    last_line = lines[-1]
+                    second_last = lines[-2]
+                    if 'F=' in last_line:
+                        parts = second_last.split()
+                        if len(parts) >= 2:
+                            try:
+                                e_step = int(parts[1])
+                                electronic_converged = e_step < nelm
+                            except ValueError:
+                                pass
             
             if not electronic_converged:
-                print(f"    Warning: VASP electronic SCF not converged (from OUTCAR)")
+                print(f"    Warning: VASP electronic SCF not converged (from OSZICAR)")
                 return None, None
             
             # Extract final energy from OUTCAR

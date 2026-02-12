@@ -27,24 +27,66 @@ from pymatgen.io.vasp.outputs import Vasprun
 warnings.filterwarnings('ignore', category=BadInputSetWarning)
 
 
-def check_electronic_convergence_outcar(outcar_path):
+def check_electronic_convergence_oszicar(relax_dir):
     """
-    Check electronic convergence from OUTCAR file.
+    Check electronic convergence of the LAST ionic step from OSZICAR.
     
-    For timed-out jobs, vasprun.xml is incomplete/corrupted. This function checks
-    OUTCAR for "aborting loop because EDIFF is reached" marker, which indicates
-    electronic SCF converged in at least one ionic step.
+    Reads the last 2 non-empty lines of OSZICAR:
+    - Last line: ionic step summary containing "F= ..."
+    - Second-to-last line: last electronic SCF iteration (e.g. "RMM:  12 ...")
+    
+    If the electronic step count < NELM (read from INCAR), the electronic
+    SCF converged for the final ionic step.
+    
+    Args:
+        relax_dir: Path to VASP relaxation directory (contains OSZICAR and INCAR)
     
     Returns:
-        bool: True if electronic convergence was achieved
+        bool: True if electronic convergence was achieved in the last ionic step
     """
-    if not outcar_path.exists():
+    relax_dir = Path(relax_dir)
+    oszicar_path = relax_dir / 'OSZICAR'
+    incar_path = relax_dir / 'INCAR'
+    
+    if not oszicar_path.exists():
         return False
     
+    nelm = 60
+    if incar_path.exists():
+        try:
+            with open(incar_path, 'r') as f:
+                for line in f:
+                    if 'NELM' in line and '=' in line:
+                        val = line.split('=')[1].split()[0].strip()
+                        nelm = int(val)
+                        break
+        except Exception:
+            pass
+    
     try:
-        with open(outcar_path, 'r') as f:
-            content = f.read()
-        return 'aborting loop because EDIFF is reached' in content
+        with open(oszicar_path, 'r') as f:
+            lines = [l.rstrip() for l in f.readlines() if l.strip()]
+        
+        if len(lines) < 2:
+            return False
+        
+        last_line = lines[-1]
+        second_last = lines[-2]
+        
+        if 'F=' not in last_line:
+            return False
+        
+        parts = second_last.split()
+        if len(parts) < 2:
+            return False
+        
+        try:
+            e_step = int(parts[1])
+        except ValueError:
+            return False
+        
+        return e_step < nelm
+        
     except Exception:
         return False
 
@@ -216,7 +258,7 @@ export PMG_VASP_PSP_DIR=$HOME/apps/PBE64
 
 # Intel MPI settings for SLURM
 if [ -e /opt/slurm/lib/libpmi.so ]; then
-  export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
+export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
 else
   export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi.so.0
 fi
@@ -474,21 +516,15 @@ def update_job_status(db):
                         pass
                 
                 if is_timeout:
-                    # Check if electronic converged (using OUTCAR) and CONTCAR exists
-                    outcar_path = relax_dir / 'OUTCAR'
+                    # Check if electronic converged (using OSZICAR) and CONTCAR exists
                     contcar_path = relax_dir / 'CONTCAR'
                     
-                    if not outcar_path.exists():
-                        sdata['state'] = 'FAILED'
-                        sdata['update_time'] = datetime.now().isoformat()
-                        print(f"    {mp_id}: FAILED (timeout, OUTCAR missing)")
-                        failed += 1
-                    elif not contcar_path.exists() or contcar_path.stat().st_size == 0:
+                    if not contcar_path.exists() or contcar_path.stat().st_size == 0:
                         sdata['state'] = 'FAILED'
                         sdata['update_time'] = datetime.now().isoformat()
                         print(f"    {mp_id}: FAILED (timeout, CONTCAR missing/empty)")
                         failed += 1
-                    elif check_electronic_convergence_outcar(outcar_path):
+                    elif check_electronic_convergence_oszicar(relax_dir):
                         # Electronic converged, extract energy from OUTCAR
                         try:
                             # Parse final energy from OUTCAR
@@ -535,7 +571,7 @@ def update_job_status(db):
                     sdata['state'] = 'FAILED'
                     sdata['update_time'] = datetime.now().isoformat()
                     print(f"    {mp_id}: FAILED (crash or terminated without completion)")
-                    failed += 1
+            failed += 1
     
     return completed, failed
 

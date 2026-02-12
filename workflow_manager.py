@@ -43,24 +43,67 @@ warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data w
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
 
 
-def check_electronic_convergence_outcar(outcar_path):
+def check_electronic_convergence_oszicar(relax_dir):
     """
-    Check electronic convergence from OUTCAR file.
+    Check electronic convergence of the LAST ionic step from OSZICAR.
     
-    For timed-out jobs, vasprun.xml is incomplete/corrupted. This function checks
-    OUTCAR for "aborting loop because EDIFF is reached" marker, which indicates
-    electronic SCF converged in at least one ionic step.
+    Reads the last 2 non-empty lines of OSZICAR:
+    - Last line: ionic step summary containing "F= ..."
+    - Second-to-last line: last electronic SCF iteration (e.g. "RMM:  12 ...")
+    
+    If the electronic step count < NELM (read from INCAR), the electronic
+    SCF converged for the final ionic step.
+    
+    Args:
+        relax_dir: Path to VASP relaxation directory (contains OSZICAR and INCAR)
     
     Returns:
-        bool: True if electronic convergence was achieved
+        bool: True if electronic convergence was achieved in the last ionic step
     """
-    if not outcar_path.exists():
+    relax_dir = Path(relax_dir)
+    oszicar_path = relax_dir / 'OSZICAR'
+    incar_path = relax_dir / 'INCAR'
+    
+    if not oszicar_path.exists():
         return False
     
+    # Read NELM from INCAR (default 60 per VASP manual)
+    nelm = 60
+    if incar_path.exists():
+        try:
+            with open(incar_path, 'r') as f:
+                for line in f:
+                    if 'NELM' in line and '=' in line:
+                        val = line.split('=')[1].split()[0].strip()
+                        nelm = int(val)
+                        break
+        except Exception:
+            pass
+    
     try:
-        with open(outcar_path, 'r') as f:
-            content = f.read()
-        return 'aborting loop because EDIFF is reached' in content
+        with open(oszicar_path, 'r') as f:
+            lines = [l.rstrip() for l in f.readlines() if l.strip()]
+        
+        if len(lines) < 2:
+            return False
+        
+        last_line = lines[-1]
+        second_last = lines[-2]
+        
+        if 'F=' not in last_line:
+            return False
+        
+        parts = second_last.split()
+        if len(parts) < 2:
+            return False
+        
+        try:
+            e_step = int(parts[1])
+        except ValueError:
+            return False
+        
+        return e_step < nelm
+        
     except Exception:
         return False
 
@@ -555,16 +598,46 @@ fi
 
 echo "Verified CHGCAR ($(du -h CHGCAR | cut -f1)), WAVECAR ($(du -h WAVECAR | cut -f1)), and vasprun.xml exist"
 
+# Check SC electronic convergence from OSZICAR (last electronic step < NELM)
+echo ""
+echo "Checking SC electronic convergence (OSZICAR)..."
+if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    echo "ERROR: OSZICAR not found - cannot verify SC convergence"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+    exit 1
+fi
+
+LAST_LINE=$(tail -n 1 OSZICAR)
+SECOND_LAST=$(tail -n 2 OSZICAR | head -n 1)
+
+if echo "$LAST_LINE" | grep -q "F="; then
+    ESTEP=$(echo "$SECOND_LAST" | awk '{{print $2}}')
+    NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
+    NELM_VAL=${{NELM_VAL:-60}}
+    if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
+        echo "  SC electronic SCF converged (e-steps: $ESTEP < NELM=$NELM_VAL)"
+    else
+        echo "VASP calculation failed at SC" > VASP_FAILED
+        echo "ERROR: SC electronic SCF did not converge (e-steps: $ESTEP >= NELM=$NELM_VAL)"
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+        exit 1
+    fi
+else
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    echo "ERROR: OSZICAR last line does not contain expected format (F=)"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+    exit 1
+fi
+
 # Save SC outputs with -SC suffix
 mv OSZICAR OSZICAR-SC
+mv OUTCAR OUTCAR-SC
 cp vasprun.xml vasprun.xml-SC
 cp CHGCAR CHGCAR-SC
 cp WAVECAR WAVECAR-SC
 touch SC_DONE
 echo "SC calculation completed successfully"
-
-# Cleanup SC calculation outputs for next stage
-rm -f OSZICAR vasprun.xml OUTCAR 2>/dev/null
 
 # ========================================
 # Stage 2: Generate PARCHG INCARs
@@ -623,7 +696,7 @@ for label in e0025 e05 e10 band0 band1; do
     mv PARCHG PARCHG-$label
     echo "PARCHG-$label completed successfully"
     
-    # Cleanup before next PARCHG run
+    # Cleanup before next PARCHG run (no convergence check needed for PARCHG)
     rm -f CHG WFULL TMPCAR OSZICAR vasprun.xml OUTCAR 2>/dev/null
 done
 
@@ -973,19 +1046,14 @@ fi
                             pass
                     
                     if is_timeout:
-                        # Check if electronic converged (using OUTCAR) and CONTCAR exists
-                        outcar_path = relax_dir / 'OUTCAR'
+                        # Check if electronic converged (using OSZICAR) and CONTCAR exists
                         contcar_path = relax_dir / 'CONTCAR'
                         
-                        if not outcar_path.exists():
-                            self.db.update_state(struct_id, 'RELAX_FAILED',
-                                               error='Job timed out, OUTCAR not found')
-                            print(f"  {struct_id}: Relax FAILED (timeout, OUTCAR missing)")
-                        elif not contcar_path.exists() or contcar_path.stat().st_size == 0:
+                        if not contcar_path.exists() or contcar_path.stat().st_size == 0:
                             self.db.update_state(struct_id, 'RELAX_FAILED',
                                                error='Job timed out, CONTCAR missing/empty')
                             print(f"  {struct_id}: Relax FAILED (timeout, CONTCAR missing)")
-                        elif check_electronic_convergence_outcar(outcar_path):
+                        elif check_electronic_convergence_oszicar(relax_dir):
                             self.db.update_state(struct_id, 'RELAX_TMOUT',
                                                error='Relaxation timed out but electronic converged')
                             print(f"  {struct_id}: Relax TMOUT (electronic converged, proceeding)")

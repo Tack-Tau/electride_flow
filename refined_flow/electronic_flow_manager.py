@@ -475,16 +475,46 @@ fi
 
 echo "Verified CHGCAR ($(du -h CHGCAR | cut -f1)), WAVECAR ($(du -h WAVECAR | cut -f1)), and vasprun.xml exist"
 
+# Check SC electronic convergence from OSZICAR (last electronic step < NELM)
+echo ""
+echo "Checking SC electronic convergence (OSZICAR)..."
+if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    echo "ERROR: OSZICAR not found - cannot verify SC convergence"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+    exit 1
+fi
+
+LAST_LINE=$(tail -n 1 OSZICAR)
+SECOND_LAST=$(tail -n 2 OSZICAR | head -n 1)
+
+if echo "$LAST_LINE" | grep -q "F="; then
+    ESTEP=$(echo "$SECOND_LAST" | awk '{{print $2}}')
+    NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
+    NELM_VAL=${{NELM_VAL:-60}}
+    if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
+        echo "  SC electronic SCF converged (e-steps: $ESTEP < NELM=$NELM_VAL)"
+    else
+        echo "VASP calculation failed at SC" > VASP_FAILED
+        echo "ERROR: SC electronic SCF did not converge (e-steps: $ESTEP >= NELM=$NELM_VAL)"
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+        exit 1
+    fi
+else
+    echo "VASP calculation failed at SC" > VASP_FAILED
+    echo "ERROR: OSZICAR last line does not contain expected format (F=)"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+    exit 1
+fi
+
 # Save SC outputs with -SC suffix
 mv OSZICAR OSZICAR-SC
+mv OUTCAR OUTCAR-SC
 cp vasprun.xml vasprun.xml-SC
 cp CHGCAR CHGCAR-SC
 cp WAVECAR WAVECAR-SC
 touch SC_DONE
 echo "SC calculation completed successfully"
-
-# Cleanup SC calculation outputs for next stage
-rm -f OSZICAR vasprun.xml OUTCAR 2>/dev/null
 
 # ========================================
 # Stage 2: Generate PARCHG INCARs

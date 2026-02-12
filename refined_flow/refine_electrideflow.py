@@ -56,26 +56,6 @@ except ImportError:
 warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data with symbol.*')
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
 
-def check_electronic_convergence_outcar(outcar_path):
-    """
-    Check electronic convergence from OUTCAR file.
-    
-    For timed-out jobs, vasprun.xml is incomplete/corrupted. This function checks
-    OUTCAR for "aborting loop because EDIFF is reached" marker, which indicates
-    electronic SCF converged in at least one ionic step.
-    
-    Returns:
-        bool: True if electronic convergence was achieved
-    """
-    if not outcar_path.exists():
-        return False
-    
-    try:
-        with open(outcar_path, 'r') as f:
-            content = f.read()
-        return 'aborting loop because EDIFF is reached' in content
-    except Exception:
-        return False
 
 
 def load_electride_candidates(input_path, vasp_jobs_dir):
@@ -505,13 +485,13 @@ if [ $EXIT_CODE -eq 140 ] || [ $EXIT_CODE -eq 143 ]; then
         echo "CONTCAR exists, proceeding to step 2 with partial relaxation"
     else
         echo "ERROR: Step 1 timed out without producing CONTCAR"
-        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
         touch VASP_FAILED
         exit 1
     fi
 elif [ $EXIT_CODE -ne 0 ]; then
     echo "ERROR: Relaxation step 1 failed with exit code $EXIT_CODE"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
@@ -519,26 +499,39 @@ fi
 # Verify CONTCAR from step 1
 if [ ! -f "CONTCAR" ] || [ ! -s "CONTCAR" ]; then
     echo "ERROR: CONTCAR missing/empty after step 1"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
 
-# Check electronic convergence from OUTCAR
+# Check electronic convergence from OSZICAR (last ionic step)
 echo ""
-echo "Checking electronic convergence..."
-if [ ! -f "OUTCAR" ] || [ ! -s "OUTCAR" ]; then
-    echo "ERROR: OUTCAR not found - cannot verify convergence"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+echo "Checking electronic convergence (OSZICAR)..."
+if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
+    echo "ERROR: OSZICAR not found - cannot verify convergence"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
 
-if grep -q "aborting loop because EDIFF is reached" OUTCAR; then
-    echo "  Electronic SCF converged in step 1"
+LAST_LINE=$(tail -n 1 OSZICAR)
+SECOND_LAST=$(tail -n 2 OSZICAR | head -n 1)
+
+if echo "$LAST_LINE" | grep -q "F="; then
+    ESTEP=$(echo "$SECOND_LAST" | awk '{{print $2}}')
+    NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
+    NELM_VAL=${{NELM_VAL:-60}}
+    if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
+        echo "  Electronic SCF converged in step 1 (e-steps: $ESTEP < NELM=$NELM_VAL)"
+    else
+        echo "ERROR: Electronic SCF did not converge in step 1 (e-steps: $ESTEP >= NELM=$NELM_VAL)"
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+        touch VASP_FAILED
+        exit 1
+    fi
 else
-    echo "ERROR: Electronic SCF did not converge in step 1"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    echo "ERROR: OSZICAR last line does not contain ionic step summary (F=)"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
@@ -575,13 +568,13 @@ if [ $EXIT_CODE -eq 140 ] || [ $EXIT_CODE -eq 143 ]; then
         echo "CONTCAR exists, proceeding to step 3 with partial relaxation"
     else
         echo "ERROR: Step 2 timed out without producing CONTCAR"
-        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
         touch VASP_FAILED
         exit 1
     fi
 elif [ $EXIT_CODE -ne 0 ]; then
     echo "ERROR: Relaxation step 2 failed with exit code $EXIT_CODE"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
@@ -589,26 +582,39 @@ fi
 # Verify CONTCAR from step 2
 if [ ! -f "CONTCAR" ] || [ ! -s "CONTCAR" ]; then
     echo "ERROR: CONTCAR missing/empty after step 2"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
 
-# Check electronic convergence from OUTCAR
+# Check electronic convergence from OSZICAR (last ionic step)
 echo ""
-echo "Checking electronic convergence..."
-if [ ! -f "OUTCAR" ] || [ ! -s "OUTCAR" ]; then
-    echo "ERROR: OUTCAR not found - cannot verify convergence"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+echo "Checking electronic convergence (OSZICAR)..."
+if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
+    echo "ERROR: OSZICAR not found - cannot verify convergence"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
 
-if grep -q "aborting loop because EDIFF is reached" OUTCAR; then
-    echo "  Electronic SCF converged in step 2"
+LAST_LINE=$(tail -n 1 OSZICAR)
+SECOND_LAST=$(tail -n 2 OSZICAR | head -n 1)
+
+if echo "$LAST_LINE" | grep -q "F="; then
+    ESTEP=$(echo "$SECOND_LAST" | awk '{{print $2}}')
+    NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
+    NELM_VAL=${{NELM_VAL:-60}}
+    if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
+        echo "  Electronic SCF converged in step 2 (e-steps: $ESTEP < NELM=$NELM_VAL)"
+    else
+        echo "ERROR: Electronic SCF did not converge in step 2 (e-steps: $ESTEP >= NELM=$NELM_VAL)"
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+        touch VASP_FAILED
+        exit 1
+    fi
 else
-    echo "ERROR: Electronic SCF did not converge in step 2"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    echo "ERROR: OSZICAR last line does not contain ionic step summary (F=)"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
@@ -646,19 +652,19 @@ if [ $EXIT_CODE -eq 140 ] || [ $EXIT_CODE -eq 143 ]; then
         echo "Partial relaxation completed, may proceed to analysis"
         # Mark as timeout instead of failure, clean up large files
         echo "Cleaning up large intermediate files..."
-        rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+        rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR 2>/dev/null
         touch RELAX_TMOUT
         touch VASP_DONE
         exit 0
     else
         echo "ERROR: Step 3 timed out without producing CONTCAR"
-        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
         touch VASP_FAILED
         exit 1
     fi
 elif [ $EXIT_CODE -ne 0 ]; then
     echo "ERROR: Relaxation step 3 failed with exit code $EXIT_CODE"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
@@ -666,26 +672,39 @@ fi
 # Verify CONTCAR from step 3
 if [ ! -f "CONTCAR" ] || [ ! -s "CONTCAR" ]; then
     echo "ERROR: CONTCAR missing/empty after step 3"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
 
-# Check electronic convergence from OUTCAR
+# Check electronic convergence from OSZICAR (last ionic step)
 echo ""
-echo "Checking electronic convergence..."
-if [ ! -f "OUTCAR" ] || [ ! -s "OUTCAR" ]; then
-    echo "ERROR: OUTCAR not found - cannot verify convergence"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+echo "Checking electronic convergence (OSZICAR)..."
+if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
+    echo "ERROR: OSZICAR not found - cannot verify convergence"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
 
-if grep -q "aborting loop because EDIFF is reached" OUTCAR; then
-    echo "  Electronic SCF converged in step 3"
+LAST_LINE=$(tail -n 1 OSZICAR)
+SECOND_LAST=$(tail -n 2 OSZICAR | head -n 1)
+
+if echo "$LAST_LINE" | grep -q "F="; then
+    ESTEP=$(echo "$SECOND_LAST" | awk '{{print $2}}')
+    NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
+    NELM_VAL=${{NELM_VAL:-60}}
+    if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
+        echo "  Electronic SCF converged in step 3 (e-steps: $ESTEP < NELM=$NELM_VAL)"
+    else
+        echo "ERROR: Electronic SCF did not converge in step 3 (e-steps: $ESTEP >= NELM=$NELM_VAL)"
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
+        touch VASP_FAILED
+        exit 1
+    fi
 else
-    echo "ERROR: Electronic SCF did not converge in step 3"
-    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR OSZICAR OUTCAR 2>/dev/null
+    echo "ERROR: OSZICAR last line does not contain ionic step summary (F=)"
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
 fi
