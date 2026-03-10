@@ -504,10 +504,11 @@ def load_mattersim_results(prescreen_json):
     
     mattersim_lookup = {}
     for result in data.get('results', []):
-        if result.get('energy_above_hull') is not None:
+        e_hull = result.get('energy_above_hull')
+        if e_hull is not None:
             mattersim_lookup[result['structure_id']] = {
-                'energy_above_hull': result['energy_above_hull'],
-                'passed_prescreening': result.get('passed_prescreening', False)
+                'energy_above_hull': float(e_hull),
+                'passed_prescreening': bool(result.get('passed_prescreening', False))
             }
     
     return mattersim_lookup
@@ -571,12 +572,19 @@ def match_and_analyze_hulls(dft_results, mattersim_lookup, threshold=0.1, outlie
         print(f"  Analyzing {len(matched_filtered)} structures after filtering")
     
     # Calculate statistics on filtered data
-    mattersim_vals = np.array([d['mattersim_e_hull'] for d in matched_filtered])
-    dft_vals = np.array([d['dft_e_hull'] for d in matched_filtered])
-    passed = np.array([d['passed_prescreen'] for d in matched_filtered])
+    if not matched_filtered:
+        print("  WARNING: No matched structures after outlier filtering. Cannot compute statistics.")
+        return None
+    
+    mattersim_vals = np.array([d['mattersim_e_hull'] for d in matched_filtered], dtype=float)
+    dft_vals = np.array([d['dft_e_hull'] for d in matched_filtered], dtype=float)
+    passed = np.array([bool(d['passed_prescreen']) for d in matched_filtered], dtype=bool)
     
     # Correlation and error metrics
-    correlation = np.corrcoef(mattersim_vals, dft_vals)[0, 1]
+    if len(mattersim_vals) >= 2:
+        correlation = np.corrcoef(mattersim_vals, dft_vals)[0, 1]
+    else:
+        correlation = float('nan')
     mae = np.mean(np.abs(mattersim_vals - dft_vals))
     rmse = np.sqrt(np.mean((mattersim_vals - dft_vals)**2))
     

@@ -363,22 +363,28 @@ def compare_generated_structures(prescreen_json, workflow_json, vasp_jobs_dir, d
         print(f"  Analyzing {len(matched_filtered)} structures after filtering")
     
     # Calculate statistics on filtered data
-    diffs = np.array([m['energy_diff'] for m in matched_filtered])
-    ms_vals = np.array([m['mattersim_energy_per_atom'] for m in matched_filtered])
-    vasp_vals = np.array([m['vasp_energy_per_atom'] for m in matched_filtered])
+    if not matched_filtered:
+        print("  WARNING: No matched structures after outlier filtering. Cannot compute statistics.")
+        return None
+    
+    diffs = np.array([m['energy_diff'] for m in matched_filtered], dtype=float)
+    ms_vals = np.array([m['mattersim_energy_per_atom'] for m in matched_filtered], dtype=float)
+    vasp_vals = np.array([m['vasp_energy_per_atom'] for m in matched_filtered], dtype=float)
+    
+    correlation = np.corrcoef(ms_vals, vasp_vals)[0, 1] if len(ms_vals) >= 2 else float('nan')
     
     stats = {
         'n_structures': len(matched_filtered),
         'n_total_matched': len(matched),
         'n_outliers_filtered': len(skipped_outliers),
         'outlier_threshold': outlier_threshold,
-        'mae': np.mean(np.abs(diffs)),
-        'rmse': np.sqrt(np.mean(diffs**2)),
-        'mean_diff': np.mean(diffs),
-        'std_diff': np.std(diffs),
-        'correlation': np.corrcoef(ms_vals, vasp_vals)[0, 1],
-        'min_diff': np.min(diffs),
-        'max_diff': np.max(diffs)
+        'mae': float(np.mean(np.abs(diffs))),
+        'rmse': float(np.sqrt(np.mean(diffs**2))),
+        'mean_diff': float(np.mean(diffs)),
+        'std_diff': float(np.std(diffs)),
+        'correlation': float(correlation),
+        'min_diff': float(np.min(diffs)),
+        'max_diff': float(np.max(diffs))
     }
     
     # Calculate coverage percentage
@@ -404,9 +410,13 @@ def plot_mp_phase_comparison(mp_results, output_prefix='mp_phases_comparison'):
     matched = mp_results['matched']
     stats = mp_results['statistics']
     
+    if len(matched) < 2:
+        print("  WARNING: Need at least 2 matched MP phases for plotting. Skipping.")
+        return
+    
     # Extract data
-    ms_per_atom = np.array([m['mattersim_energy_per_atom'] for m in matched])
-    dft_per_atom = np.array([m['dft_energy_per_atom'] for m in matched])
+    ms_per_atom = np.array([m['mattersim_energy_per_atom'] for m in matched], dtype=float)
+    dft_per_atom = np.array([m['dft_energy_per_atom'] for m in matched], dtype=float)
     
     # Scatter plot
     fig, ax = plt.subplots(figsize=(12, 10))
@@ -496,9 +506,13 @@ def plot_generated_structures_comparison(gen_results, output_prefix='generated_s
     matched = gen_results['matched']
     stats = gen_results['statistics']
     
+    if len(matched) < 2:
+        print("  WARNING: Need at least 2 matched structures for plotting. Skipping.")
+        return
+    
     # Extract data
-    ms_vals = np.array([m['mattersim_energy_per_atom'] for m in matched])
-    vasp_vals = np.array([m['vasp_energy_per_atom'] for m in matched])
+    ms_vals = np.array([m['mattersim_energy_per_atom'] for m in matched], dtype=float)
+    vasp_vals = np.array([m['vasp_energy_per_atom'] for m in matched], dtype=float)
     
     # Scatter plot
     fig, ax = plt.subplots(figsize=(12, 10))
