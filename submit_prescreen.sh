@@ -26,6 +26,7 @@ HULL_THRESHOLD=${HULL_THRESHOLD:-0.1}
 DEVICE=${DEVICE:-"cuda"}
 BATCH_SIZE=${BATCH_SIZE:-32}
 MAX_ATOMS_GPU=${MAX_ATOMS_GPU:-2048}
+MODEL_PATH=${MODEL_PATH:-""}
 PURE_PBE=${PURE_PBE:-""}
 
 echo "========================================================================"
@@ -148,6 +149,10 @@ if [ -n "$MP_API_KEY" ]; then
     CMD="$CMD --mp-api-key $MP_API_KEY"
 fi
 
+if [ -n "$MODEL_PATH" ]; then
+    CMD="$CMD --model-path $MODEL_PATH"
+fi
+
 if [ -n "$PURE_PBE" ]; then
     CMD="$CMD $PURE_PBE"
 fi
@@ -162,6 +167,7 @@ echo "  Hull threshold: ${HULL_THRESHOLD} eV/atom"
 echo "  Device: $DEVICE"
 echo "  Batch size: $BATCH_SIZE"
 echo "  Max atoms on GPU: $MAX_ATOMS_GPU"
+echo "  Model: ${MODEL_PATH:-MatterSim-v1.0.0-5M.pth (default)}"
 if [ -n "$PURE_PBE" ]; then
     echo "  Functional filtering: Pure GGA-PBE only"
 else

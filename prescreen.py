@@ -879,6 +879,13 @@ def main():
              "Default: accept both PBE and PBE+U for accurate phase diagrams. "
              "Use this flag to match DFT calculations using pure PBE without +U corrections."
     )
+    parser.add_argument(
+        '--model-path',
+        type=str,
+        default='MatterSim-v1.0.0-5M.pth',
+        help="Path to MatterSim checkpoint (default: MatterSim-v1.0.0-5M.pth). "
+             "Use a finetuned model path for domain-specific prescreening."
+    )
     
     args = parser.parse_args()
     
@@ -908,6 +915,7 @@ def main():
     print(f"Start composition index: {args.start_composition}")
     print(f"Max compositions: {args.max_compositions or 'all'}")
     print(f"Max structures per composition: {args.max_structures}")
+    print(f"Model: {args.model_path}")
     print(f"MP cache file: {mp_cache_file}")
     print(f"MP API: Legacy pymatgen.ext.matproj.MPRester (complete GGA coverage)")
     
@@ -1023,12 +1031,12 @@ def main():
     print("="*70 + "\n")
     
     # Create MatterSim Potential for MP phases (one-time)
-    print(f"Creating MatterSim Potential (device={args.device})...")
+    print(f"Creating MatterSim Potential (model={args.model_path}, device={args.device})...")
     try:
         import torch
         import gc
         potential_mp = Potential.from_checkpoint(
-            checkpoint_path="MatterSim-v1.0.0-5M.pth",
+            checkpoint_path=args.model_path,
             device=args.device
         )
         print("  Potential created successfully\n")
@@ -1184,7 +1192,7 @@ def main():
             # Create MatterSim Potential for this batch (with error handling)
             try:
                 potential = Potential.from_checkpoint(
-                    checkpoint_path="MatterSim-v1.0.0-5M.pth",
+                    checkpoint_path=args.model_path,
                     device=args.device
                 )
             except Exception as e:
@@ -1485,7 +1493,7 @@ def main():
             'passed_prescreening': passed,
             'failed_prescreening': failed,
             'hull_threshold': args.hull_threshold,
-            'energy_reference': 'MatterSim-v1.0.0-5M',
+            'energy_reference': Path(args.model_path).name,
             'mp_api': 'legacy_pymatgen_mprester_complete_gga',
             'mp_filtering': 'pure_pbe_only' if args.pure_pbe else 'mixed_pbe_pbeU',
             'mp_suffix_filter': 'strict_-GGA_suffix' if args.pure_pbe else 'strict_-GGA_or_-GGA+U_suffix'

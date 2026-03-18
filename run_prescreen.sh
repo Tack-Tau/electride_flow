@@ -15,6 +15,7 @@ HULL_THRESHOLD=0.1
 DEVICE="cuda"
 BATCH_SIZE=32
 MAX_ATOMS_GPU=2048
+MODEL_PATH=""
 PURE_PBE=""
 
 # Colors
@@ -71,6 +72,10 @@ while [[ $# -gt 0 ]]; do
             CONDA_ENV="$2"
             shift 2
             ;;
+        --model-path)
+            MODEL_PATH="$2"
+            shift 2
+            ;;
         --pure-pbe)
             PURE_PBE="--pure-pbe"
             shift
@@ -95,7 +100,9 @@ while [[ $# -gt 0 ]]; do
             echo "                             Adjust for GPU memory: 2048 (V100 16GB), 4096 (A100 40GB),"
             echo "                             8192 (A100 80GB / H100)"
             echo "  --conda-env NAME           Conda environment name (default: mattersim)"
-            echo "  --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)"
+    echo "  --model-path PATH          Path to MatterSim checkpoint (default: MatterSim-v1.0.0-5M.pth)"
+    echo "                             Use finetuned model: --model-path /path/to/ft_mattersim/model/best_model.pth"
+    echo "  --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)"
             echo "                             Default: accept both PBE and PBE+U (recommended)"
             echo ""
             echo "Example:"
@@ -149,6 +156,7 @@ echo "  Batch size:           $BATCH_SIZE"
 echo "  Max atoms on GPU:     $MAX_ATOMS_GPU"
 echo "  Conda environment:    $CONDA_ENV"
 echo "  MP API key:           ${MP_API_KEY:+[SET]}${MP_API_KEY:-[NOT SET]}"
+echo "  Model path:           ${MODEL_PATH:-MatterSim-v1.0.0-5M.pth (default)}"
 echo "  Functional filter:    ${PURE_PBE:+Pure PBE only}${PURE_PBE:-Mixed PBE/PBE+U (default)}"
 echo ""
 
@@ -179,6 +187,7 @@ export HULL_THRESHOLD
 export DEVICE
 export BATCH_SIZE
 export MAX_ATOMS_GPU
+export MODEL_PATH
 export PURE_PBE
 
 JOB_ID=$(sbatch submit_prescreen.sh | awk '{print $NF}')
