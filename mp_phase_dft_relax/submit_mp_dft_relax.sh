@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=mp_dft_relax
-#SBATCH --partition=Apus
+#SBATCH --partition=Apus,Orion
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G

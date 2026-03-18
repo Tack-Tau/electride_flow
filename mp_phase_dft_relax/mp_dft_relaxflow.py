@@ -26,6 +26,43 @@ from pymatgen.io.vasp.outputs import Vasprun
 # Suppress POTCAR warnings (they are informational only)
 warnings.filterwarnings('ignore', category=BadInputSetWarning)
 
+# MAGMOM overrides for elements with wrong pymatgen neutral-element defaults.
+# pymatgen gives Co=0.6 (should be ~5 for magnetic intermetallics) and
+# most rare earths get 0.6 (only Ce=5 and Eu=10 have neutral entries).
+# RE values: Hund's rule spin-only moments (unpaired 4f electron count).
+MAGMOM_OVERRIDE = {
+    'Pr': 2.0, 'Nd': 3.0, 'Pm': 4.0, 'Sm': 5.0,
+    'Gd': 7.0, 'Tb': 6.0, 'Dy': 5.0, 'Ho': 4.0,
+    'Er': 3.0, 'Tm': 2.0, 'Yb': 1.0,
+    'Co': 2.0,
+}
+
+
+def build_magmom(structure):
+    """Build MAGMOM dict overriding wrong pymatgen defaults for intermetallics.
+    
+    When overriding via user_incar_settings, pymatgen does NOT merge with its
+    config defaults, so all elements must be included in the returned dict.
+    Returns dict (element -> value) if any override is needed,
+    None otherwise (use pymatgen defaults).
+    """
+    elements = [str(el) for el in structure.composition.elements]
+    if not any(el in MAGMOM_OVERRIDE for el in elements):
+        return None
+    pmg_defaults = {
+        'Ce': 5, 'Eu': 10, 'Fe': 5, 'Ni': 5,
+        'Mn': 5, 'Cr': 5, 'V': 5, 'Mo': 5, 'W': 5,
+    }
+    result = {}
+    for el in elements:
+        if el in MAGMOM_OVERRIDE:
+            result[el] = MAGMOM_OVERRIDE[el]
+        elif el in pmg_defaults:
+            result[el] = pmg_defaults[el]
+        else:
+            result[el] = 0.6
+    return result
+
 
 def check_electronic_convergence_oszicar(relax_dir):
     """
@@ -194,35 +231,40 @@ def save_database(db_path, db):
 
 def create_vasp_relax_inputs(structure, job_dir):
     """
-    Create VASP input files for relaxation using same settings as main workflow.
-    
-    Uses MPRelaxSet with exact settings from workflow_manager.py for consistency.
+    Create VASP input files for relaxation using same settings as bin_mag_flow.py.
     """
     job_dir = Path(job_dir)
     job_dir.mkdir(parents=True, exist_ok=True)
     
-    # Same settings as workflow_manager.py
+    incar_settings = {
+        'PREC': 'Normal',
+        'ALGO': 'All',
+        'ADDGRID': True,
+        'EDIFF': 1e-4,
+        'EDIFFG': -0.005,
+        'IBRION': 1,
+        'ISIF': 3,
+        'NELM': 120,
+        'NSW': 100,
+        'ISMEAR': 1,
+        'SIGMA': 0.05,
+        'ISPIN': 2,
+        'POTIM': 0.2,
+        'LREAL': 'Auto',
+        'LWAVE': False,
+        'LCHARG': False,
+        'LAECHG': False,
+        'LASPH': True,
+        'LORBIT': 11,
+    }
+    
+    # Override MAGMOM for RE and Co (pymatgen defaults are wrong for intermetallics)
+    magmom = build_magmom(structure)
+    if magmom is not None:
+        incar_settings['MAGMOM'] = magmom
+    
     vis = MPRelaxSet(structure,
-        user_incar_settings={
-            'PREC': 'Accurate',
-            'ALGO': 'Fast',
-            'ADDGRID': True,
-            'EDIFF': 1e-6,
-            'EDIFFG': -0.01,
-            'IBRION': 2,
-            'ISIF': 3,
-            'NELM': 60,
-            'NSW': 30,
-            'ISMEAR': 0,
-            'SIGMA': 0.05,
-            'ISPIN': 1,
-            'POTIM': 0.3,
-            'LWAVE': False,
-            'LCHARG': False,
-            'LAECHG': False,
-            'LASPH': False,
-            'LORBIT': 0,
-        },
+        user_incar_settings=incar_settings,
         user_kpoints_settings={'reciprocal_density': 64}
     )
     
@@ -230,20 +272,17 @@ def create_vasp_relax_inputs(structure, job_dir):
 
 
 def create_slurm_script(job_dir, job_name):
-    """
-    Create SLURM submission script for VASP job.
-    
-    Uses same configuration as main workflow_manager.py for consistency.
-    """
+    """Create SLURM submission script for VASP relaxation."""
     job_dir = Path(job_dir).resolve()
     
     script = f"""#!/bin/bash
-#SBATCH --job-name={job_name}
+#SBATCH --job-name={job_name}_relax
 #SBATCH --partition=Apus,Orion
 #SBATCH --nodes=1
-#SBATCH --ntasks=32
-#SBATCH --mem=64G
-#SBATCH --time=00:30:00
+#SBATCH --ntasks=16
+#SBATCH --mem=32G
+#SBATCH --time=24:00:00
+#SBATCH --exclude=str-c[85-97]
 #SBATCH --output={job_dir}/vasp_%j.out
 #SBATCH --error={job_dir}/vasp_%j.err
 
@@ -254,24 +293,58 @@ ulimit -s unlimited
 
 # Set environment
 export OMP_NUM_THREADS=1
-export PMG_VASP_PSP_DIR=$HOME/apps/PBE64
+export PMG_VASP_PSP_DIR=$HOME/apps/PBE52
 
 # Intel MPI settings for SLURM
 if [ -e /opt/slurm/lib/libpmi.so ]; then
-export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
+  export I_MPI_PMI_LIBRARY=/opt/slurm/lib/libpmi.so
 else
   export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi.so.0
 fi
 export I_MPI_FABRICS=shm:ofi
 
 # VASP executable (use srun for SLURM-native MPI launching)
-VASP_CMD="srun $HOME/apps/vasp.6.2.1/bin/vasp_std"
+VASP_CMD="srun --mpi=pmi2 $HOME/apps/vasp.6.2.1/bin/vasp_std"
 
 # Change to job directory
 cd {job_dir}
 
 # Run VASP
-$VASP_CMD > vasp.log 2>&1
+echo "Starting VASP coarse relaxation"
+echo "Working directory: $(pwd)"
+echo "VASP command: $VASP_CMD"
+echo "Start time: $(date)"
+
+$VASP_CMD
+
+EXIT_CODE=$?
+
+echo "End time: $(date)"
+echo "Exit code: $EXIT_CODE"
+
+# Check if successful
+if [ $EXIT_CODE -eq 0 ]; then
+    # Verify critical files for Relax calculation
+    if [ -f "CONTCAR" ] && [ -s "CONTCAR" ]; then
+        echo "VASP calculation completed successfully"
+        echo "Verified CONTCAR exists"
+        
+        # Clean up large unnecessary files to save disk space
+        rm -f CHGCAR CHG WAVECAR WFULL AECCAR* TMPCAR PROCAR 2>/dev/null
+        
+        touch VASP_DONE
+    else
+        echo "VASP calculation failed: CONTCAR missing/empty"
+        # Clean up large intermediate files to save disk space
+        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR PROCAR 2>/dev/null
+        touch VASP_FAILED
+    fi
+else
+    echo "VASP calculation failed with exit code $EXIT_CODE"
+    # Clean up large intermediate files to save disk space
+    rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR PROCAR 2>/dev/null
+    touch VASP_FAILED
+fi
 """
     
     script_path = job_dir / 'job.sh'
@@ -314,7 +387,7 @@ def check_job_status(slurm_id):
     Check SLURM job status.
     
     Returns:
-        str: 'RUNNING', 'PENDING', 'COMPLETED', 'FAILED', or None
+        str: 'RUNNING', 'PENDING', 'RELAX_DONE', 'RELAX_FAILED', or None
     """
     if slurm_id is None:
         return None
@@ -342,9 +415,9 @@ def check_job_status(slurm_id):
         if result.returncode == 0 and result.stdout.strip():
             status = result.stdout.strip().split()[0]
             if 'COMPLETED' in status:
-                return 'COMPLETED'
+                return 'RELAX_DONE'
             else:
-                return 'FAILED'
+                return 'RELAX_FAILED'
         
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pass
@@ -388,25 +461,21 @@ def submit_pending_jobs(db, structures_dict, vasp_jobs_dir, max_concurrent):
     Returns:
         int: Number of jobs submitted
     """
-    # Count running jobs
-    running_count = sum(1 for s in db['structures'].values() if s['state'] == 'RUNNING')
+    running_count = sum(1 for s in db['structures'].values() if s['state'] == 'RELAX_RUNNING')
     
     if running_count >= max_concurrent:
         return 0
     
-    # Find pending structures
     pending = [mp_id for mp_id, s in db['structures'].items() if s['state'] == 'PENDING']
     
     if not pending:
         return 0
     
-    # Submit jobs
     submitted = 0
     for mp_id in pending:
         if running_count + submitted >= max_concurrent:
             break
         
-        # Skip if structure not loaded (e.g., filtered by --chemsys)
         if mp_id not in structures_dict:
             print(f"  WARNING: {mp_id} not in loaded structures, skipping...")
             db['structures'][mp_id]['state'] = 'SKIPPED'
@@ -416,23 +485,17 @@ def submit_pending_jobs(db, structures_dict, vasp_jobs_dir, max_concurrent):
         structure = structures_dict[mp_id]['structure']
         chemsys = sdata['chemsys']
         
-        # Create job directory
         relax_dir = Path(vasp_jobs_dir) / f"mp_{chemsys}" / mp_id / "Relax"
         
         print(f"Submitting {mp_id} ({sdata['formula']})...")
         
         try:
-            # Create VASP inputs
             create_vasp_relax_inputs(structure, relax_dir)
-            
-            # Create SLURM script
             script_path = create_slurm_script(relax_dir, f"{mp_id}")
-            
-            # Submit job
             slurm_id = submit_vasp_job(script_path)
             
             if slurm_id:
-                sdata['state'] = 'RUNNING'
+                sdata['state'] = 'RELAX_RUNNING'
                 sdata['slurm_id'] = slurm_id
                 sdata['relax_dir'] = str(relax_dir)
                 sdata['submit_time'] = datetime.now().isoformat()
@@ -459,119 +522,135 @@ def update_job_status(db):
     completed = 0
     failed = 0
     
-    running_structures = [(mp_id, s) for mp_id, s in db['structures'].items() if s['state'] == 'RUNNING']
+    running_structures = [(mp_id, s) for mp_id, s in db['structures'].items() if s['state'] == 'RELAX_RUNNING']
     
     for mp_id, sdata in running_structures:
         slurm_id = sdata['slurm_id']
         slurm_status = check_job_status(slurm_id)
         
-        if slurm_status == 'COMPLETED':
-            # Check VASP convergence
+        if slurm_status == 'RELAX_DONE':
+            # Check local marker first, then vasprun.xml convergence
+            relax_dir = Path(sdata['relax_dir'])
+            
+            if (relax_dir / 'VASP_FAILED').exists():
+                sdata['state'] = 'RELAX_FAILED'
+                sdata['update_time'] = datetime.now().isoformat()
+                print(f"    {mp_id}: RELAX_FAILED (VASP_FAILED marker)")
+                failed += 1
+                continue
+            
             converged, energy_per_atom = check_relax_convergence(sdata['relax_dir'])
             
             if converged:
-                sdata['state'] = 'COMPLETED'
+                sdata['state'] = 'RELAX_DONE'
                 sdata['vasp_energy_per_atom'] = energy_per_atom
                 sdata['update_time'] = datetime.now().isoformat()
-                print(f"    {mp_id}: COMPLETED (E={energy_per_atom:.6f} eV/atom)")
+                print(f"    {mp_id}: RELAX_DONE (E={energy_per_atom:.6f} eV/atom)")
                 completed += 1
             else:
-                sdata['state'] = 'FAILED'
+                sdata['state'] = 'RELAX_FAILED'
                 sdata['update_time'] = datetime.now().isoformat()
-                print(f"    {mp_id}: FAILED (electronic not converged)")
+                print(f"    {mp_id}: RELAX_FAILED (electronic not converged)")
                 failed += 1
         
-        elif slurm_status == 'FAILED':
-            sdata['state'] = 'FAILED'
+        elif slurm_status == 'RELAX_FAILED':
+            sdata['state'] = 'RELAX_FAILED'
             sdata['update_time'] = datetime.now().isoformat()
-            print(f"    {mp_id}: FAILED (SLURM job failed)")
+            print(f"    {mp_id}: RELAX_FAILED (SLURM job failed)")
             failed += 1
         
         elif slurm_status is None:
-            # Job not found in queue or sacct - likely timed out or crashed
             relax_dir = Path(sdata['relax_dir'])
             
-            # First try standard vasprun.xml check
-            converged, energy_per_atom = check_relax_convergence(sdata['relax_dir'])
+            # Check local markers first
+            if (relax_dir / 'VASP_DONE').exists():
+                converged, energy_per_atom = check_relax_convergence(sdata['relax_dir'])
+                if converged:
+                    sdata['state'] = 'RELAX_DONE'
+                    sdata['vasp_energy_per_atom'] = energy_per_atom
+                    sdata['update_time'] = datetime.now().isoformat()
+                    print(f"    {mp_id}: RELAX_DONE (E={energy_per_atom:.6f} eV/atom)")
+                    completed += 1
+                else:
+                    sdata['state'] = 'RELAX_FAILED'
+                    sdata['update_time'] = datetime.now().isoformat()
+                    print(f"    {mp_id}: RELAX_FAILED (VASP_DONE but vasprun not converged)")
+                    failed += 1
+                continue
             
-            if converged:
-                # Job finished but SLURM lost track of it - mark as completed
-                sdata['state'] = 'COMPLETED'
-                sdata['vasp_energy_per_atom'] = energy_per_atom
+            if (relax_dir / 'VASP_FAILED').exists():
+                sdata['state'] = 'RELAX_FAILED'
                 sdata['update_time'] = datetime.now().isoformat()
-                print(f"    {mp_id}: COMPLETED (E={energy_per_atom:.6f} eV/atom, SLURM lost)")
-                completed += 1
-            else:
-                # vasprun.xml check failed - check if timed out
-                err_files = list(relax_dir.glob('vasp_*.err'))
-                is_timeout = False
+                print(f"    {mp_id}: RELAX_FAILED (VASP_FAILED marker)")
+                failed += 1
+                continue
+            
+            # No markers - check if timed out
+            err_files = list(relax_dir.glob('vasp_*.err'))
+            is_timeout = False
+            
+            if err_files:
+                err_file = max(err_files, key=lambda p: p.stat().st_mtime)
+                try:
+                    with open(err_file, 'r') as f:
+                        if 'DUE TO TIME LIMIT' in f.read():
+                            is_timeout = True
+                except Exception:
+                    pass
+            
+            if is_timeout:
+                contcar_path = relax_dir / 'CONTCAR'
                 
-                if err_files:
-                    err_file = max(err_files, key=lambda p: p.stat().st_mtime)
+                if not contcar_path.exists() or contcar_path.stat().st_size == 0:
+                    sdata['state'] = 'RELAX_FAILED'
+                    sdata['update_time'] = datetime.now().isoformat()
+                    print(f"    {mp_id}: RELAX_FAILED (timeout, CONTCAR missing/empty)")
+                    failed += 1
+                elif check_electronic_convergence_oszicar(relax_dir):
                     try:
-                        with open(err_file, 'r') as f:
-                            if 'DUE TO TIME LIMIT' in f.read():
-                                is_timeout = True
-                    except Exception:
-                        pass
-                
-                if is_timeout:
-                    # Check if electronic converged (using OSZICAR) and CONTCAR exists
-                    contcar_path = relax_dir / 'CONTCAR'
-                    
-                    if not contcar_path.exists() or contcar_path.stat().st_size == 0:
-                        sdata['state'] = 'FAILED'
-                        sdata['update_time'] = datetime.now().isoformat()
-                        print(f"    {mp_id}: FAILED (timeout, CONTCAR missing/empty)")
-                        failed += 1
-                    elif check_electronic_convergence_oszicar(relax_dir):
-                        # Electronic converged, extract energy from OUTCAR
-                        try:
-                            # Parse final energy from OUTCAR
-                            with open(outcar_path, 'r') as f:
-                                outcar_lines = f.readlines()
+                        outcar_path = relax_dir / 'OUTCAR'
+                        with open(outcar_path, 'r') as f:
+                            outcar_lines = f.readlines()
+                        
+                        final_energy = None
+                        for line in reversed(outcar_lines):
+                            if 'free  energy   TOTEN' in line or 'energy  without entropy' in line:
+                                try:
+                                    final_energy = float(line.split()[4])
+                                    break
+                                except (IndexError, ValueError):
+                                    continue
+                        
+                        if final_energy is not None:
+                            structure = Structure.from_file(str(contcar_path))
+                            n_atoms = len(structure)
+                            energy_per_atom = final_energy / n_atoms
                             
-                            final_energy = None
-                            for line in reversed(outcar_lines):
-                                if 'free  energy   TOTEN' in line or 'energy  without entropy' in line:
-                                    try:
-                                        final_energy = float(line.split()[4])
-                                        break
-                                    except (IndexError, ValueError):
-                                        continue
-                            
-                            if final_energy is not None:
-                                # Get number of atoms from CONTCAR
-                                structure = Structure.from_file(str(contcar_path))
-                                n_atoms = len(structure)
-                                energy_per_atom = final_energy / n_atoms
-                                
-                                sdata['state'] = 'COMPLETED'
-                                sdata['vasp_energy_per_atom'] = energy_per_atom
-                                sdata['update_time'] = datetime.now().isoformat()
-                                print(f"    {mp_id}: COMPLETED (E={energy_per_atom:.6f} eV/atom, timed out but converged)")
-                                completed += 1
-                            else:
-                                sdata['state'] = 'FAILED'
-                                sdata['update_time'] = datetime.now().isoformat()
-                                print(f"    {mp_id}: FAILED (timeout, could not extract energy from OUTCAR)")
-                                failed += 1
-                        except Exception as e:
-                            sdata['state'] = 'FAILED'
+                            sdata['state'] = 'RELAX_TMOUT'
+                            sdata['vasp_energy_per_atom'] = energy_per_atom
                             sdata['update_time'] = datetime.now().isoformat()
-                            print(f"    {mp_id}: FAILED (timeout, error parsing OUTCAR: {e})")
+                            print(f"    {mp_id}: RELAX_TMOUT (E={energy_per_atom:.6f} eV/atom)")
+                            completed += 1
+                        else:
+                            sdata['state'] = 'RELAX_FAILED'
+                            sdata['update_time'] = datetime.now().isoformat()
+                            print(f"    {mp_id}: RELAX_FAILED (timeout, could not extract energy)")
                             failed += 1
-                    else:
-                        sdata['state'] = 'FAILED'
+                    except Exception as e:
+                        sdata['state'] = 'RELAX_FAILED'
                         sdata['update_time'] = datetime.now().isoformat()
-                        print(f"    {mp_id}: FAILED (timeout, electronic not converged)")
+                        print(f"    {mp_id}: RELAX_FAILED (timeout, error parsing OUTCAR: {e})")
                         failed += 1
                 else:
-                    # Not a timeout - likely crashed
-                    sdata['state'] = 'FAILED'
+                    sdata['state'] = 'RELAX_FAILED'
                     sdata['update_time'] = datetime.now().isoformat()
-                    print(f"    {mp_id}: FAILED (crash or terminated without completion)")
-            failed += 1
+                    print(f"    {mp_id}: RELAX_FAILED (timeout, electronic not converged)")
+                    failed += 1
+            else:
+                sdata['state'] = 'RELAX_FAILED'
+                sdata['update_time'] = datetime.now().isoformat()
+                print(f"    {mp_id}: RELAX_FAILED (crash or terminated without completion)")
+                failed += 1
     
     return completed, failed
 
@@ -585,10 +664,10 @@ def print_status_summary(db):
     print("\n" + "="*70)
     print("Workflow Status")
     print("="*70)
-    for state in ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'SKIPPED']:
+    for state in ['PENDING', 'RELAX_RUNNING', 'RELAX_DONE', 'RELAX_TMOUT', 'RELAX_FAILED', 'SKIPPED']:
         count = state_counts.get(state, 0)
-        if count > 0 or state in ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED']:
-            print(f"  {state:12s}: {count:4d}")
+        if count > 0 or state in ['PENDING', 'RELAX_RUNNING', 'RELAX_DONE', 'RELAX_FAILED']:
+            print(f"  {state:14s}: {count:4d}")
     print("="*70 + "\n")
     sys.stdout.flush()
 
@@ -704,7 +783,7 @@ def main():
             
             # Check if done
             pending = sum(1 for s in db['structures'].values() if s['state'] == 'PENDING')
-            running = sum(1 for s in db['structures'].values() if s['state'] == 'RUNNING')
+            running = sum(1 for s in db['structures'].values() if s['state'] == 'RELAX_RUNNING')
             
             if pending == 0 and running == 0:
                 print("\n" + "="*70)
@@ -717,7 +796,7 @@ def main():
             if running > 0:
                 running_jobs = [f"{mp_id} (job {s['slurm_id']})" 
                                for mp_id, s in db['structures'].items() 
-                               if s['state'] == 'RUNNING']
+                               if s['state'] == 'RELAX_RUNNING']
                 print(f"Active jobs: {', '.join(running_jobs[:5])}")
                 if len(running_jobs) > 5:
                     print(f"  ... and {len(running_jobs) - 5} more")
@@ -738,10 +817,12 @@ def main():
     print("Final Summary")
     print("="*70)
     
-    completed_count = sum(1 for s in db['structures'].values() if s['state'] == 'COMPLETED')
-    failed_count = sum(1 for s in db['structures'].values() if s['state'] == 'FAILED')
+    done_count = sum(1 for s in db['structures'].values() if s['state'] == 'RELAX_DONE')
+    tmout_count = sum(1 for s in db['structures'].values() if s['state'] == 'RELAX_TMOUT')
+    failed_count = sum(1 for s in db['structures'].values() if s['state'] == 'RELAX_FAILED')
     
-    print(f"Completed: {completed_count}")
+    print(f"Relaxed: {done_count}")
+    print(f"Timed out (usable): {tmout_count}")
     print(f"Failed: {failed_count}")
     print(f"Total: {len(db['structures'])}")
     print("="*70 + "\n")

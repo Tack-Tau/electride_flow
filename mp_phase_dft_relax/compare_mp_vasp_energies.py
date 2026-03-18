@@ -231,7 +231,7 @@ def analyze_energy_differences(db, mp_energies, check_convergence=True, outlier_
     recovered_from_outcar = []
     
     for mp_id, sdata in db['structures'].items():
-        if sdata['state'] != 'COMPLETED':
+        if sdata['state'] not in ('RELAX_DONE', 'RELAX_TMOUT'):
             continue
         
         # Get VASP energy - try from database first, fall back to OUTCAR if None
@@ -653,14 +653,14 @@ def main():
             print("\nPlease specify --mp-energies-file or generate the file by running:")
             print("  1. get_mp_struct.py (saves to mp_cache_structs/mp_vaspdft.json), or")
             print("  2. compute_dft_e_hull.py (saves to VASP_JOBS/mp_vaspdft.json)")
-        return 1
+            return 1
     
     # Load database
     print(f"Loading workflow database: {db_path}")
     db = load_workflow_db(db_path)
     
     total = len(db['structures'])
-    completed = sum(1 for s in db['structures'].values() if s['state'] == 'COMPLETED')
+    completed = sum(1 for s in db['structures'].values() if s['state'] in ('RELAX_DONE', 'RELAX_TMOUT'))
     
     print(f"Total structures: {total}")
     print(f"Completed: {completed}")
@@ -671,7 +671,7 @@ def main():
     
     # Get list of completed MP IDs
     completed_mp_ids = [mp_id for mp_id, s in db['structures'].items() 
-                        if s['state'] == 'COMPLETED' and s['vasp_energy_per_atom'] is not None]
+                        if s['state'] in ('RELAX_DONE', 'RELAX_TMOUT') and s['vasp_energy_per_atom'] is not None]
     
     # Load MP energies from JSON file
     try:
