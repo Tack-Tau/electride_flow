@@ -203,7 +203,7 @@ def check_vasp_convergence(relax_dir):
     if vasprun_path.exists():
         try:
             vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
-            return vr.converged
+            return vr.converged_electronic
         except Exception:
             # vasprun.xml exists but corrupted - likely timeout
             pass
@@ -268,15 +268,15 @@ def analyze_energy_differences(db, mp_energies, check_convergence=True, outlier_
         if mp_e is None:
             continue
         
-        # Check VASP convergence if requested
-        if check_convergence and sdata.get('relax_dir'):
+        # Check VASP convergence (skip for RELAX_TMOUT -- already validated by workflow)
+        if check_convergence and sdata['state'] != 'RELAX_TMOUT' and sdata.get('relax_dir'):
             if not check_vasp_convergence(sdata['relax_dir']):
                 skipped_not_converged.append(mp_id)
                 print(f"  WARNING: Skipping {mp_id} - VASP calculation not converged")
                 continue
-        
-            sdata['mp_energy_per_atom'] = mp_e  # Cache in sdata
-            completed[mp_id] = sdata
+
+        sdata['mp_energy_per_atom'] = mp_e
+        completed[mp_id] = sdata
     
     if not completed:
         return None

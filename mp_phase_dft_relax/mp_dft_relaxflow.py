@@ -416,6 +416,8 @@ def check_job_status(slurm_id):
             status = result.stdout.strip().split()[0]
             if 'COMPLETED' in status:
                 return 'RELAX_DONE'
+            elif 'TIMEOUT' in status or 'CANCELLED' in status:
+                return 'TIMEOUT'
             else:
                 return 'RELAX_FAILED'
         
@@ -559,44 +561,46 @@ def update_job_status(db):
             print(f"    {mp_id}: RELAX_FAILED (SLURM job failed)")
             failed += 1
         
-        elif slurm_status is None:
+        elif slurm_status in ('TIMEOUT', None):
             relax_dir = Path(sdata['relax_dir'])
             
-            # Check local markers first
-            if (relax_dir / 'VASP_DONE').exists():
-                converged, energy_per_atom = check_relax_convergence(sdata['relax_dir'])
-                if converged:
-                    sdata['state'] = 'RELAX_DONE'
-                    sdata['vasp_energy_per_atom'] = energy_per_atom
-                    sdata['update_time'] = datetime.now().isoformat()
-                    print(f"    {mp_id}: RELAX_DONE (E={energy_per_atom:.6f} eV/atom)")
-                    completed += 1
-                else:
+            if slurm_status is None:
+                # Check local markers when sacct has no record
+                if (relax_dir / 'VASP_DONE').exists():
+                    converged, energy_per_atom = check_relax_convergence(sdata['relax_dir'])
+                    if converged:
+                        sdata['state'] = 'RELAX_DONE'
+                        sdata['vasp_energy_per_atom'] = energy_per_atom
+                        sdata['update_time'] = datetime.now().isoformat()
+                        print(f"    {mp_id}: RELAX_DONE (E={energy_per_atom:.6f} eV/atom)")
+                        completed += 1
+                    else:
+                        sdata['state'] = 'RELAX_FAILED'
+                        sdata['update_time'] = datetime.now().isoformat()
+                        print(f"    {mp_id}: RELAX_FAILED (VASP_DONE but vasprun not converged)")
+                        failed += 1
+                    continue
+                
+                if (relax_dir / 'VASP_FAILED').exists():
                     sdata['state'] = 'RELAX_FAILED'
                     sdata['update_time'] = datetime.now().isoformat()
-                    print(f"    {mp_id}: RELAX_FAILED (VASP_DONE but vasprun not converged)")
+                    print(f"    {mp_id}: RELAX_FAILED (VASP_FAILED marker)")
                     failed += 1
-                continue
+                    continue
             
-            if (relax_dir / 'VASP_FAILED').exists():
-                sdata['state'] = 'RELAX_FAILED'
-                sdata['update_time'] = datetime.now().isoformat()
-                print(f"    {mp_id}: RELAX_FAILED (VASP_FAILED marker)")
-                failed += 1
-                continue
+            # Timeout detected from sacct or inferred from .err file
+            is_timeout = slurm_status == 'TIMEOUT'
             
-            # No markers - check if timed out
-            err_files = list(relax_dir.glob('vasp_*.err'))
-            is_timeout = False
-            
-            if err_files:
-                err_file = max(err_files, key=lambda p: p.stat().st_mtime)
-                try:
-                    with open(err_file, 'r') as f:
-                        if 'DUE TO TIME LIMIT' in f.read():
-                            is_timeout = True
-                except Exception:
-                    pass
+            if not is_timeout:
+                err_files = list(relax_dir.glob('vasp_*.err'))
+                if err_files:
+                    err_file = max(err_files, key=lambda p: p.stat().st_mtime)
+                    try:
+                        with open(err_file, 'r') as f:
+                            if 'DUE TO TIME LIMIT' in f.read():
+                                is_timeout = True
+                    except Exception:
+                        pass
             
             if is_timeout:
                 contcar_path = relax_dir / 'CONTCAR'
