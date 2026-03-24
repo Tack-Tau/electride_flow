@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DB_FILE="${SCRIPT_DIR}/mp_relax_workflow.json"
 OUTPUT_FILE="${SCRIPT_DIR}/mp_vasp_comparison.json"
 MP_ENERGIES_FILE=""
+OUTLIER_THRESHOLD="0.5"
 
 # Help message
 show_help() {
@@ -21,6 +22,7 @@ OPTIONS:
     --output FILE            Output file for results (default: ./mp_vasp_comparison.json)
     --mp-energies-file FILE  Path to mp_vaspdft.json with MP energies
                              (default: auto-detect from ./mp_cache_structs/ or ./VASP_JOBS/)
+    --outlier-threshold F    Energy diff threshold (eV/atom) for outlier detection (default: 0.5)
     --help                   Show this help message
 
 EXAMPLES:
@@ -56,6 +58,10 @@ while [[ $# -gt 0 ]]; do
             MP_ENERGIES_FILE="$2"
             shift 2
             ;;
+        --outlier-threshold)
+            OUTLIER_THRESHOLD="$2"
+            shift 2
+            ;;
         --help)
             show_help
             exit 0
@@ -88,6 +94,7 @@ if [ -n "${MP_ENERGIES_FILE}" ]; then
 else
     echo "MP energies file: Auto-detect (mp_cache_structs/ or VASP_JOBS/)"
 fi
+echo "Outlier threshold: ${OUTLIER_THRESHOLD} eV/atom"
 echo "========================================================================"
 echo ""
 
@@ -96,6 +103,7 @@ export SCRIPT_DIR
 export DB_FILE
 export OUTPUT_FILE
 export MP_ENERGIES_FILE
+export OUTLIER_THRESHOLD
 
 # Submit to SLURM
 cd "${SCRIPT_DIR}"

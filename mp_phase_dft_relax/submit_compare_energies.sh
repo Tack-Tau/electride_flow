@@ -19,6 +19,7 @@ SCRIPT_DIR=${SCRIPT_DIR:-"$(pwd)"}
 DB_FILE=${DB_FILE:-"./mp_relax_workflow.json"}
 OUTPUT_FILE=${OUTPUT_FILE:-"./mp_vasp_comparison.json"}
 MP_ENERGIES_FILE=${MP_ENERGIES_FILE:-""}
+OUTLIER_THRESHOLD=${OUTLIER_THRESHOLD:-"0.5"}
 
 echo "========================================================================"
 echo "MP vs VASP Energy Comparison (SLURM Job)"
@@ -88,11 +89,14 @@ else
     echo "MP energies file: Auto-detect"
 fi
 
+CMD="$CMD --outlier-threshold $OUTLIER_THRESHOLD"
+
 # Print configuration
 echo "Configuration:"
 echo "  Script directory: $SCRIPT_DIR"
 echo "  Database: $DB_FILE"
 echo "  Output: $OUTPUT_FILE"
+echo "  Outlier threshold: $OUTLIER_THRESHOLD eV/atom"
 echo ""
 
 echo "========================================================================"
