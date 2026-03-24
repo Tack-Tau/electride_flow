@@ -47,7 +47,7 @@ Options:
                          (default: ./mp_cache_structs)
     --chemsys SYSTEM     Process specific chemical system (e.g., B-Li-N)
                          (default: process all chemical systems in cache)
-    --force              Force re-download even if CIF files already exist
+    --force              Force re-download even if POSCAR files already exist
     --pure-pbe           Filter to pure GGA-PBE only (exclude PBE+U)
                          (default: accept both PBE and PBE+U)
     -h, --help           Show this help message
@@ -74,13 +74,13 @@ Notes:
     - Requires MP_API_KEY environment variable (32 characters)
     - Strict filtering: only entries with '-GGA' or '-GGA+U' suffix
     - Saves MP GGA-PBE uncorrected energies (raw DFT, no corrections)
-    - Downloads structure CIF files
-    - Saves flat: mp_cache_structs/mp-XXXXX.cif (no subdirectories)
+    - Downloads structure POSCAR files
+    - Saves flat: mp_cache_structs/mp-XXXXX.vasp (no subdirectories)
 
 Output Structure:
     mp_cache_structs/
-    ├── mp-12345.cif
-    ├── mp-67890.cif
+    ├── mp-12345.vasp
+    ├── mp-67890.vasp
     ├── ...
     └── mp_vaspdft.json    (MP GGA-PBE energies for comparison)
 
@@ -143,7 +143,7 @@ if [ -n "$JOB_ID" ]; then
     echo "  tail -f get_mp_struct_${JOB_ID}.out"
     echo ""
     echo "When complete:"
-    echo "  - Structures: $OUTPUT_DIR/mp-*.cif"
+    echo "  - Structures: $OUTPUT_DIR/mp-*.vasp"
     echo "  - Energies: $OUTPUT_DIR/mp_vaspdft.json (for VASP comparison)"
 else
     echo "ERROR: Job submission failed"

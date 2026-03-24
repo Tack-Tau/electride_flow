@@ -11,11 +11,11 @@ Features:
 - Strict filtering: only accepts entries with '-GGA' or '-GGA+U' suffix
 - Optional --pure-pbe flag to exclude PBE+U (use pure GGA-PBE only)
 - Saves MP GGA-PBE uncorrected energies to mp_vaspdft.json
-- Downloads structure files as CIF format
+- Downloads structure files as POSCAR format
 - Saves structures flat (no subdirectories per MP ID)
 
 Output: 
-- Structures saved to mp_phase_dft_relax/mp_cache_structs/mp-XXXXX.cif
+- Structures saved to mp_phase_dft_relax/mp_cache_structs/mp-XXXXX.vasp
 - Energies saved to mp_phase_dft_relax/mp_cache_structs/mp_vaspdft.json
 """
 
@@ -86,7 +86,7 @@ def query_and_download_structures(chemsys, output_dir, mp_api_key, skip_existing
         - Strict filtering: only accepts entries with '-GGA' or '-GGA+U' suffix
         - Saves MP GGA-PBE uncorrected energies (raw DFT, no composition corrections)
         - Deduplicates by entry_id: keeps all polymorphs (no formula-based dedup)
-        - Saves flat: mp_cache_structs/mp-XXXXX.cif
+        - Saves flat: mp_cache_structs/mp-XXXXX.vasp
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -164,12 +164,11 @@ def query_and_download_structures(chemsys, output_dir, mp_api_key, skip_existing
         skipped_count = 0
         
         for mp_id, structure, has_U, entry_id, mp_energy_per_atom in mp_phases:
-            cif_file = output_dir / f"{mp_id}.cif"
+            vasp_file = output_dir / f"{mp_id}.vasp"
             
             # Skip if already downloaded and skip_existing is True
-            if skip_existing and cif_file.exists():
+            if skip_existing and vasp_file.exists():
                 skipped_count += 1
-                # Still add to downloaded dict for energy tracking
                 struct_elements = sorted([str(el) for el in structure.composition.elements])
                 struct_chemsys = '-'.join(struct_elements)
                 downloaded[mp_id] = {
@@ -182,8 +181,7 @@ def query_and_download_structures(chemsys, output_dir, mp_api_key, skip_existing
                 continue
             
             try:
-                # Save structure as CIF
-                structure.to(filename=str(cif_file), fmt='cif')
+                structure.to(filename=str(vasp_file), fmt='poscar')
                 
                 # Determine chemsys for this structure
                 struct_elements = sorted([str(el) for el in structure.composition.elements])
@@ -300,7 +298,7 @@ def main():
     print("  2. Query MP using legacy MPRester get_entries_in_chemsys()")
     print("  3. Strict filtering: only '-GGA' or '-GGA+U' suffix")
     print("  4. Save MP GGA-PBE uncorrected energies (raw DFT)")
-    print("  5. Download structures as CIF files")
+    print("  5. Download structures as POSCAR files")
     print("  6. Save energies to mp_vaspdft.json for VASP comparison")
     print("="*70)
     
@@ -386,7 +384,7 @@ def main():
     print(f"Chemical systems processed: {len(unique_chemsys)}")
     print(f"Total structures with energies: {len(all_downloaded)}")
     print(f"Output directory: {output_dir}")
-    print(f"Structure files: {output_dir}/mp-*.cif")
+    print(f"Structure files: {output_dir}/mp-*.vasp")
     print(f"Energy file: {energy_json_file}")
     print("="*70)
     print()

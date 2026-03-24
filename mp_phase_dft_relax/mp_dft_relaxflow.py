@@ -22,6 +22,7 @@ from collections import defaultdict
 from pymatgen.core import Structure
 from pymatgen.io.vasp.sets import MPRelaxSet, BadInputSetWarning
 from pymatgen.io.vasp.outputs import Vasprun
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 # Suppress POTCAR warnings (they are informational only)
 warnings.filterwarnings('ignore', category=BadInputSetWarning)
@@ -130,7 +131,7 @@ def check_electronic_convergence_oszicar(relax_dir):
 
 def load_structures_from_cache(cache_dir):
     """
-    Load structures from mp_cache_structs directory (flat CIF files).
+    Load structures from mp_cache_structs directory (POSCAR .vasp files).
     
     Returns:
         dict: {mp_id: {'structure': Structure, 'chemsys': str, 'formula': str}}
@@ -140,22 +141,20 @@ def load_structures_from_cache(cache_dir):
     
     print("Loading structures from cache...")
     
-    # Find all mp-*.cif files (flat structure, no subdirectories)
-    cif_files = sorted(cache_dir.glob("mp-*.cif"))
+    vasp_files = sorted(cache_dir.glob("mp-*.vasp"))
     
-    if not cif_files:
-        print(f"  WARNING: No CIF files found in {cache_dir}")
+    if not vasp_files:
+        print(f"  WARNING: No POSCAR (.vasp) files found in {cache_dir}")
         return structures
     
-    print(f"  Found {len(cif_files)} CIF files")
+    print(f"  Found {len(vasp_files)} POSCAR files")
     
-    for cif_file in cif_files:
-        mp_id = cif_file.stem  # mp-12345 from mp-12345.cif
+    for vasp_file in vasp_files:
+        mp_id = vasp_file.stem  # mp-12345 from mp-12345.vasp
         
         try:
-            structure = Structure.from_file(str(cif_file))
+            structure = Structure.from_file(str(vasp_file))
             
-            # Extract chemical system from composition
             chemsys = '-'.join(sorted(set([el.symbol for el in structure.composition.elements])))
             
             structures[mp_id] = {
@@ -229,13 +228,46 @@ def save_database(db_path, db):
         json.dump(db, f, indent=2)
 
 
+def symmetrize_structure(structure, symprec_list=(0.01, 0.1)):
+    """Symmetrize structure to clean up numerical noise from CIF conversion.
+
+    Tries progressively looser tolerances until symmetry is detected.
+    Prefers primitive cell, falls back to conventional if it matches original size.
+    If neither matches, returns original structure with a WARNING.
+    """
+    n_orig = len(structure)
+    for symprec in symprec_list:
+        try:
+            sga = SpacegroupAnalyzer(structure, symprec=symprec)
+            prim = sga.get_primitive_standard_structure()
+            spg = sga.get_space_group_symbol()
+            spg_num = sga.get_space_group_number()
+            if len(prim) == n_orig:
+                print(f"    Symmetrized (prim): {spg} (#{spg_num}), "
+                      f"symprec={symprec}, {len(prim)} atoms")
+                return prim
+            refined = sga.get_refined_structure()
+            if len(refined) == n_orig:
+                print(f"    Symmetrized (conv): {spg} (#{spg_num}), "
+                      f"symprec={symprec}, {n_orig} atoms")
+                return refined
+            print(f"    WARNING: Symmetrization changes atom count "
+                  f"({n_orig} -> prim {len(prim)}, conv {len(refined)}), "
+                  f"symprec={symprec}, skipping")
+        except Exception:
+            continue
+    return structure
+
+
 def create_vasp_relax_inputs(structure, job_dir):
     """
     Create VASP input files for relaxation using same settings as bin_mag_flow.py.
     """
     job_dir = Path(job_dir)
     job_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    structure = symmetrize_structure(structure)
+
     incar_settings = {
         'PREC': 'Normal',
         'ALGO': 'All',
