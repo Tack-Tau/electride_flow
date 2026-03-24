@@ -33,6 +33,8 @@ MAX_FORCE=${MAX_FORCE:-50.0}
 TEST_FRACTION=${TEST_FRACTION:-0.1}
 PATIENCE=${PATIENCE:-50}
 RE_NORMALIZE=${RE_NORMALIZE:-""}
+EVAL_ONLY=${EVAL_ONLY:-""}
+MODEL_PATH=${MODEL_PATH:-""}
 CONDA_ENV=${CONDA_ENV:-"mattersim"}
 
 echo "========================================================================"
@@ -137,6 +139,8 @@ fi
 
 if [ -n "$INCLUDE_STRESSES" ]; then
     CMD="$CMD $INCLUDE_STRESSES"
+else
+    CMD="$CMD --no-stresses"
 fi
 
 if [ -n "$DATASET_ONLY" ]; then
@@ -150,6 +154,14 @@ if [ -n "$RE_NORMALIZE" ]; then
     CMD="$CMD --re-normalize"
 fi
 
+if [ -n "$EVAL_ONLY" ]; then
+    CMD="$CMD --eval-only"
+fi
+
+if [ -n "$MODEL_PATH" ]; then
+    CMD="$CMD --model-path $MODEL_PATH"
+fi
+
 echo "Configuration:"
 echo "  Workflow DB: $WORKFLOW_DB"
 echo "  Output dir: $OUTPUT_DIR"
@@ -159,6 +171,8 @@ echo "  Batch size: $BATCH_SIZE"
 echo "  Learning rate: $LR"
 echo "  Val fraction: $VAL_FRACTION"
 echo "  Seed: $SEED"
+echo "  Eval only: $([ -n "$EVAL_ONLY" ] && echo yes || echo no)"
+echo "  Model path: ${MODEL_PATH:-auto}"
 echo ""
 
 echo "========================================================================"

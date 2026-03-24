@@ -22,6 +22,8 @@ MAX_FORCE=50.0
 TEST_FRACTION=0.1
 PATIENCE=50
 RE_NORMALIZE=""
+EVAL_ONLY=""
+MODEL_PATH=""
 CONDA_ENV="mattersim"
 
 show_help() {
@@ -53,6 +55,8 @@ OPTIONS:
     --max-force F            Skip steps with max |force| > F eV/A (default: 50.0)
     --patience N             Early stopping patience in epochs (default: 50)
     --re-normalize           Re-normalize energy/force scales to finetuning data
+    --eval-only              Only evaluate an existing finetuned model (skip training)
+    --model-path FILE        Path to finetuned model checkpoint for evaluation
     --help                   Show this help message
 
 EXAMPLES:
@@ -73,6 +77,9 @@ EXAMPLES:
 
     # Custom output and learning rate
     bash run_ft_mattersim.sh --output-dir ./ft_model_v2 --lr 5e-5 --epochs 500
+
+    # Evaluate an existing finetuned model
+    bash run_ft_mattersim.sh --eval-only --model-path ft_mattersim/model/mattersim-v1.0.0-5m_20260317_ft.pth
 
 EOF
 }
@@ -144,6 +151,14 @@ while [[ $# -gt 0 ]]; do
             RE_NORMALIZE="1"
             shift
             ;;
+        --eval-only)
+            EVAL_ONLY="1"
+            shift
+            ;;
+        --model-path)
+            MODEL_PATH="$2"
+            shift 2
+            ;;
         --help)
             show_help
             exit 0
@@ -196,6 +211,8 @@ echo "Skip first: ${SKIP_FIRST}"
 echo "Max force: ${MAX_FORCE} eV/A"
 echo "Patience: ${PATIENCE}"
 echo "Re-normalize: $([ -n "$RE_NORMALIZE" ] && echo yes || echo no)"
+echo "Eval only: $([ -n "$EVAL_ONLY" ] && echo yes || echo no)"
+echo "Model path: ${MODEL_PATH:-auto}"
 echo "========================================================================"
 echo ""
 
@@ -218,6 +235,8 @@ export MAX_FORCE
 export TEST_FRACTION
 export PATIENCE
 export RE_NORMALIZE
+export EVAL_ONLY
+export MODEL_PATH
 export CONDA_ENV
 
 # Submit to SLURM
