@@ -24,6 +24,9 @@ BATCH_SIZE=32
 HULL_THRESHOLD=0.1
 DEVICE="cuda"
 MAX_STRUCTURES=0
+MAX_ATOMS_GPU=2048
+MODEL_PATH=""
+PURE_PBE=""
 
 # Parse remaining arguments
 while [[ $# -gt 0 ]]; do
@@ -56,6 +59,18 @@ while [[ $# -gt 0 ]]; do
             MAX_STRUCTURES="$2"
             shift 2
             ;;
+        --max-atoms-gpu)
+            MAX_ATOMS_GPU="$2"
+            shift 2
+            ;;
+        --model-path)
+            MODEL_PATH="$2"
+            shift 2
+            ;;
+        --pure-pbe)
+            PURE_PBE="--pure-pbe"
+            shift
+            ;;
         *)
             echo "ERROR: Unknown option: $1"
             exit 1
@@ -73,7 +88,10 @@ echo "Compositions per job: $COMPOSITIONS_PER_JOB"
 echo "Batch size: $BATCH_SIZE"
 echo "Hull threshold: $HULL_THRESHOLD eV/atom"
 echo "Max structures: $MAX_STRUCTURES"
+echo "Max atoms on GPU: $MAX_ATOMS_GPU"
 echo "Device: $DEVICE"
+echo "Model: ${MODEL_PATH:-MatterSim-v1.0.0-5M.pth (default)}"
+echo "Functional filter: ${PURE_PBE:+Pure PBE only}${PURE_PBE:-Mixed PBE/PBE+U}"
 echo "========================================"
 echo ""
 
@@ -122,9 +140,12 @@ BATCH_ID=$i
 RESULTS_DIR="$RESULTS_DIR"
 OUTPUT_DIR="$OUTPUT_DIR"
 BATCH_SIZE=$BATCH_SIZE
+MAX_ATOMS_GPU=$MAX_ATOMS_GPU
 HULL_THRESHOLD=$HULL_THRESHOLD
 MAX_STRUCTURES=$MAX_STRUCTURES
 DEVICE="$DEVICE"
+MODEL_PATH="$MODEL_PATH"
+PURE_PBE="$PURE_PBE"
 
 EOF_PARAMS
     
@@ -141,20 +162,33 @@ echo "Output directory: $OUTPUT_DIR"
 echo "Batch size: $BATCH_SIZE"
 echo "Hull threshold: $HULL_THRESHOLD eV/atom"
 echo "Max structures per composition: $MAX_STRUCTURES"
+echo "Max atoms on GPU: $MAX_ATOMS_GPU"
 echo "Device: $DEVICE"
+echo "Model: ${MODEL_PATH:-MatterSim-v1.0.0-5M.pth (default)}"
 echo "========================================"
 
 # Run prescreening
-python3 prescreen.py \
-    --results-dir "$RESULTS_DIR" \
-    --output-dir "$OUTPUT_DIR" \
-    --hull-threshold $HULL_THRESHOLD \
-    --device $DEVICE \
-    --batch-size $BATCH_SIZE \
-    --start-composition $START_INDEX \
-    --max-compositions $MAX_COMPS \
-    --max-structures $MAX_STRUCTURES \
-    --batch-id $BATCH_ID
+CMD="python3 prescreen.py"
+CMD="$CMD --results-dir $RESULTS_DIR"
+CMD="$CMD --output-dir $OUTPUT_DIR"
+CMD="$CMD --hull-threshold $HULL_THRESHOLD"
+CMD="$CMD --device $DEVICE"
+CMD="$CMD --batch-size $BATCH_SIZE"
+CMD="$CMD --max-atoms-gpu $MAX_ATOMS_GPU"
+CMD="$CMD --start-composition $START_INDEX"
+CMD="$CMD --max-compositions $MAX_COMPS"
+CMD="$CMD --max-structures $MAX_STRUCTURES"
+CMD="$CMD --batch-id $BATCH_ID"
+
+if [ -n "$MODEL_PATH" ]; then
+    CMD="$CMD --model-path $MODEL_PATH"
+fi
+
+if [ -n "$PURE_PBE" ]; then
+    CMD="$CMD $PURE_PBE"
+fi
+
+$CMD
 
 EXIT_CODE=$?
 
