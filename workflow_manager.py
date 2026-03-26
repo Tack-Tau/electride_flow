@@ -45,29 +45,25 @@ warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0'
 
 def check_electronic_convergence_oszicar(relax_dir):
     """
-    Check electronic convergence of the LAST ionic step from OSZICAR.
-    
-    Reads the last 2 non-empty lines of OSZICAR:
-    - Last line: ionic step summary containing "F= ..."
-    - Second-to-last line: last electronic SCF iteration (e.g. "RMM:  12 ...")
-    
-    If the electronic step count < NELM (read from INCAR), the electronic
-    SCF converged for the final ionic step.
-    
+    Check electronic convergence from OSZICAR and return energy.
+
+    Searches backwards through ionic steps (F= lines) to find the most recent
+    one with converged electronic SCF (iteration count < NELM). Returns the
+    energy from that step for reliable timeout recovery.
+
     Args:
         relax_dir: Path to VASP relaxation directory (contains OSZICAR and INCAR)
-    
+
     Returns:
-        bool: True if electronic convergence was achieved in the last ionic step
+        tuple: (converged: bool, total_energy: float or None)
     """
     relax_dir = Path(relax_dir)
     oszicar_path = relax_dir / 'OSZICAR'
     incar_path = relax_dir / 'INCAR'
-    
+
     if not oszicar_path.exists():
-        return False
-    
-    # Read NELM from INCAR (default 60 per VASP manual)
+        return False, None
+
     nelm = 60
     if incar_path.exists():
         try:
@@ -79,33 +75,50 @@ def check_electronic_convergence_oszicar(relax_dir):
                         break
         except Exception:
             pass
-    
+
     try:
         with open(oszicar_path, 'r') as f:
             lines = [l.rstrip() for l in f.readlines() if l.strip()]
-        
+
         if len(lines) < 2:
-            return False
-        
-        last_line = lines[-1]
-        second_last = lines[-2]
-        
-        if 'F=' not in last_line:
-            return False
-        
-        parts = second_last.split()
-        if len(parts) < 2:
-            return False
-        
-        try:
-            e_step = int(parts[1])
-        except ValueError:
-            return False
-        
-        return e_step < nelm
-        
+            return False, None
+
+        search_from = len(lines) - 1
+        while search_from > 0:
+            f_idx = None
+            for i in range(search_from, -1, -1):
+                if 'F=' in lines[i]:
+                    f_idx = i
+                    break
+
+            if f_idx is None or f_idx < 1:
+                return False, None
+
+            f_line = lines[f_idx]
+            try:
+                f_pos = f_line.index('F=')
+                energy_str = f_line[f_pos + 2:].split()[0]
+                total_energy = float(energy_str)
+            except (ValueError, IndexError):
+                search_from = f_idx - 1
+                continue
+
+            scf_line = lines[f_idx - 1]
+            parts = scf_line.split()
+            if len(parts) >= 2:
+                try:
+                    e_step = int(parts[1])
+                    if e_step < nelm:
+                        return True, total_energy
+                except ValueError:
+                    pass
+
+            search_from = f_idx - 1
+
+        return False, None
+
     except Exception:
-        return False
+        return False, None
 
 
 def parse_band_gap_from_vasprun(vasprun_path):
@@ -1053,14 +1066,16 @@ fi
                             self.db.update_state(struct_id, 'RELAX_FAILED',
                                                error='Job timed out, CONTCAR missing/empty')
                             print(f"  {struct_id}: Relax FAILED (timeout, CONTCAR missing)")
-                        elif check_electronic_convergence_oszicar(relax_dir):
-                            self.db.update_state(struct_id, 'RELAX_TMOUT',
-                                               error='Relaxation timed out but electronic converged')
-                            print(f"  {struct_id}: Relax TMOUT (electronic converged, proceeding)")
                         else:
-                            self.db.update_state(struct_id, 'RELAX_FAILED',
-                                               error='Job timed out, electronic not converged')
-                            print(f"  {struct_id}: Relax FAILED (timeout, electronic not converged)")
+                            converged, _ = check_electronic_convergence_oszicar(relax_dir)
+                            if converged:
+                                self.db.update_state(struct_id, 'RELAX_TMOUT',
+                                                   error='Relaxation timed out but electronic converged')
+                                print(f"  {struct_id}: Relax TMOUT (electronic converged, proceeding)")
+                            else:
+                                self.db.update_state(struct_id, 'RELAX_FAILED',
+                                                   error='Job timed out, electronic not converged')
+                                print(f"  {struct_id}: Relax FAILED (timeout, electronic not converged)")
                     else:
                         self.db.update_state(struct_id, 'RELAX_FAILED', 
                                            error='Job terminated without completion marker (crash)')

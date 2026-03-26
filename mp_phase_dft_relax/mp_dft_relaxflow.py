@@ -67,28 +67,25 @@ def build_magmom(structure):
 
 def check_electronic_convergence_oszicar(relax_dir):
     """
-    Check electronic convergence of the LAST ionic step from OSZICAR.
-    
-    Reads the last 2 non-empty lines of OSZICAR:
-    - Last line: ionic step summary containing "F= ..."
-    - Second-to-last line: last electronic SCF iteration (e.g. "RMM:  12 ...")
-    
-    If the electronic step count < NELM (read from INCAR), the electronic
-    SCF converged for the final ionic step.
-    
+    Check electronic convergence from OSZICAR and return energy.
+
+    Searches backwards through ionic steps (F= lines) to find the most recent
+    one with converged electronic SCF (iteration count < NELM). Returns the
+    energy from that step for reliable timeout recovery.
+
     Args:
         relax_dir: Path to VASP relaxation directory (contains OSZICAR and INCAR)
-    
+
     Returns:
-        bool: True if electronic convergence was achieved in the last ionic step
+        tuple: (converged: bool, total_energy: float or None)
     """
     relax_dir = Path(relax_dir)
     oszicar_path = relax_dir / 'OSZICAR'
     incar_path = relax_dir / 'INCAR'
-    
+
     if not oszicar_path.exists():
-        return False
-    
+        return False, None
+
     nelm = 60
     if incar_path.exists():
         try:
@@ -100,33 +97,56 @@ def check_electronic_convergence_oszicar(relax_dir):
                         break
         except Exception:
             pass
-    
+
     try:
         with open(oszicar_path, 'r') as f:
             lines = [l.rstrip() for l in f.readlines() if l.strip()]
-        
+
         if len(lines) < 2:
-            return False
-        
-        last_line = lines[-1]
-        second_last = lines[-2]
-        
-        if 'F=' not in last_line:
-            return False
-        
-        parts = second_last.split()
-        if len(parts) < 2:
-            return False
-        
-        try:
-            e_step = int(parts[1])
-        except ValueError:
-            return False
-        
-        return e_step < nelm
-        
+            return False, None
+
+        # Search backwards through F= lines for the most recent ionic step
+        # with converged electronic SCF
+        search_from = len(lines) - 1
+        while search_from > 0:
+            f_idx = None
+            for i in range(search_from, -1, -1):
+                if 'F=' in lines[i]:
+                    f_idx = i
+                    break
+
+            if f_idx is None or f_idx < 1:
+                return False, None
+
+            # Extract total energy from F= line
+            f_line = lines[f_idx]
+            try:
+                f_pos = f_line.index('F=')
+                energy_str = f_line[f_pos + 2:].split()[0]
+                total_energy = float(energy_str)
+            except (ValueError, IndexError):
+                search_from = f_idx - 1
+                continue
+
+            # Check electronic convergence: line before F= is the last
+            # electronic SCF iteration for that ionic step
+            scf_line = lines[f_idx - 1]
+            parts = scf_line.split()
+            if len(parts) >= 2:
+                try:
+                    e_step = int(parts[1])
+                    if e_step < nelm:
+                        return True, total_energy
+                except ValueError:
+                    pass
+
+            # This step's electronic SCF didn't converge, try earlier step
+            search_from = f_idx - 1
+
+        return False, None
+
     except Exception:
-        return False
+        return False, None
 
 
 def load_structures_from_cache(cache_dir):
@@ -288,6 +308,8 @@ def create_vasp_relax_inputs(structure, job_dir):
         'LAECHG': False,
         'LASPH': True,
         'LORBIT': 11,
+        'SYMPREC': 1e-4,
+        'NCORE': 4,
     }
     
     # Override MAGMOM for RE and Co (pymatgen defaults are wrong for intermetallics)
@@ -419,7 +441,9 @@ def check_job_status(slurm_id):
     Check SLURM job status.
     
     Returns:
-        str: 'RUNNING', 'PENDING', 'RELAX_DONE', 'RELAX_FAILED', or None
+        str: 'RUNNING'/'PENDING' (in queue), 'RELAX_DONE' (sacct COMPLETED),
+             'TIMEOUT' (sacct TIMEOUT/CANCELLED), 'RELAX_FAILED' (other sacct),
+             or None (sacct unavailable)
     """
     if slurm_id is None:
         return None
@@ -587,13 +611,7 @@ def update_job_status(db):
                 print(f"    {mp_id}: RELAX_FAILED (electronic not converged)")
                 failed += 1
         
-        elif slurm_status == 'RELAX_FAILED':
-            sdata['state'] = 'RELAX_FAILED'
-            sdata['update_time'] = datetime.now().isoformat()
-            print(f"    {mp_id}: RELAX_FAILED (SLURM job failed)")
-            failed += 1
-        
-        elif slurm_status in ('TIMEOUT', None):
+        elif slurm_status in ('RELAX_FAILED', 'TIMEOUT', None):
             relax_dir = Path(sdata['relax_dir'])
             
             if slurm_status is None:
@@ -620,8 +638,10 @@ def update_job_status(db):
                     failed += 1
                     continue
             
-            # Timeout detected from sacct or inferred from .err file
-            is_timeout = slurm_status == 'TIMEOUT'
+            # Check for timeout: sacct may report TIMEOUT, CANCELLED, or
+            # even FAILED depending on SLURM version/config -- always check
+            # the .err file as a fallback.
+            is_timeout = (slurm_status == 'TIMEOUT')
             
             if not is_timeout:
                 err_files = list(relax_dir.glob('vasp_*.err'))
@@ -642,40 +662,24 @@ def update_job_status(db):
                     sdata['update_time'] = datetime.now().isoformat()
                     print(f"    {mp_id}: RELAX_FAILED (timeout, CONTCAR missing/empty)")
                     failed += 1
-                elif check_electronic_convergence_oszicar(relax_dir):
+                    continue
+
+                converged, total_energy = check_electronic_convergence_oszicar(relax_dir)
+                if converged and total_energy is not None:
                     try:
-                        outcar_path = relax_dir / 'OUTCAR'
-                        with open(outcar_path, 'r') as f:
-                            outcar_lines = f.readlines()
+                        structure = Structure.from_file(str(contcar_path))
+                        n_atoms = len(structure)
+                        energy_per_atom = total_energy / n_atoms
                         
-                        final_energy = None
-                        for line in reversed(outcar_lines):
-                            if 'free  energy   TOTEN' in line or 'energy  without entropy' in line:
-                                try:
-                                    final_energy = float(line.split()[4])
-                                    break
-                                except (IndexError, ValueError):
-                                    continue
-                        
-                        if final_energy is not None:
-                            structure = Structure.from_file(str(contcar_path))
-                            n_atoms = len(structure)
-                            energy_per_atom = final_energy / n_atoms
-                            
-                            sdata['state'] = 'RELAX_TMOUT'
-                            sdata['vasp_energy_per_atom'] = energy_per_atom
-                            sdata['update_time'] = datetime.now().isoformat()
-                            print(f"    {mp_id}: RELAX_TMOUT (E={energy_per_atom:.6f} eV/atom)")
-                            completed += 1
-                        else:
-                            sdata['state'] = 'RELAX_FAILED'
-                            sdata['update_time'] = datetime.now().isoformat()
-                            print(f"    {mp_id}: RELAX_FAILED (timeout, could not extract energy)")
-                            failed += 1
+                        sdata['state'] = 'RELAX_TMOUT'
+                        sdata['vasp_energy_per_atom'] = energy_per_atom
+                        sdata['update_time'] = datetime.now().isoformat()
+                        print(f"    {mp_id}: RELAX_TMOUT (E={energy_per_atom:.6f} eV/atom)")
+                        completed += 1
                     except Exception as e:
                         sdata['state'] = 'RELAX_FAILED'
                         sdata['update_time'] = datetime.now().isoformat()
-                        print(f"    {mp_id}: RELAX_FAILED (timeout, error parsing OUTCAR: {e})")
+                        print(f"    {mp_id}: RELAX_FAILED (timeout, error reading CONTCAR: {e})")
                         failed += 1
                 else:
                     sdata['state'] = 'RELAX_FAILED'
@@ -685,7 +689,7 @@ def update_job_status(db):
             else:
                 sdata['state'] = 'RELAX_FAILED'
                 sdata['update_time'] = datetime.now().isoformat()
-                print(f"    {mp_id}: RELAX_FAILED (crash or terminated without completion)")
+                print(f"    {mp_id}: RELAX_FAILED (SLURM: {slurm_status or 'unknown'})")
                 failed += 1
     
     return completed, failed

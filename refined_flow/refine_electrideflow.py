@@ -504,7 +504,8 @@ if [ ! -f "CONTCAR" ] || [ ! -s "CONTCAR" ]; then
     exit 1
 fi
 
-# Check electronic convergence from OSZICAR (last ionic step)
+# Check electronic convergence from OSZICAR (search backwards for last
+# converged ionic step, handles killed-mid-electronic-SCF case)
 echo ""
 echo "Checking electronic convergence (OSZICAR)..."
 if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
@@ -514,23 +515,24 @@ if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
     exit 1
 fi
 
-LAST_LINE=$(tail -n 1 OSZICAR)
-SECOND_LAST=$(tail -n 2 OSZICAR | head -n 1)
-
-if echo "$LAST_LINE" | grep -q "F="; then
-    ESTEP=$(echo "$SECOND_LAST" | awk '{{print $2}}')
-    NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
-    NELM_VAL=${{NELM_VAL:-60}}
-    if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
-        echo "  Electronic SCF converged in step 1 (e-steps: $ESTEP < NELM=$NELM_VAL)"
-    else
-        echo "ERROR: Electronic SCF did not converge in step 1 (e-steps: $ESTEP >= NELM=$NELM_VAL)"
-        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
-        touch VASP_FAILED
-        exit 1
-    fi
-else
-    echo "ERROR: OSZICAR last line does not contain ionic step summary (F=)"
+NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
+NELM_VAL=${{NELM_VAL:-60}}
+CONVERGED=0
+F_LINES=$(grep -n "F=" OSZICAR | tac)
+if [ -n "$F_LINES" ]; then
+    while IFS=: read -r FNUM REST; do
+        SCF_NUM=$((FNUM - 1))
+        [ "$SCF_NUM" -lt 1 ] && continue
+        ESTEP=$(sed -n "${{SCF_NUM}}p" OSZICAR | awk '{{print $2}}')
+        if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
+            echo "  Electronic SCF converged in step 1 (e-steps: $ESTEP < NELM=$NELM_VAL)"
+            CONVERGED=1
+            break
+        fi
+    done <<< "$F_LINES"
+fi
+if [ "$CONVERGED" -ne 1 ]; then
+    echo "ERROR: No ionic step with converged electronic SCF found in step 1"
     rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
@@ -587,7 +589,8 @@ if [ ! -f "CONTCAR" ] || [ ! -s "CONTCAR" ]; then
     exit 1
 fi
 
-# Check electronic convergence from OSZICAR (last ionic step)
+# Check electronic convergence from OSZICAR (search backwards for last
+# converged ionic step, handles killed-mid-electronic-SCF case)
 echo ""
 echo "Checking electronic convergence (OSZICAR)..."
 if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
@@ -597,23 +600,24 @@ if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
     exit 1
 fi
 
-LAST_LINE=$(tail -n 1 OSZICAR)
-SECOND_LAST=$(tail -n 2 OSZICAR | head -n 1)
-
-if echo "$LAST_LINE" | grep -q "F="; then
-    ESTEP=$(echo "$SECOND_LAST" | awk '{{print $2}}')
-    NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
-    NELM_VAL=${{NELM_VAL:-60}}
-    if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
-        echo "  Electronic SCF converged in step 2 (e-steps: $ESTEP < NELM=$NELM_VAL)"
-    else
-        echo "ERROR: Electronic SCF did not converge in step 2 (e-steps: $ESTEP >= NELM=$NELM_VAL)"
-        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
-        touch VASP_FAILED
-        exit 1
-    fi
-else
-    echo "ERROR: OSZICAR last line does not contain ionic step summary (F=)"
+NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
+NELM_VAL=${{NELM_VAL:-60}}
+CONVERGED=0
+F_LINES=$(grep -n "F=" OSZICAR | tac)
+if [ -n "$F_LINES" ]; then
+    while IFS=: read -r FNUM REST; do
+        SCF_NUM=$((FNUM - 1))
+        [ "$SCF_NUM" -lt 1 ] && continue
+        ESTEP=$(sed -n "${{SCF_NUM}}p" OSZICAR | awk '{{print $2}}')
+        if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
+            echo "  Electronic SCF converged in step 2 (e-steps: $ESTEP < NELM=$NELM_VAL)"
+            CONVERGED=1
+            break
+        fi
+    done <<< "$F_LINES"
+fi
+if [ "$CONVERGED" -ne 1 ]; then
+    echo "ERROR: No ionic step with converged electronic SCF found in step 2"
     rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1
@@ -677,7 +681,8 @@ if [ ! -f "CONTCAR" ] || [ ! -s "CONTCAR" ]; then
     exit 1
 fi
 
-# Check electronic convergence from OSZICAR (last ionic step)
+# Check electronic convergence from OSZICAR (search backwards for last
+# converged ionic step, handles killed-mid-electronic-SCF case)
 echo ""
 echo "Checking electronic convergence (OSZICAR)..."
 if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
@@ -687,23 +692,24 @@ if [ ! -f "OSZICAR" ] || [ ! -s "OSZICAR" ]; then
     exit 1
 fi
 
-LAST_LINE=$(tail -n 1 OSZICAR)
-SECOND_LAST=$(tail -n 2 OSZICAR | head -n 1)
-
-if echo "$LAST_LINE" | grep -q "F="; then
-    ESTEP=$(echo "$SECOND_LAST" | awk '{{print $2}}')
-    NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
-    NELM_VAL=${{NELM_VAL:-60}}
-    if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
-        echo "  Electronic SCF converged in step 3 (e-steps: $ESTEP < NELM=$NELM_VAL)"
-    else
-        echo "ERROR: Electronic SCF did not converge in step 3 (e-steps: $ESTEP >= NELM=$NELM_VAL)"
-        rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
-        touch VASP_FAILED
-        exit 1
-    fi
-else
-    echo "ERROR: OSZICAR last line does not contain ionic step summary (F=)"
+NELM_VAL=$(grep -m1 'NELM' INCAR | awk -F'=' '{{print $2}}' | awk '{{print $1}}')
+NELM_VAL=${{NELM_VAL:-60}}
+CONVERGED=0
+F_LINES=$(grep -n "F=" OSZICAR | tac)
+if [ -n "$F_LINES" ]; then
+    while IFS=: read -r FNUM REST; do
+        SCF_NUM=$((FNUM - 1))
+        [ "$SCF_NUM" -lt 1 ] && continue
+        ESTEP=$(sed -n "${{SCF_NUM}}p" OSZICAR | awk '{{print $2}}')
+        if [ "$ESTEP" -lt "$NELM_VAL" ] 2>/dev/null; then
+            echo "  Electronic SCF converged in step 3 (e-steps: $ESTEP < NELM=$NELM_VAL)"
+            CONVERGED=1
+            break
+        fi
+    done <<< "$F_LINES"
+fi
+if [ "$CONVERGED" -ne 1 ]; then
+    echo "ERROR: No ionic step with converged electronic SCF found in step 3"
     rm -f CHGCAR CHG WAVECAR vasprun.xml WFULL AECCAR* TMPCAR 2>/dev/null
     touch VASP_FAILED
     exit 1

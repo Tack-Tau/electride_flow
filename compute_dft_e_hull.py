@@ -108,67 +108,65 @@ def get_vasp_energy_from_relax(relax_dir):
             print(f"    Warning: Could not parse vasprun.xml: {e}")
             print(f"    Trying OUTCAR fallback...")
     
-    # Fallback: Try OSZICAR convergence check + OUTCAR energy + CONTCAR structure
+    # Fallback: Try OSZICAR convergence check + energy + CONTCAR structure
     oszicar_path = relax_dir / 'OSZICAR'
     incar_path = relax_dir / 'INCAR'
     
-    if outcar_path.exists():
+    if oszicar_path.exists():
         try:
-            # Check electronic convergence from OSZICAR (last ionic step)
-            electronic_converged = False
-            if oszicar_path.exists():
-                nelm = 60
-                if incar_path.exists():
-                    try:
-                        with open(incar_path, 'r') as f:
-                            for line in f:
-                                if 'NELM' in line and '=' in line:
-                                    val = line.split('=')[1].split()[0].strip()
-                                    nelm = int(val)
-                                    break
-                    except Exception:
-                        pass
-                
-                with open(oszicar_path, 'r') as f:
-                    lines = [l.rstrip() for l in f.readlines() if l.strip()]
-                
-                if len(lines) >= 2:
-                    last_line = lines[-1]
-                    second_last = lines[-2]
-                    if 'F=' in last_line:
-                        parts = second_last.split()
-                        if len(parts) >= 2:
-                            try:
-                                e_step = int(parts[1])
-                                electronic_converged = e_step < nelm
-                            except ValueError:
-                                pass
+            nelm = 60
+            if incar_path.exists():
+                try:
+                    with open(incar_path, 'r') as f:
+                        for line in f:
+                            if 'NELM' in line and '=' in line:
+                                val = line.split('=')[1].split()[0].strip()
+                                nelm = int(val)
+                                break
+                except Exception:
+                    pass
             
-            if not electronic_converged:
+            with open(oszicar_path, 'r') as f:
+                lines = [l.rstrip() for l in f.readlines() if l.strip()]
+            
+            # Search backwards for the most recent ionic step with converged electronic SCF
+            converged = False
+            total_energy = None
+            if len(lines) >= 2:
+                search_from = len(lines) - 1
+                while search_from > 0:
+                    f_idx = None
+                    for i in range(search_from, -1, -1):
+                        if 'F=' in lines[i]:
+                            f_idx = i
+                            break
+                    if f_idx is None or f_idx < 1:
+                        break
+                    try:
+                        f_pos = lines[f_idx].index('F=')
+                        energy_str = lines[f_idx][f_pos + 2:].split()[0]
+                        energy = float(energy_str)
+                    except (ValueError, IndexError):
+                        search_from = f_idx - 1
+                        continue
+                    parts = lines[f_idx - 1].split()
+                    if len(parts) >= 2:
+                        try:
+                            e_step = int(parts[1])
+                            if e_step < nelm:
+                                converged = True
+                                total_energy = energy
+                                break
+                        except ValueError:
+                            pass
+                    search_from = f_idx - 1
+            
+            if not converged or total_energy is None:
                 print(f"    Warning: VASP electronic SCF not converged (from OSZICAR)")
                 return None, None
             
-            # Extract final energy from OUTCAR
-            final_energy = None
-            with open(outcar_path, 'r') as f:
-                for line in f:
-                    if 'free energy    TOTEN' in line:
-                        try:
-                            parts = line.split('=')
-                            if len(parts) >= 2:
-                                energy_str = parts[1].split()[0]
-                                # Handle overflow markers like '*******'
-                                if '*' in energy_str:
-                                    continue
-                                final_energy = float(energy_str)
-                                # Check for float overflow
-                                if not np.isfinite(final_energy):
-                                    final_energy = None
-                        except (ValueError, IndexError):
-                            continue
-            
-            if final_energy is None:
-                print(f"    Warning: Could not extract energy from OUTCAR")
+            if not np.isfinite(total_energy):
+                print(f"    Warning: Float overflow in OSZICAR energy")
                 return None, None
             
             if not contcar_path.exists():
@@ -178,20 +176,19 @@ def get_vasp_energy_from_relax(relax_dir):
             from pymatgen.core import Structure
             structure = Structure.from_file(str(contcar_path))
             n_atoms = len(structure)
-            energy_per_atom = final_energy / n_atoms
+            energy_per_atom = total_energy / n_atoms
             
-            # Check for float overflow in energy_per_atom
             if not np.isfinite(energy_per_atom):
-                print(f"    Warning: Float overflow in energy_per_atom calculation from OUTCAR")
+                print(f"    Warning: Float overflow in energy_per_atom calculation from OSZICAR")
                 return None, None
             
-            print(f"    Energy extracted from OUTCAR (vasprun.xml not available)")
+            print(f"    Energy extracted from OSZICAR (vasprun.xml not available)")
             return energy_per_atom, structure
             
         except Exception as e:
-            print(f"    Error parsing OUTCAR: {e}")
+            print(f"    Error parsing OSZICAR fallback: {e}")
             return None, None
-    print(f"    Error: Neither vasprun.xml nor OUTCAR found/readable")
+    print(f"    Error: Neither vasprun.xml nor OSZICAR found/readable")
     return None, None
 
 
