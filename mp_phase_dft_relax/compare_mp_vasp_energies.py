@@ -89,28 +89,25 @@ def load_mp_energies_from_json(json_path):
 
 def check_electronic_convergence_oszicar(relax_dir):
     """
-    Check electronic convergence of the LAST ionic step from OSZICAR.
-    
-    Reads the last 2 non-empty lines of OSZICAR:
-    - Last line: ionic step summary containing "F= ..."
-    - Second-to-last line: last electronic SCF iteration (e.g. "RMM:  12 ...")
-    
-    If the electronic step count < NELM (read from INCAR), the electronic
-    SCF converged for the final ionic step.
-    
+    Check electronic convergence from OSZICAR and return energy.
+
+    Searches backwards through ionic steps (F= lines) to find the most recent
+    one with converged electronic SCF (iteration count < NELM). Returns the
+    energy from that step for reliable timeout recovery.
+
     Args:
         relax_dir: Path to VASP relaxation directory (contains OSZICAR and INCAR)
-    
+
     Returns:
-        bool: True if electronic convergence was achieved in the last ionic step
+        tuple: (converged: bool, total_energy: float or None)
     """
     relax_dir = Path(relax_dir)
     oszicar_path = relax_dir / 'OSZICAR'
     incar_path = relax_dir / 'INCAR'
-    
+
     if not oszicar_path.exists():
-        return False
-    
+        return False, None
+
     nelm = 60
     if incar_path.exists():
         try:
@@ -122,67 +119,50 @@ def check_electronic_convergence_oszicar(relax_dir):
                         break
         except Exception:
             pass
-    
+
     try:
         with open(oszicar_path, 'r') as f:
             lines = [l.rstrip() for l in f.readlines() if l.strip()]
-        
+
         if len(lines) < 2:
-            return False
-        
-        last_line = lines[-1]
-        second_last = lines[-2]
-        
-        if 'F=' not in last_line:
-            return False
-        
-        parts = second_last.split()
-        if len(parts) < 2:
-            return False
-        
-        try:
-            e_step = int(parts[1])
-        except ValueError:
-            return False
-        
-        return e_step < nelm
-        
-    except Exception:
-        return False
+            return False, None
 
-
-def extract_energy_from_outcar(outcar_path):
-    """
-    Extract final energy from OUTCAR file.
-    
-    Used for timed-out jobs where vasprun.xml is incomplete. Searches for the
-    last occurrence of "free energy TOTEN" or "energy without entropy".
-    
-    Args:
-        outcar_path: Path to OUTCAR file
-    
-    Returns:
-        float or None: Final energy (total, not per atom) or None if not found
-    """
-    if not outcar_path.exists():
-        return None
-    
-    try:
-        with open(outcar_path, 'r') as f:
-            outcar_lines = f.readlines()
-        
-        final_energy = None
-        for line in reversed(outcar_lines):
-            if 'free  energy   TOTEN' in line or 'energy  without entropy' in line:
-                try:
-                    final_energy = float(line.split()[4])
+        search_from = len(lines) - 1
+        while search_from > 0:
+            f_idx = None
+            for i in range(search_from, -1, -1):
+                if 'F=' in lines[i]:
+                    f_idx = i
                     break
-                except (IndexError, ValueError):
-                    continue
-                
-        return final_energy
+
+            if f_idx is None or f_idx < 1:
+                return False, None
+
+            f_line = lines[f_idx]
+            try:
+                f_pos = f_line.index('F=')
+                energy_str = f_line[f_pos + 2:].split()[0]
+                total_energy = float(energy_str)
+            except (ValueError, IndexError):
+                search_from = f_idx - 1
+                continue
+
+            scf_line = lines[f_idx - 1]
+            parts = scf_line.split()
+            if len(parts) >= 2:
+                try:
+                    e_step = int(parts[1])
+                    if e_step < nelm:
+                        return True, total_energy
+                except ValueError:
+                    pass
+
+            search_from = f_idx - 1
+
+        return False, None
+
     except Exception:
-        return None
+        return False, None
 
 
 def check_vasp_convergence(relax_dir):
@@ -209,7 +189,8 @@ def check_vasp_convergence(relax_dir):
             pass
     
     # Fall back to OSZICAR (timeout case)
-    return check_electronic_convergence_oszicar(relax_dir)
+    converged, _ = check_electronic_convergence_oszicar(relax_dir)
+    return converged
 
 
 def analyze_energy_differences(db, mp_energies, check_convergence=True, outlier_threshold=0.5):
@@ -238,25 +219,23 @@ def analyze_energy_differences(db, mp_energies, check_convergence=True, outlier_
         vasp_energy_per_atom = sdata.get('vasp_energy_per_atom')
         
         if vasp_energy_per_atom is None and sdata.get('relax_dir'):
-            # Try to extract from OUTCAR (timeout case)
             relax_dir = Path(sdata['relax_dir'])
-            outcar_path = relax_dir / 'OUTCAR'
             contcar_path = relax_dir / 'CONTCAR'
             
-            if outcar_path.exists() and contcar_path.exists():
+            if contcar_path.exists():
                 try:
                     from pymatgen.core import Structure
                     
-                    final_energy = extract_energy_from_outcar(outcar_path)
-                    if final_energy is not None:
+                    converged, total_energy = check_electronic_convergence_oszicar(relax_dir)
+                    if converged and total_energy is not None:
                         structure = Structure.from_file(str(contcar_path))
                         n_atoms = len(structure)
-                        vasp_energy_per_atom = final_energy / n_atoms
+                        vasp_energy_per_atom = total_energy / n_atoms
                         sdata['vasp_energy_per_atom'] = vasp_energy_per_atom
                         recovered_from_outcar.append(mp_id)
-                        print(f"  INFO: Recovered {mp_id} energy from OUTCAR (timed out)")
+                        print(f"  INFO: Recovered {mp_id} energy from OSZICAR (timed out)")
                 except Exception as e:
-                    print(f"  WARNING: Could not extract {mp_id} energy from OUTCAR: {e}")
+                    print(f"  WARNING: Could not extract {mp_id} energy from OSZICAR: {e}")
         
         if vasp_energy_per_atom is None:
             skipped_no_energy.append(mp_id)
@@ -301,68 +280,54 @@ def analyze_energy_differences(db, mp_energies, check_convergence=True, outlier_
     abs_diffs = [abs_diff for _, _, abs_diff, _ in all_diffs]
     q25, q75 = np.percentile(abs_diffs, [25, 75])
     iqr = q75 - q25
-    outlier_threshold_iqr = q75 + 3 * iqr  # 3*IQR above Q3
-    
-    # Also use absolute threshold
+    outlier_threshold_iqr = q75 + 3 * iqr
     outlier_threshold_abs = outlier_threshold
     
-    # Filter outliers
-    skipped_outliers = []
-    filtered_diffs = []
-    
-    for mp_id, diff, abs_diff, sdata in all_diffs:
-        # Check both statistical and absolute thresholds
-        if abs_diff > outlier_threshold_iqr or abs_diff > outlier_threshold_abs:
-            skipped_outliers.append({
-                'mp_id': mp_id,
-                'formula': sdata['formula'],
-                'mp_energy': sdata['mp_energy_per_atom'],
-                'vasp_energy': sdata['vasp_energy_per_atom'],
-                'diff': diff,
-                'abs_diff': abs_diff
-            })
-            print(f"  WARNING: Excluding outlier {mp_id} ({sdata['formula']}): "
-                  f"Δ = {diff:+.4f} eV/atom (|Δ| = {abs_diff:.4f})")
-        else:
-            filtered_diffs.append((mp_id, diff, abs_diff, sdata))
-    
-    if skipped_outliers:
-        print(f"\n  Filtered out {len(skipped_outliers)} statistical outliers "
-              f"(|Δ| > {outlier_threshold:.2f} eV/atom or > Q3+3*IQR)")
-    
-    print(f"  Analyzing {len(filtered_diffs)} structures after filtering\n")
-    
-    # Calculate differences from filtered data
+    # Build structures list with is_outlier flag
     diffs = []
     by_chemsys = defaultdict(list)
+    n_outliers = 0
     
-    for mp_id, diff, abs_diff, sdata in filtered_diffs:
-        mp_e = sdata['mp_energy_per_atom']
-        vasp_e = sdata['vasp_energy_per_atom']
-        
+    for mp_id, diff, abs_diff, sdata in all_diffs:
+        is_outlier = abs_diff > outlier_threshold_iqr or abs_diff > outlier_threshold_abs
         diffs.append({
             'mp_id': mp_id,
             'chemsys': sdata['chemsys'],
             'formula': sdata['formula'],
-            'mp_energy': mp_e,
-            'vasp_energy': vasp_e,
+            'mp_energy': sdata['mp_energy_per_atom'],
+            'vasp_energy': sdata['vasp_energy_per_atom'],
             'diff': diff,
-            'abs_diff': abs_diff
+            'abs_diff': abs_diff,
+            'is_outlier': is_outlier,
         })
-        
-        by_chemsys[sdata['chemsys']].append(diff)
+        if is_outlier:
+            n_outliers += 1
+            print(f"  WARNING: Excluding outlier {mp_id} ({sdata['formula']}): "
+                  f"Δ = {diff:+.4f} eV/atom (|Δ| = {abs_diff:.4f})")
+        else:
+            by_chemsys[sdata['chemsys']].append(diff)
     
-    # Overall statistics (after filtering)
-    diff_values = [d['diff'] for d in diffs]
-    abs_diff_values = [d['abs_diff'] for d in diffs]
+    if n_outliers:
+        print(f"\n  Flagged {n_outliers} statistical outliers "
+              f"(|Δ| > {outlier_threshold:.2f} eV/atom or > Q3+3*IQR)")
+    
+    n_non_outlier = len(diffs) - n_outliers
+    print(f"  Analyzing {n_non_outlier} structures after filtering\n")
+    
+    # Statistics on non-outliers only
+    non_outlier = [d for d in diffs if not d['is_outlier']]
+    diff_values = [d['diff'] for d in non_outlier]
+    abs_diff_values = [d['abs_diff'] for d in non_outlier]
     
     stats = {
-        'n_structures': len(diffs),
+        'n_structures': n_non_outlier,
+        'n_total': len(diffs),
         'n_recovered_from_outcar': len(recovered_from_outcar),
         'n_skipped_no_energy': len(skipped_no_energy),
         'n_skipped_not_converged': len(skipped_not_converged),
-        'n_skipped_outliers': len(skipped_outliers),
+        'n_outliers': n_outliers,
         'outlier_threshold': outlier_threshold,
+        'outlier_threshold_iqr': round(float(outlier_threshold_iqr), 6),
         'mean_diff': np.mean(diff_values),
         'std_diff': np.std(diff_values),
         'mae': np.mean(abs_diff_values),
@@ -374,7 +339,7 @@ def analyze_energy_differences(db, mp_energies, check_convergence=True, outlier_
         'q75': np.percentile(diff_values, 75)
     }
     
-    # Per-chemsys statistics
+    # Per-chemsys statistics (non-outliers only)
     chemsys_stats = {}
     for chemsys, chemsys_diffs in by_chemsys.items():
         chemsys_stats[chemsys] = {
@@ -392,143 +357,119 @@ def analyze_energy_differences(db, mp_energies, check_convergence=True, outlier_
         'recovered_from_outcar': recovered_from_outcar,
         'skipped_no_energy': skipped_no_energy,
         'skipped_not_converged': skipped_not_converged,
-        'skipped_outliers': skipped_outliers
     }
 
 
 def plot_energy_comparison(results, output_prefix='mp_vasp_comparison'):
-    """
-    Create scatter plot comparing MP vs VASP energies.
-    
-    Args:
-        results: Analysis results dictionary
-        output_prefix: Prefix for output files
+    """Create scatter and residual plots comparing MP vs VASP energies.
+
+    Outliers (is_outlier=True) are plotted in a distinct color.
+    Statistics in the legend box are computed on non-outlier points only.
     """
     structures = results['structures']
     stats = results['stats']
-    
-    # Extract data
-    vasp_energies = np.array([s['vasp_energy'] for s in structures])
-    mp_energies = np.array([s['mp_energy'] for s in structures])
-    formulas = [s['formula'] for s in structures]
-    
-    # Create figure
+
+    normal = [s for s in structures if not s['is_outlier']]
+    outliers = [s for s in structures if s['is_outlier']]
+
+    vasp_n = np.array([s['vasp_energy'] for s in normal])
+    mp_n = np.array([s['mp_energy'] for s in normal])
+    vasp_o = np.array([s['vasp_energy'] for s in outliers]) if outliers else np.array([])
+    mp_o = np.array([s['mp_energy'] for s in outliers]) if outliers else np.array([])
+
+    all_vasp = np.concatenate([vasp_n, vasp_o]) if len(vasp_o) else vasp_n
+    all_mp = np.concatenate([mp_n, mp_o]) if len(mp_o) else mp_n
+    all_e = np.concatenate([all_vasp, all_mp])
+    margin = (all_e.max() - all_e.min()) * 0.05
+    plot_min, plot_max = all_e.min() - margin, all_e.max() + margin
+
+    # --- Scatter plot ---
     fig, ax = plt.subplots(figsize=(12, 10))
-    
-    # Scatter plot
-    ax.scatter(vasp_energies, mp_energies, alpha=0.6, s=50, c='steelblue', edgecolors='black', linewidth=0.5)
-    
-    # Perfect agreement line (y = x)
-    all_energies = np.concatenate([vasp_energies, mp_energies])
-    energy_min, energy_max = all_energies.min(), all_energies.max()
-    margin = (energy_max - energy_min) * 0.05
-    plot_min, plot_max = energy_min - margin, energy_max + margin
-    
-    ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--', linewidth=2, alpha=0.7, 
-            label='Perfect agreement (y=x)')
-    
-    # Add error bands (±0.05 eV/atom)
-    ax.fill_between([plot_min, plot_max], 
-                     [plot_min - 0.05, plot_max - 0.05],
-                     [plot_min + 0.05, plot_max + 0.05],
-                     alpha=0.2, color='green', label='±0.05 eV/atom')
-    
-    # Labels and title
+
+    ax.scatter(vasp_n, mp_n, alpha=0.6, s=50, c='steelblue',
+               edgecolors='black', linewidth=0.5,
+               label=f'Non-outlier (N={len(normal)})', zorder=3)
+    if len(vasp_o):
+        ax.scatter(vasp_o, mp_o, alpha=0.7, s=50, c='#d62728', marker='x',
+                   linewidth=1.2, label=f'Outlier (N={len(outliers)})', zorder=4)
+
+    ax.plot([plot_min, plot_max], [plot_min, plot_max], 'r--', linewidth=2,
+            alpha=0.7, label='Perfect agreement (y=x)')
+    ax.fill_between([plot_min, plot_max],
+                    [plot_min - 0.05, plot_max - 0.05],
+                    [plot_min + 0.05, plot_max + 0.05],
+                    alpha=0.2, color='green', label='±0.05 eV/atom')
+
     ax.set_xlabel('VASP PBE Energy per Atom (eV)', fontsize=12, fontweight='bold')
     ax.set_ylabel('MP GGA-PBE Energy per Atom (eV)', fontsize=12, fontweight='bold')
-    n_skipped_conv = stats.get('n_skipped_not_converged', 0)
-    n_skipped_outliers = stats.get('n_skipped_outliers', 0)
-    title_suffix = f' (Pure GGA-PBE, N={stats["n_structures"]}'
-    if n_skipped_conv > 0 or n_skipped_outliers > 0:
-        title_suffix += ', excluded:'
-        if n_skipped_conv > 0:
-            title_suffix += f' {n_skipped_conv} non-converged'
-        if n_skipped_outliers > 0:
-            if n_skipped_conv > 0:
-                title_suffix += ','
-            title_suffix += f' {n_skipped_outliers} outliers'
-    title_suffix += ')'
-    ax.set_title(f'MP vs VASP DFT Energy Comparison\n{title_suffix}', 
+    ax.set_title(f'MP vs VASP DFT Energy Comparison\n'
+                 f'(Pure GGA-PBE, N={stats["n_structures"]}, '
+                 f'{stats["n_outliers"]} outliers)',
                  fontsize=14, fontweight='bold')
-    
-    # Add statistics text box
+
     stats_text = (
-        f"N = {stats['n_structures']}\n"
+        f"N = {stats['n_structures']} (excl. outliers)\n"
         f"MAE = {stats['mae']:.4f} eV/atom\n"
         f"RMSE = {stats['rmse']:.4f} eV/atom\n"
         f"Mean Diff = {stats['mean_diff']:+.4f} eV/atom\n"
         f"Std Diff = {stats['std_diff']:.4f} eV/atom"
     )
     ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=10,
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    
-    # Grid and legend
+            verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.minorticks_on()
     ax.grid(True, which='minor', alpha=0.15, linestyle=':')
     ax.legend(loc='lower right', fontsize=10)
-    
-    # Equal aspect ratio
     ax.set_aspect('equal', adjustable='box')
     ax.set_xlim(plot_min, plot_max)
     ax.set_ylim(plot_min, plot_max)
-    
-    # Save figure
+
     plt.tight_layout()
     plot_file = f"{output_prefix}_scatter.png"
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     print(f"\nScatter plot saved to: {plot_file}")
     plt.close()
-    
-    # Create residual plot
+
+    # --- Residual plot ---
     fig, ax = plt.subplots(figsize=(12, 10))
-    
-    # Residual vs VASP energy
-    residuals = vasp_energies - mp_energies
-    ax.scatter(vasp_energies, residuals, alpha=0.6, s=50, c='steelblue', edgecolors='black', linewidth=0.5)
-    
-    # Reference lines
-    ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7, label='Zero residual')
-    ax.axhline(y=0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6, label='±0.05 eV/atom')
+
+    res_n = vasp_n - mp_n
+    ax.scatter(vasp_n, res_n, alpha=0.6, s=50, c='steelblue',
+               edgecolors='black', linewidth=0.5,
+               label=f'Non-outlier (N={len(normal)})', zorder=3)
+    if len(vasp_o):
+        res_o = vasp_o - mp_o
+        ax.scatter(vasp_o, res_o, alpha=0.7, s=50, c='#d62728', marker='x',
+                   linewidth=1.2, label=f'Outlier (N={len(outliers)})', zorder=4)
+    else:
+        res_o = np.array([])
+
+    ax.axhline(y=0, color='r', linestyle='--', linewidth=2, alpha=0.7,
+               label='Zero residual')
+    ax.axhline(y=0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6,
+               label='±0.05 eV/atom')
     ax.axhline(y=-0.05, color='green', linestyle=':', linewidth=1.5, alpha=0.6)
-    
-    # Mean residual line
-    ax.axhline(y=stats['mean_diff'], color='orange', linestyle='-', linewidth=2, 
+    ax.axhline(y=stats['mean_diff'], color='orange', linestyle='-', linewidth=2,
                alpha=0.7, label=f'Mean = {stats["mean_diff"]:+.4f} eV/atom')
-    
-    # Labels and title
+
     ax.set_xlabel('VASP PBE Energy per Atom (eV)', fontsize=12, fontweight='bold')
     ax.set_ylabel('Residual (VASP - MP) (eV/atom)', fontsize=12, fontweight='bold')
-    n_skipped_conv = stats.get('n_skipped_not_converged', 0)
-    n_skipped_outliers = stats.get('n_skipped_outliers', 0)
-    title_suffix = f' (Pure GGA-PBE, N={stats["n_structures"]}'
-    if n_skipped_conv > 0 or n_skipped_outliers > 0:
-        title_suffix += ', excluded:'
-        if n_skipped_conv > 0:
-            title_suffix += f' {n_skipped_conv} non-converged'
-        if n_skipped_outliers > 0:
-            if n_skipped_conv > 0:
-                title_suffix += ','
-            title_suffix += f' {n_skipped_outliers} outliers'
-    title_suffix += ')'
-    ax.set_title(f'Energy Residuals vs VASP Energy\n{title_suffix}', 
+    ax.set_title(f'Energy Residuals vs VASP Energy\n'
+                 f'(Pure GGA-PBE, N={stats["n_structures"]}, '
+                 f'{stats["n_outliers"]} outliers)',
                  fontsize=14, fontweight='bold')
-    
-    # Set focused Y-axis range based on data
-    residual_range = max(abs(residuals.min()), abs(residuals.max()))
-    # Use ±0.15 eV/atom or 1.5x the max residual, whichever is larger
-    y_limit = max(0.15, residual_range * 1.5)
+
+    all_res = np.concatenate([res_n, res_o]) if len(res_o) else res_n
+    y_limit = max(0.15, np.max(np.abs(all_res)) * 1.2)
     ax.set_ylim(-y_limit, y_limit)
-    
-    # Grid with minor ticks
+
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.minorticks_on()
     ax.grid(True, which='minor', alpha=0.15, linestyle=':')
-    
-    # Legend
     ax.legend(loc='best', fontsize=10)
-    
-    # Save figure
+
     plt.tight_layout()
     residual_file = f"{output_prefix}_residuals.png"
     plt.savefig(residual_file, dpi=300, bbox_inches='tight')
@@ -550,8 +491,8 @@ def print_summary(results):
         print(f"Skipped (no energy): {stats['n_skipped_no_energy']}")
     if stats.get('n_skipped_not_converged', 0) > 0:
         print(f"Skipped (not converged): {stats['n_skipped_not_converged']}")
-    if stats.get('n_skipped_outliers', 0) > 0:
-        print(f"Skipped (statistical outliers): {stats['n_skipped_outliers']}")
+    if stats.get('n_outliers', 0) > 0:
+        print(f"Outliers (flagged): {stats['n_outliers']}")
     print(f"MAE:  {stats['mae']:.4f} eV/atom")
     print(f"RMSE: {stats['rmse']:.4f} eV/atom")
     print(f"Mean: {stats['mean_diff']:+.4f} eV/atom")
@@ -568,19 +509,20 @@ def save_detailed_comparison(results, output_file, mp_energies_file):
         'mp_field_used': 'energy_per_atom (uncorrected GGA-PBE energy, raw DFT)',
         'convergence_check': 'Only converged VASP calculations included (checks vasprun.xml, falls back to OUTCAR for timeouts)',
         'timeout_handling': 'Timed-out jobs with electronic convergence recovered from OUTCAR',
-        'outlier_detection': 'Statistical outliers excluded using IQR method and absolute threshold',
+        'outlier_detection': 'Statistical outliers flagged (is_outlier field) using IQR method and absolute threshold',
         'outlier_threshold': results['stats'].get('outlier_threshold', 0.5),
+        'outlier_threshold_iqr': results['stats'].get('outlier_threshold_iqr'),
         'n_recovered_from_outcar': results['stats'].get('n_recovered_from_outcar', 0),
         'n_skipped_no_energy': results['stats'].get('n_skipped_no_energy', 0),
         'n_skipped_not_converged': results['stats'].get('n_skipped_not_converged', 0),
-        'n_skipped_outliers': results['stats'].get('n_skipped_outliers', 0)
+        'n_outliers': results['stats'].get('n_outliers', 0)
     }
     
     with open(output_file, 'w') as f:
         json.dump(results, f, indent=2)
     
     print(f"\nDetailed results saved to: {output_file}")
-    print(f"  (MP GGA-PBE from {mp_energies_file.name} vs converged VASP PBE, outliers excluded)")
+    print(f"  (MP GGA-PBE from {mp_energies_file.name} vs converged VASP PBE, outliers flagged)")
 
 
 def main():
