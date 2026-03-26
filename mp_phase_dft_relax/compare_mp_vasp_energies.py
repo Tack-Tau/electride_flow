@@ -289,7 +289,7 @@ def analyze_energy_differences(db, mp_energies, check_convergence=True, outlier_
     n_outliers = 0
     
     for mp_id, diff, abs_diff, sdata in all_diffs:
-        is_outlier = abs_diff > outlier_threshold_iqr or abs_diff > outlier_threshold_abs
+        is_outlier = bool(abs_diff > outlier_threshold_iqr or abs_diff > outlier_threshold_abs)
         diffs.append({
             'mp_id': mp_id,
             'chemsys': sdata['chemsys'],
