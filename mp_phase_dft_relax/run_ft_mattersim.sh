@@ -18,7 +18,8 @@ DEVICE="cuda"
 INCLUDE_STRESSES="--include-stresses"
 DATASET_ONLY=""
 SKIP_FIRST=0
-MAX_FORCE=50.0
+MAX_FORCE=10.0
+MAX_FRAMES_PER_ID=""
 TEST_FRACTION=0.1
 PATIENCE=50
 RE_NORMALIZE=""
@@ -52,7 +53,8 @@ OPTIONS:
     --dataset-only           Only prepare train/val/test XYZ files, skip training
     --test-fraction F        Fraction for test set (default: 0.1)
     --skip-first N           Skip the first N ionic steps per trajectory (default: 0)
-    --max-force F            Skip steps with max |force| > F eV/A (default: 50.0)
+    --max-force F            Skip steps with max |force| > F eV/A (default: 10.0)
+    --max-frames-per-id N    Cap frames per MP-ID by evenly sampling (default: all)
     --patience N             Early stopping patience in epochs (default: 50)
     --re-normalize           Re-normalize energy/force scales to finetuning data
     --eval-only              Only evaluate an existing finetuned model (skip training)
@@ -143,6 +145,10 @@ while [[ $# -gt 0 ]]; do
             MAX_FORCE="$2"
             shift 2
             ;;
+        --max-frames-per-id)
+            MAX_FRAMES_PER_ID="$2"
+            shift 2
+            ;;
         --patience)
             PATIENCE="$2"
             shift 2
@@ -209,6 +215,7 @@ echo "Dataset only: $([ -n "$DATASET_ONLY" ] && echo yes || echo no)"
 echo "Test fraction: ${TEST_FRACTION}"
 echo "Skip first: ${SKIP_FIRST}"
 echo "Max force: ${MAX_FORCE} eV/A"
+echo "Max frames/ID: ${MAX_FRAMES_PER_ID:-all}"
 echo "Patience: ${PATIENCE}"
 echo "Re-normalize: $([ -n "$RE_NORMALIZE" ] && echo yes || echo no)"
 echo "Eval only: $([ -n "$EVAL_ONLY" ] && echo yes || echo no)"
@@ -232,6 +239,7 @@ export INCLUDE_STRESSES
 export DATASET_ONLY
 export SKIP_FIRST
 export MAX_FORCE
+export MAX_FRAMES_PER_ID
 export TEST_FRACTION
 export PATIENCE
 export RE_NORMALIZE

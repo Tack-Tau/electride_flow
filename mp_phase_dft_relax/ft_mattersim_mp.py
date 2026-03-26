@@ -48,7 +48,7 @@ def _atoms_from_ionic_step(structure, energy, forces, stress_kbar, mp_id, step_i
     return atoms
 
 
-def _extract_from_vasprun(vr, mp_id, skip_first=0, max_force=50.0):
+def _extract_from_vasprun(vr, mp_id, skip_first=0, max_force=10.0):
     """
     Extract Atoms from all ionic steps of a parsed Vasprun.
 
@@ -73,7 +73,7 @@ def _extract_from_vasprun(vr, mp_id, skip_first=0, max_force=50.0):
     return entries
 
 
-def collect_structures_from_workflow_db(db_path, skip_first=0, max_force=50.0):
+def collect_structures_from_workflow_db(db_path, skip_first=0, max_force=10.0):
     """
     Collect structures from mp_relax_workflow.json.
     Reads vasprun.xml for each RELAX_DONE/RELAX_TMOUT entry.
@@ -116,7 +116,7 @@ def collect_structures_from_workflow_db(db_path, skip_first=0, max_force=50.0):
 
 
 def collect_structures_from_comparison(comparison_path, workflow_db_path,
-                                       skip_first=0, max_force=50.0):
+                                       skip_first=0, max_force=10.0):
     """
     Collect structures using mp_vasp_comparison.json for validated mp_ids,
     then read vasprun.xml from relax_dir in workflow DB.
@@ -165,6 +165,41 @@ def collect_structures_from_comparison(comparison_path, workflow_db_path,
     n_mp = len(set(a.info['mp_id'] for a in entries))
     print(f"Collected {len(entries)} frames from {n_mp} structures ({skipped} skipped)")
     return entries
+
+
+def subsample_per_mp_id(entries, max_frames):
+    """Cap frames per MP-ID by selecting evenly spaced ionic steps.
+
+    Always includes first and last frame. When a trajectory exceeds
+    max_frames, selects evenly spaced frames in between.
+    """
+    if max_frames is None or max_frames <= 0:
+        return entries
+
+    mp_id_to_atoms = {}
+    for a in entries:
+        mp_id_to_atoms.setdefault(a.info['mp_id'], []).append(a)
+
+    result = []
+    n_capped = 0
+    for mp_id in sorted(mp_id_to_atoms.keys()):
+        frames = mp_id_to_atoms[mp_id]
+        frames.sort(key=lambda a: a.info['ionic_step'])
+
+        if len(frames) <= max_frames:
+            result.extend(frames)
+        else:
+            n_capped += 1
+            indices = np.round(np.linspace(0, len(frames) - 1, max_frames)).astype(int)
+            indices = sorted(set(indices))
+            result.extend(frames[i] for i in indices)
+
+    if n_capped > 0:
+        print(f"  Capped frames for {n_capped}/{len(mp_id_to_atoms)} structures "
+              f"(max {max_frames} per MP-ID)")
+    print(f"  After subsampling: {len(result)} frames "
+          f"(was {len(entries)})")
+    return result
 
 
 def train_val_test_split(entries, val_fraction=0.1, test_fraction=0.1, seed=42):
@@ -482,8 +517,14 @@ def main():
     parser.add_argument(
         '--max-force',
         type=float,
-        default=50.0,
-        help="Skip ionic steps with max |force| > this value in eV/A (default: 50.0)"
+        default=10.0,
+        help="Skip ionic steps with max |force| > this value in eV/A (default: 10.0)"
+    )
+    parser.add_argument(
+        '--max-frames-per-id',
+        type=int,
+        default=None,
+        help="Cap frames per MP-ID by evenly sampling (default: None = keep all)"
     )
     parser.add_argument(
         '--eval-only',
@@ -546,6 +587,7 @@ def main():
     print(f"Re-normalize: {args.re_normalize}")
     print(f"Device: {args.device}")
     print(f"Trajectory filter: skip_first={args.skip_first}, max_force={args.max_force}")
+    print(f"Max frames per ID: {args.max_frames_per_id or 'all'}")
     print("=" * 70 + "\n")
 
     traj_kw = dict(skip_first=args.skip_first, max_force=args.max_force)
@@ -566,6 +608,9 @@ def main():
 
     n_mp = len(set(a.info['mp_id'] for a in entries))
     print(f"\nTotal frames: {len(entries)} from {n_mp} structures")
+
+    if args.max_frames_per_id is not None:
+        entries = subsample_per_mp_id(entries, args.max_frames_per_id)
 
     # Train/val/test split (by mp_id to prevent data leakage)
     train_set, val_set, test_set = train_val_test_split(

@@ -29,7 +29,8 @@ DEVICE=${DEVICE:-"cuda"}
 INCLUDE_STRESSES=${INCLUDE_STRESSES:-"--include-stresses"}
 DATASET_ONLY=${DATASET_ONLY:-""}
 SKIP_FIRST=${SKIP_FIRST:-0}
-MAX_FORCE=${MAX_FORCE:-50.0}
+MAX_FORCE=${MAX_FORCE:-10.0}
+MAX_FRAMES_PER_ID=${MAX_FRAMES_PER_ID:-""}
 TEST_FRACTION=${TEST_FRACTION:-0.1}
 PATIENCE=${PATIENCE:-50}
 RE_NORMALIZE=${RE_NORMALIZE:-""}
@@ -148,6 +149,10 @@ if [ -n "$DATASET_ONLY" ]; then
 fi
 
 CMD="$CMD --skip-first $SKIP_FIRST --max-force $MAX_FORCE --test-fraction $TEST_FRACTION"
+
+if [ -n "$MAX_FRAMES_PER_ID" ]; then
+    CMD="$CMD --max-frames-per-id $MAX_FRAMES_PER_ID"
+fi
 CMD="$CMD --patience $PATIENCE"
 
 if [ -n "$RE_NORMALIZE" ]; then
