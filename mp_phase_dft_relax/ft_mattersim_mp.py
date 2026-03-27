@@ -102,6 +102,8 @@ def collect_structures_from_workflow_db(db_path, skip_first=0, max_force=10.0):
             vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
             frames = _extract_from_vasprun(vr, mp_id, skip_first, max_force)
             if frames:
+                for a in frames:
+                    a.info['is_outlier'] = False
                 entries.extend(frames)
             else:
                 skipped += 1
@@ -120,6 +122,8 @@ def collect_structures_from_comparison(comparison_path, workflow_db_path,
     """
     Collect structures using mp_vasp_comparison.json for validated mp_ids,
     then read vasprun.xml from relax_dir in workflow DB.
+
+    Tags each frame's atoms.info['is_outlier'] from the comparison JSON.
     """
     with open(comparison_path, 'r') as f:
         comparison = json.load(f)
@@ -127,14 +131,14 @@ def collect_structures_from_comparison(comparison_path, workflow_db_path,
     with open(workflow_db_path, 'r') as f:
         db = json.load(f)
 
-    valid_mp_ids = set()
+    outlier_lookup = {}
     for entry in comparison.get('structures', []):
-        valid_mp_ids.add(entry['mp_id'])
+        outlier_lookup[entry['mp_id']] = bool(entry.get('is_outlier', False))
 
     entries = []
     skipped = 0
 
-    for mp_id in valid_mp_ids:
+    for mp_id in sorted(outlier_lookup.keys()):
         sdata = db['structures'].get(mp_id)
         if not sdata:
             skipped += 1
@@ -154,6 +158,9 @@ def collect_structures_from_comparison(comparison_path, workflow_db_path,
             vr = Vasprun(str(vasprun_path), parse_dos=False, parse_eigen=False)
             frames = _extract_from_vasprun(vr, mp_id, skip_first, max_force)
             if frames:
+                is_out = outlier_lookup.get(mp_id, False)
+                for a in frames:
+                    a.info['is_outlier'] = is_out
                 entries.extend(frames)
             else:
                 skipped += 1
@@ -163,7 +170,9 @@ def collect_structures_from_comparison(comparison_path, workflow_db_path,
             skipped += 1
 
     n_mp = len(set(a.info['mp_id'] for a in entries))
-    print(f"Collected {len(entries)} frames from {n_mp} structures ({skipped} skipped)")
+    n_out = len(set(a.info['mp_id'] for a in entries if a.info.get('is_outlier')))
+    print(f"Collected {len(entries)} frames from {n_mp} structures "
+          f"({n_out} outlier, {skipped} skipped)")
     return entries
 
 
@@ -202,11 +211,20 @@ def subsample_per_mp_id(entries, max_frames):
     return result
 
 
+def _split_ids(mp_ids, val_fraction, test_fraction, rng):
+    """Shuffle and split a list of mp_ids into train/val/test."""
+    ids = list(mp_ids)
+    rng.shuffle(ids)
+    n_test = max(1, int(len(ids) * test_fraction))
+    n_val = max(1, int(len(ids) * val_fraction))
+    return ids[n_test + n_val:], ids[n_test:n_test + n_val], ids[:n_test]
+
+
 def train_val_test_split(entries, val_fraction=0.1, test_fraction=0.1, seed=42):
     """
-    Split by mp_id (not by frame) to prevent data leakage.
-    All frames from the same trajectory go into the same split.
-    Default: 80/10/10 train/val/test.
+    Stratified split by mp_id: outlier and normal structures are split
+    independently so each split preserves the outlier/normal ratio.
+    All frames from the same mp_id go into the same split.
     """
     if val_fraction + test_fraction >= 1.0:
         raise ValueError("val_fraction + test_fraction must be < 1.0")
@@ -215,24 +233,66 @@ def train_val_test_split(entries, val_fraction=0.1, test_fraction=0.1, seed=42):
     for a in entries:
         mp_id_to_atoms.setdefault(a.info['mp_id'], []).append(a)
 
-    mp_ids = sorted(mp_id_to_atoms.keys())
+    normal_ids = sorted(mid for mid in mp_id_to_atoms
+                        if not mp_id_to_atoms[mid][0].info.get('is_outlier', False))
+    outlier_ids = sorted(mid for mid in mp_id_to_atoms
+                         if mp_id_to_atoms[mid][0].info.get('is_outlier', False))
+
     rng = np.random.default_rng(seed)
-    indices = np.arange(len(mp_ids))
-    rng.shuffle(indices)
-    mp_ids_shuffled = [mp_ids[i] for i in indices]
 
-    n_test = max(1, int(len(mp_ids_shuffled) * test_fraction))
-    n_val = max(1, int(len(mp_ids_shuffled) * val_fraction))
+    train_n, val_n, test_n = _split_ids(normal_ids, val_fraction, test_fraction, rng)
+    if outlier_ids:
+        train_o, val_o, test_o = _split_ids(outlier_ids, val_fraction, test_fraction, rng)
+    else:
+        train_o, val_o, test_o = [], [], []
 
-    test_ids = mp_ids_shuffled[:n_test]
-    val_ids = mp_ids_shuffled[n_test:n_test + n_val]
-    train_ids = mp_ids_shuffled[n_test + n_val:]
+    train_ids = train_n + train_o
+    val_ids = val_n + val_o
+    test_ids = test_n + test_o
 
     train = [a for mid in train_ids for a in mp_id_to_atoms[mid]]
     val = [a for mid in val_ids for a in mp_id_to_atoms[mid]]
     test = [a for mid in test_ids for a in mp_id_to_atoms[mid]]
 
+    if outlier_ids:
+        print(f"  Stratified split: {len(train_n)}+{len(train_o)} train, "
+              f"{len(val_n)}+{len(val_o)} val, "
+              f"{len(test_n)}+{len(test_o)} test (normal+outlier structures)")
+
     return train, val, test
+
+
+def oversample_outliers(entries, outlier_weight=1.0):
+    """Oversample outlier frames in training set to approximate loss weighting.
+
+    MatterSim's training loop uses uniform sampling, so repeating outlier
+    frames achieves an effective per-sample weight proportional to repeat count.
+
+    oversample factor = round(outlier_weight * N_normal_ids / N_outlier_ids)
+    outlier_weight=1.0 gives balanced (equal total contribution from each group).
+    """
+    normal = [a for a in entries if not a.info.get('is_outlier', False)]
+    outliers = [a for a in entries if a.info.get('is_outlier', False)]
+
+    if not outliers:
+        return entries
+
+    n_normal_ids = len(set(a.info['mp_id'] for a in normal))
+    n_outlier_ids = len(set(a.info['mp_id'] for a in outliers))
+
+    factor = max(1, round(outlier_weight * n_normal_ids / n_outlier_ids))
+
+    if factor <= 1:
+        return entries
+
+    result = list(normal)
+    for _ in range(factor):
+        result.extend(outliers)
+
+    print(f"  Oversampled outlier frames {factor}x: "
+          f"{len(outliers)} -> {len(outliers) * factor} "
+          f"(total train: {len(result)} frames)")
+    return result
 
 
 def write_xyz_dataset(atoms_list, output_path):
@@ -244,7 +304,9 @@ def write_xyz_dataset(atoms_list, output_path):
 def evaluate_model(model_path, xyz_paths, device='cuda'):
     """Single-point energy evaluation of finetuned model on train/val/test XYZ.
 
-    Returns {split: {vasp_epa, ms_epa, mp_ids, mae, rmse}}.
+    Returns {split: {vasp_epa, ms_epa, mp_ids, is_outlier, mae, rmse,
+                      mae_normal, rmse_normal, mae_outlier, rmse_outlier}}.
+    Deduplplicates oversampled frames by (mp_id, ionic_step) before metrics.
     """
     from mattersim.forcefield import MatterSimCalculator
     from ase.io import read as ase_read
@@ -260,37 +322,70 @@ def evaluate_model(model_path, xyz_paths, device='cuda'):
             continue
 
         atoms_list = ase_read(str(xyz_path), index=':')
-        vasp_epa, ms_epa, mp_ids = [], [], []
+
+        vasp_epa, ms_epa, mp_ids, is_outlier_flags = [], [], [], []
+        seen = set()
 
         print(f"  {split}: {len(atoms_list)} frames ...", end='', flush=True)
         for atoms in atoms_list:
+            key = (atoms.info.get('mp_id', ''), atoms.info.get('ionic_step', 0))
+            if key in seen:
+                continue
+            seen.add(key)
+
             n = len(atoms)
             vasp_epa.append(atoms.get_potential_energy() / n)
             atoms_eval = atoms.copy()
             atoms_eval.calc = calc
             ms_epa.append(atoms_eval.get_potential_energy() / n)
             mp_ids.append(atoms.info.get('mp_id', ''))
+            is_outlier_flags.append(bool(atoms.info.get('is_outlier', False)))
 
         vasp_epa = np.array(vasp_epa)
         ms_epa = np.array(ms_epa)
+        is_outlier_arr = np.array(is_outlier_flags)
         diff = ms_epa - vasp_epa
         mae = float(np.mean(np.abs(diff)))
         rmse = float(np.sqrt(np.mean(diff ** 2)))
-        print(f" MAE={mae:.4f}, RMSE={rmse:.4f} eV/atom")
 
-        results[split] = {
+        split_result = {
             'vasp_epa': vasp_epa,
             'ms_epa': ms_epa,
             'mp_ids': mp_ids,
+            'is_outlier': is_outlier_flags,
             'mae': mae,
             'rmse': rmse,
         }
+
+        normal_mask = ~is_outlier_arr
+        outlier_mask = is_outlier_arr
+
+        msg = f" MAE={mae:.4f}, RMSE={rmse:.4f} eV/atom"
+        if np.any(normal_mask):
+            mae_n = float(np.mean(np.abs(diff[normal_mask])))
+            rmse_n = float(np.sqrt(np.mean(diff[normal_mask] ** 2)))
+            split_result['mae_normal'] = mae_n
+            split_result['rmse_normal'] = rmse_n
+            msg += f" | normal: MAE={mae_n:.4f}"
+        if np.any(outlier_mask):
+            mae_o = float(np.mean(np.abs(diff[outlier_mask])))
+            rmse_o = float(np.sqrt(np.mean(diff[outlier_mask] ** 2)))
+            split_result['mae_outlier'] = mae_o
+            split_result['rmse_outlier'] = rmse_o
+            msg += f" | outlier: MAE={mae_o:.4f}"
+
+        n_unique = len(seen)
+        print(f" ({n_unique} unique){msg}")
+        results[split] = split_result
 
     return results
 
 
 def plot_evaluation(results, output_path):
-    """Scatter plot of VASP vs finetuned MatterSim energy per atom."""
+    """Scatter plot of VASP vs finetuned MatterSim energy per atom.
+
+    Normal structures in blue, outlier structures in red.
+    """
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -299,7 +394,6 @@ def plot_evaluation(results, output_path):
     if not splits:
         return
 
-    colors = {'train': '#1f77b4', 'val': '#ff7f0e', 'test': '#2ca02c'}
     n = len(splits)
     fig, axes = plt.subplots(1, n, figsize=(6 * n, 5.5), squeeze=False)
 
@@ -313,22 +407,36 @@ def plot_evaluation(results, output_path):
     for idx, split in enumerate(splits):
         ax = axes[0][idx]
         d = results[split]
-        ax.scatter(d['vasp_epa'], d['ms_epa'],
-                   c=colors.get(split, 'gray'), s=12, alpha=0.6,
-                   edgecolors='black', linewidth=0.3,
-                   label=(f"N={len(d['vasp_epa'])}\n"
-                          f"MAE={d['mae']:.4f} eV/atom\n"
-                          f"RMSE={d['rmse']:.4f} eV/atom"))
-        ax.plot([lo, hi], [lo, hi], 'r--', lw=1.5, alpha=0.6)
+        is_out = np.array(d.get('is_outlier', [False] * len(d['vasp_epa'])))
+        normal_mask = ~is_out
+        outlier_mask = is_out
+
+        label_n = f"Normal N={int(np.sum(normal_mask))}"
+        if 'mae_normal' in d:
+            label_n += f"\nMAE={d['mae_normal']:.4f}"
+        ax.scatter(d['vasp_epa'][normal_mask], d['ms_epa'][normal_mask],
+                   c='#1f77b4', s=12, alpha=0.6, edgecolors='black',
+                   linewidth=0.3, label=label_n)
+
+        if np.any(outlier_mask):
+            label_o = f"Outlier N={int(np.sum(outlier_mask))}"
+            if 'mae_outlier' in d:
+                label_o += f"\nMAE={d['mae_outlier']:.4f}"
+            ax.scatter(d['vasp_epa'][outlier_mask], d['ms_epa'][outlier_mask],
+                       c='red', s=20, alpha=0.8, marker='x', linewidth=1.0,
+                       label=label_o)
+
+        ax.plot([lo, hi], [lo, hi], 'k--', lw=1.0, alpha=0.5)
         ax.fill_between([lo, hi], [lo - 0.05, hi - 0.05], [lo + 0.05, hi + 0.05],
-                        alpha=0.1, color='green')
+                        alpha=0.08, color='green')
         ax.set_xlim(lo, hi)
         ax.set_ylim(lo, hi)
         ax.set_aspect('equal')
         ax.set_xlabel('VASP DFT energy (eV/atom)', fontsize=10)
         ax.set_ylabel('MatterSim energy (eV/atom)', fontsize=10)
-        ax.set_title(f'{split.capitalize()} Set', fontsize=12, fontweight='bold')
-        ax.legend(fontsize=9, loc='upper left')
+        ax.set_title(f'{split.capitalize()} (MAE={d["mae"]:.4f}, '
+                     f'RMSE={d["rmse"]:.4f})', fontsize=11, fontweight='bold')
+        ax.legend(fontsize=8, loc='upper left')
         ax.grid(True, alpha=0.3)
 
     fig.suptitle('Fine-tuned MatterSim vs VASP DFT (Single-Point Energy)',
@@ -344,22 +452,30 @@ def save_eval_results(results, output_path):
     out = {'per_split': {}, 'per_mp_id': {}}
 
     for split, d in results.items():
-        out['per_split'][split] = {
+        split_info = {
             'n_frames': int(len(d['vasp_epa'])),
             'mae_eV_per_atom': d['mae'],
             'rmse_eV_per_atom': d['rmse'],
         }
+        for k in ('mae_normal', 'rmse_normal', 'mae_outlier', 'rmse_outlier'):
+            if k in d:
+                split_info[k] = d[k]
+        out['per_split'][split] = split_info
 
         mp_data = {}
+        is_outlier_map = {}
         for i, mp_id in enumerate(d['mp_ids']):
             mp_data.setdefault(mp_id, {'vasp': [], 'ms': []})
             mp_data[mp_id]['vasp'].append(float(d['vasp_epa'][i]))
             mp_data[mp_id]['ms'].append(float(d['ms_epa'][i]))
+            if 'is_outlier' in d:
+                is_outlier_map[mp_id] = d['is_outlier'][i]
 
         for mp_id, md in sorted(mp_data.items()):
             diff = np.array(md['ms']) - np.array(md['vasp'])
             entry = {
                 'split': split,
+                'is_outlier': is_outlier_map.get(mp_id, False),
                 'n_frames': len(diff),
                 'mae_eV_per_atom': float(np.mean(np.abs(diff))),
                 'rmse_eV_per_atom': float(np.sqrt(np.mean(diff ** 2))),
@@ -537,6 +653,14 @@ def main():
         default=None,
         help="Path to finetuned model checkpoint for evaluation"
     )
+    parser.add_argument(
+        '--outlier-weight',
+        type=float,
+        default=1.0,
+        help=("Outlier oversampling weight (default: 1.0 = balanced). "
+              "Oversample factor = round(weight * N_normal / N_outlier). "
+              "Only applied to training set.")
+    )
 
     args = parser.parse_args()
 
@@ -588,6 +712,7 @@ def main():
     print(f"Device: {args.device}")
     print(f"Trajectory filter: skip_first={args.skip_first}, max_force={args.max_force}")
     print(f"Max frames per ID: {args.max_frames_per_id or 'all'}")
+    print(f"Outlier weight: {args.outlier_weight}")
     print("=" * 70 + "\n")
 
     traj_kw = dict(skip_first=args.skip_first, max_force=args.max_force)
@@ -623,6 +748,10 @@ def main():
     print(f"Val:   {len(val_set)} frames ({len(val_ids)} structures)")
     print(f"Test:  {len(test_set)} frames ({len(test_ids)} structures)")
 
+    # Oversample outlier frames in training set only
+    if args.outlier_weight > 0:
+        train_set = oversample_outliers(train_set, args.outlier_weight)
+
     # Write XYZ datasets
     train_path = output_dir / 'train.xyz'
     val_path = output_dir / 'val.xyz'
@@ -632,12 +761,17 @@ def main():
     write_xyz_dataset(test_set, test_path)
 
     # Save split metadata
+    outlier_mp_ids = set(a.info['mp_id'] for a in entries if a.info.get('is_outlier'))
+    n_out_train = len(set(train_ids) & outlier_mp_ids)
+    n_out_val = len(set(val_ids) & outlier_mp_ids)
+    n_out_test = len(set(test_ids) & outlier_mp_ids)
     meta = {
         'timestamp': datetime.now().isoformat(),
         'workflow_db': str(args.workflow_db),
         'comparison_json': str(args.comparison_json) if args.comparison_json else None,
         'skip_first': args.skip_first,
         'max_force': args.max_force,
+        'outlier_weight': args.outlier_weight,
         'n_structures': n_mp,
         'n_total_frames': len(entries),
         'n_train_frames': len(train_set),
@@ -646,6 +780,9 @@ def main():
         'n_train_structures': len(train_ids),
         'n_val_structures': len(val_ids),
         'n_test_structures': len(test_ids),
+        'n_outlier_train': n_out_train,
+        'n_outlier_val': n_out_val,
+        'n_outlier_test': n_out_test,
         'val_fraction': args.val_fraction,
         'test_fraction': args.test_fraction,
         'seed': args.seed,

@@ -25,6 +25,7 @@ PATIENCE=50
 RE_NORMALIZE=""
 EVAL_ONLY=""
 MODEL_PATH=""
+OUTLIER_WEIGHT=1.0
 CONDA_ENV="mattersim"
 
 show_help() {
@@ -59,6 +60,7 @@ OPTIONS:
     --re-normalize           Re-normalize energy/force scales to finetuning data
     --eval-only              Only evaluate an existing finetuned model (skip training)
     --model-path FILE        Path to finetuned model checkpoint for evaluation
+    --outlier-weight F       Outlier oversampling weight (default: 1.0 = balanced)
     --help                   Show this help message
 
 EXAMPLES:
@@ -165,6 +167,10 @@ while [[ $# -gt 0 ]]; do
             MODEL_PATH="$2"
             shift 2
             ;;
+        --outlier-weight)
+            OUTLIER_WEIGHT="$2"
+            shift 2
+            ;;
         --help)
             show_help
             exit 0
@@ -220,6 +226,7 @@ echo "Patience: ${PATIENCE}"
 echo "Re-normalize: $([ -n "$RE_NORMALIZE" ] && echo yes || echo no)"
 echo "Eval only: $([ -n "$EVAL_ONLY" ] && echo yes || echo no)"
 echo "Model path: ${MODEL_PATH:-auto}"
+echo "Outlier weight: ${OUTLIER_WEIGHT}"
 echo "========================================================================"
 echo ""
 
@@ -245,6 +252,7 @@ export PATIENCE
 export RE_NORMALIZE
 export EVAL_ONLY
 export MODEL_PATH
+export OUTLIER_WEIGHT
 export CONDA_ENV
 
 # Submit to SLURM

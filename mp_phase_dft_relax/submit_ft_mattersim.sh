@@ -36,6 +36,7 @@ PATIENCE=${PATIENCE:-50}
 RE_NORMALIZE=${RE_NORMALIZE:-""}
 EVAL_ONLY=${EVAL_ONLY:-""}
 MODEL_PATH=${MODEL_PATH:-""}
+OUTLIER_WEIGHT=${OUTLIER_WEIGHT:-1.0}
 CONDA_ENV=${CONDA_ENV:-"mattersim"}
 
 echo "========================================================================"
@@ -167,6 +168,8 @@ if [ -n "$MODEL_PATH" ]; then
     CMD="$CMD --model-path $MODEL_PATH"
 fi
 
+CMD="$CMD --outlier-weight $OUTLIER_WEIGHT"
+
 echo "Configuration:"
 echo "  Workflow DB: $WORKFLOW_DB"
 echo "  Output dir: $OUTPUT_DIR"
@@ -178,6 +181,7 @@ echo "  Val fraction: $VAL_FRACTION"
 echo "  Seed: $SEED"
 echo "  Eval only: $([ -n "$EVAL_ONLY" ] && echo yes || echo no)"
 echo "  Model path: ${MODEL_PATH:-auto}"
+echo "  Outlier weight: $OUTLIER_WEIGHT"
 echo ""
 
 echo "========================================================================"
