@@ -285,7 +285,7 @@ def _draw_binary(ax, pd, entries, el_a, el_b, color, label, marker, ls, anno_y):
 
 
 def plot_hull_overlay(mp_entries, alt_entries, alt_name, binary_systems,
-                      output_path, alt_color, max_per_page=6):
+                      output_path, alt_color):
     """Plot binary hull comparison as multi-page PDF (2 cols x 3 rows max)."""
     n = len(binary_systems)
     if n == 0:
@@ -344,7 +344,7 @@ def plot_hull_overlay(mp_entries, alt_entries, alt_name, binary_systems,
     print(f"  Saved: {output_path} ({total_pages} pages)")
 
 
-def _ternary_coords(comp, el_a, el_b, el_c):
+def _ternary_coords(comp, el_b, el_c):
     """Convert composition to ternary (x, y) in equilateral triangle.
 
     Vertices: el_a at (0,0), el_b at (1,0), el_c at (0.5, sqrt(3)/2).
@@ -387,7 +387,7 @@ def _draw_ternary(ax, pd, entries, el_a, el_b, el_c,
             eah = pd.get_e_above_hull(entry)
         except Exception:
             continue
-        x, y = _ternary_coords(entry.composition, el_a, el_b, el_c)
+        x, y = _ternary_coords(entry.composition, el_b, el_c)
         pt = {'x': x, 'y': y,
               'formula': entry.composition.reduced_formula,
               'n_els': len(entry.composition.elements)}
@@ -399,7 +399,7 @@ def _draw_ternary(ax, pd, entries, el_a, el_b, el_c,
     # Tie-lines from hull facets
     for facet in pd.facets:
         coords = [_ternary_coords(pd.qhull_entries[i].composition,
-                                  el_a, el_b, el_c) for i in facet]
+                                  el_b, el_c) for i in facet]
         for i in range(len(coords)):
             for j in range(i + 1, len(coords)):
                 ax.plot([coords[i][0], coords[j][0]],
@@ -423,7 +423,7 @@ def _draw_ternary(ax, pd, entries, el_a, el_b, el_c,
 
 
 def plot_ternary_overlay(mp_entries, alt_entries, alt_name, ternary_systems,
-                         output_path, alt_color, max_per_page=6):
+                         output_path, alt_color):
     """Plot ternary hull comparison as multi-page PDF (2 cols x 3 rows max)."""
     n = len(ternary_systems)
     if n == 0:
@@ -483,7 +483,12 @@ def plot_hull_scatter(rows, alt_name, mp_key, alt_key, quantity_label,
                       output_path, alt_color):
     """Plot MP vs alt scatter with parity line and MAE/RMSE metrics."""
     mp_vals, alt_vals = [], []
+    seen = set()
     for r in rows:
+        mp_id = r.get('mp_id', '')
+        if mp_id in seen:
+            continue
+        seen.add(mp_id)
         mp_val = r.get(mp_key, '')
         alt_val = r.get(alt_key, '')
         if mp_val == '' or alt_val == '':
