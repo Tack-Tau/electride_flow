@@ -1036,7 +1036,7 @@ def main():
         import torch
         import gc
         potential_mp = Potential.from_checkpoint(
-            checkpoint_path=args.model_path,
+            load_path=args.model_path,
             device=args.device
         )
         print("  Potential created successfully\n")
@@ -1192,7 +1192,7 @@ def main():
             # Create MatterSim Potential for this batch (with error handling)
             try:
                 potential = Potential.from_checkpoint(
-                    checkpoint_path=args.model_path,
+                    load_path=args.model_path,
                     device=args.device
                 )
             except Exception as e:
