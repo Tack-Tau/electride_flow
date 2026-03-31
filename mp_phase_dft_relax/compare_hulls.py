@@ -338,7 +338,7 @@ def plot_hull_overlay(mp_entries, alt_entries, alt_name, binary_systems,
                          f'(page {page_num}/{total_pages})',
                          fontsize=14, fontweight='bold')
             fig.tight_layout(rect=[0, 0, 1, 0.96])
-            pdf.savefig(fig, dpi=150, bbox_inches='tight')
+            pdf.savefig(fig, dpi=300, bbox_inches='tight')
             plt.close(fig)
 
     print(f"  Saved: {output_path} ({total_pages} pages)")
@@ -473,7 +473,7 @@ def plot_ternary_overlay(mp_entries, alt_entries, alt_name, ternary_systems,
                          f'(page {page_num}/{total_pages})',
                          fontsize=14, fontweight='bold')
             fig.tight_layout(rect=[0, 0, 1, 0.96])
-            pdf.savefig(fig, dpi=150, bbox_inches='tight')
+            pdf.savefig(fig, dpi=300, bbox_inches='tight')
             plt.close(fig)
 
     print(f"  Saved: {output_path} ({total_pages} pages)")
@@ -530,7 +530,7 @@ def plot_hull_scatter(rows, alt_name, mp_key, alt_key, quantity_label,
             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
     fig.tight_layout()
-    fig.savefig(output_path, dpi=150, bbox_inches='tight')
+    fig.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"  Saved: {output_path}")
     plt.close(fig)
 
