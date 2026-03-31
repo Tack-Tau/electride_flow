@@ -323,7 +323,8 @@ def evaluate_model(model_path, xyz_paths, device='cuda'):
 
         atoms_list = ase_read(str(xyz_path), index=':')
 
-        vasp_epa, ms_epa, mp_ids, is_outlier_flags = [], [], [], []
+        vasp_epa, ms_epa, mp_ids, ionic_steps, is_outlier_flags = \
+            [], [], [], [], []
         seen = set()
 
         print(f"  {split}: {len(atoms_list)} frames ...", end='', flush=True)
@@ -339,89 +340,103 @@ def evaluate_model(model_path, xyz_paths, device='cuda'):
             atoms_eval.calc = calc
             ms_epa.append(atoms_eval.get_potential_energy() / n)
             mp_ids.append(atoms.info.get('mp_id', ''))
+            ionic_steps.append(int(atoms.info.get('ionic_step', 0)))
             is_outlier_flags.append(bool(atoms.info.get('is_outlier', False)))
 
         vasp_epa = np.array(vasp_epa)
         ms_epa = np.array(ms_epa)
         is_outlier_arr = np.array(is_outlier_flags)
+        mp_ids_arr = np.array(mp_ids)
         diff = ms_epa - vasp_epa
-        mae = float(np.mean(np.abs(diff)))
-        rmse = float(np.sqrt(np.mean(diff ** 2)))
+        abs_diff = np.abs(diff)
+
+        # Per-MP-ID MAE/RMSE, then Q3+3*IQR to flag bad predictions
+        unique_ids = sorted(set(mp_ids))
+        mpid_mae = {}
+        mpid_rmse = {}
+        for mid in unique_ids:
+            mask = mp_ids_arr == mid
+            mpid_mae[mid] = float(np.mean(abs_diff[mask]))
+            mpid_rmse[mid] = float(np.sqrt(np.mean(diff[mask] ** 2)))
+
+        mae_vals = np.array(list(mpid_mae.values()))
+        q1 = np.percentile(mae_vals, 25)
+        q3 = np.percentile(mae_vals, 75)
+        bad_thresh = q3 + 3 * (q3 - q1)
+        bad_mp_ids = set(mid for mid, v in mpid_mae.items() if v > bad_thresh)
+
+        is_bad_pred = np.array([mid in bad_mp_ids for mid in mp_ids])
+
+        mpid_avg_mae = float(np.mean(mae_vals))
+        mpid_avg_rmse = float(np.mean(list(mpid_rmse.values())))
+
+        # Per-group (normal/outlier) MP-ID averaged metrics
+        outlier_id_set = set(mp_ids_arr[is_outlier_arr])
+        normal_ids = [mid for mid in unique_ids if mid not in outlier_id_set]
+        outlier_ids_list = [mid for mid in unique_ids if mid in outlier_id_set]
 
         split_result = {
             'vasp_epa': vasp_epa,
             'ms_epa': ms_epa,
             'mp_ids': mp_ids,
+            'ionic_steps': ionic_steps,
             'is_outlier': is_outlier_flags,
-            'mae': mae,
-            'rmse': rmse,
+            'is_bad_pred': is_bad_pred,
+            'mpid_avg_mae': mpid_avg_mae,
+            'mpid_avg_rmse': mpid_avg_rmse,
+            'bad_pred_threshold': float(bad_thresh),
+            'bad_pred_mp_ids': sorted(bad_mp_ids),
+            'mpid_mae': mpid_mae,
         }
 
-        normal_mask = ~is_outlier_arr
-        outlier_mask = is_outlier_arr
-
-        msg = f" MAE={mae:.4f}, RMSE={rmse:.4f} eV/atom"
-        if np.any(normal_mask):
-            mae_n = float(np.mean(np.abs(diff[normal_mask])))
-            rmse_n = float(np.sqrt(np.mean(diff[normal_mask] ** 2)))
-            split_result['mae_normal'] = mae_n
-            split_result['rmse_normal'] = rmse_n
-            msg += f" | normal: MAE={mae_n:.4f}"
-        if np.any(outlier_mask):
-            mae_o = float(np.mean(np.abs(diff[outlier_mask])))
-            rmse_o = float(np.sqrt(np.mean(diff[outlier_mask] ** 2)))
-            split_result['mae_outlier'] = mae_o
-            split_result['rmse_outlier'] = rmse_o
-            msg += f" | outlier: MAE={mae_o:.4f}"
+        msg = f" MAE={mpid_avg_mae:.4f}, RMSE={mpid_avg_rmse:.4f} eV/atom"
+        if normal_ids:
+            mpid_avg_mae_n = float(np.mean([mpid_mae[m] for m in normal_ids]))
+            split_result['mpid_avg_mae_normal'] = mpid_avg_mae_n
+            msg += f" | normal: {mpid_avg_mae_n:.4f}"
+        if outlier_ids_list:
+            mpid_avg_mae_o = float(np.mean([mpid_mae[m] for m in outlier_ids_list]))
+            split_result['mpid_avg_mae_outlier'] = mpid_avg_mae_o
+            msg += f" | outlier: {mpid_avg_mae_o:.4f}"
 
         n_unique = len(seen)
+        n_bad = len(bad_mp_ids)
         print(f" ({n_unique} unique){msg}")
+        if n_bad > 0:
+            print(f"    Bad predictions (per-MP MAE > {bad_thresh:.4f}): "
+                  f"{n_bad} MP-IDs")
+            for mid in sorted(bad_mp_ids):
+                tag = " [outlier]" if mpid_mae.get(mid) and \
+                    any(is_outlier_flags[i] for i, m in enumerate(mp_ids)
+                        if m == mid) else ""
+                print(f"      {mid}: MAE={mpid_mae[mid]:.4f}{tag}")
+
         results[split] = split_result
 
     return results
 
 
-def plot_evaluation(results, output_path):
-    """Scatter plot of VASP vs finetuned MatterSim energy per atom.
-
-    Normal structures in blue, outlier structures in red.
-    """
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-
-    splits = [s for s in ('train', 'val', 'test') if s in results]
-    if not splits:
-        return
-
-    n = len(splits)
-    fig, axes = plt.subplots(1, n, figsize=(6 * n, 5.5), squeeze=False)
-
-    all_e = np.concatenate([
-        np.concatenate([results[s]['vasp_epa'], results[s]['ms_epa']])
-        for s in splits
-    ])
-    margin = (all_e.max() - all_e.min()) * 0.05
-    lo, hi = all_e.min() - margin, all_e.max() + margin
-
+def _plot_eval_row(axes, results, splits, lo, hi, row_label):
+    """Plot one row of scatter subplots for a single model."""
     for idx, split in enumerate(splits):
-        ax = axes[0][idx]
+        ax = axes[idx]
         d = results[split]
-        is_out = np.array(d.get('is_outlier', [False] * len(d['vasp_epa'])))
+        n_frames = len(d['vasp_epa'])
+        is_out = np.array(d.get('is_outlier', [False] * n_frames))
         normal_mask = ~is_out
         outlier_mask = is_out
 
         label_n = f"Normal N={int(np.sum(normal_mask))}"
-        if 'mae_normal' in d:
-            label_n += f"\nMAE={d['mae_normal']:.4f}"
+        if 'mpid_avg_mae_normal' in d:
+            label_n += f"\nMAE={d['mpid_avg_mae_normal']:.4f}"
         ax.scatter(d['vasp_epa'][normal_mask], d['ms_epa'][normal_mask],
                    c='#1f77b4', s=12, alpha=0.6, edgecolors='black',
                    linewidth=0.3, label=label_n)
 
         if np.any(outlier_mask):
             label_o = f"Outlier N={int(np.sum(outlier_mask))}"
-            if 'mae_outlier' in d:
-                label_o += f"\nMAE={d['mae_outlier']:.4f}"
+            if 'mpid_avg_mae_outlier' in d:
+                label_o += f"\nMAE={d['mpid_avg_mae_outlier']:.4f}"
             ax.scatter(d['vasp_epa'][outlier_mask], d['ms_epa'][outlier_mask],
                        c='red', s=20, alpha=0.8, marker='x', linewidth=1.0,
                        label=label_o)
@@ -434,15 +449,57 @@ def plot_evaluation(results, output_path):
         ax.set_aspect('equal')
         ax.set_xlabel('VASP DFT energy (eV/atom)', fontsize=10)
         ax.set_ylabel('MatterSim energy (eV/atom)', fontsize=10)
-        ax.set_title(f'{split.capitalize()} (MAE={d["mae"]:.4f}, '
-                     f'RMSE={d["rmse"]:.4f})', fontsize=11, fontweight='bold')
-        ax.legend(fontsize=8, loc='upper left')
+        ax.set_title(f'{row_label} - {split.capitalize()} '
+                     f'(MAE={d["mpid_avg_mae"]:.4f}, '
+                     f'RMSE={d["mpid_avg_rmse"]:.4f})',
+                     fontsize=10, fontweight='bold')
+        ax.legend(fontsize=7, loc='upper left')
         ax.grid(True, alpha=0.3)
 
-    fig.suptitle('Fine-tuned MatterSim vs VASP DFT (Single-Point Energy)',
-                 fontsize=13, fontweight='bold')
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(str(output_path), dpi=150, bbox_inches='tight')
+
+def plot_evaluation(results, output_path, baseline_results=None):
+    """Scatter plot of VASP vs MatterSim energy per atom.
+
+    If baseline_results is provided, generates a 2-row comparison plot
+    (top: original pretrained, bottom: fine-tuned) with shared axis range.
+    Otherwise generates a single-row plot.
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    if baseline_results is not None:
+        splits = [s for s in ('train', 'val', 'test')
+                  if s in results and s in baseline_results]
+    else:
+        splits = [s for s in ('train', 'val', 'test') if s in results]
+    if not splits:
+        return
+
+    all_arrays = [results[s]['vasp_epa'] for s in splits] + \
+                 [results[s]['ms_epa'] for s in splits]
+    if baseline_results is not None:
+        all_arrays += [baseline_results[s]['vasp_epa'] for s in splits] + \
+                      [baseline_results[s]['ms_epa'] for s in splits]
+    all_e = np.concatenate(all_arrays)
+    margin = (all_e.max() - all_e.min()) * 0.05
+    lo, hi = all_e.min() - margin, all_e.max() + margin
+
+    n = len(splits)
+    if baseline_results is not None:
+        fig, axes = plt.subplots(2, n, figsize=(6 * n, 11), squeeze=False)
+        _plot_eval_row(axes[0], baseline_results, splits, lo, hi, 'Original')
+        _plot_eval_row(axes[1], results, splits, lo, hi, 'Fine-tuned')
+        fig.suptitle('Original vs Fine-tuned MatterSim (Single-Point Energy)',
+                     fontsize=14, fontweight='bold')
+    else:
+        fig, axes = plt.subplots(1, n, figsize=(6 * n, 5.5), squeeze=False)
+        _plot_eval_row(axes[0], results, splits, lo, hi, 'Fine-tuned')
+        fig.suptitle('Fine-tuned MatterSim vs VASP DFT (Single-Point Energy)',
+                     fontsize=13, fontweight='bold')
+
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.savefig(str(output_path), dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f"  Evaluation scatter plot: {output_path}")
 
@@ -454,34 +511,53 @@ def save_eval_results(results, output_path):
     for split, d in results.items():
         split_info = {
             'n_frames': int(len(d['vasp_epa'])),
-            'mae_eV_per_atom': d['mae'],
-            'rmse_eV_per_atom': d['rmse'],
+            'n_mp_ids': len(set(d['mp_ids'])),
+            'mae': d.get('mpid_avg_mae'),
+            'rmse': d.get('mpid_avg_rmse'),
         }
-        for k in ('mae_normal', 'rmse_normal', 'mae_outlier', 'rmse_outlier'):
+        for k in ('mpid_avg_mae_normal', 'mpid_avg_mae_outlier',
+                   'bad_pred_threshold'):
             if k in d:
                 split_info[k] = d[k]
+        if 'bad_pred_mp_ids' in d:
+            split_info['n_bad_pred'] = len(d['bad_pred_mp_ids'])
+            split_info['bad_pred_mp_ids'] = d['bad_pred_mp_ids']
         out['per_split'][split] = split_info
 
-        mp_data = {}
+        bad_set = set(d.get('bad_pred_mp_ids', []))
         is_outlier_map = {}
+        mp_data = {}
         for i, mp_id in enumerate(d['mp_ids']):
-            mp_data.setdefault(mp_id, {'vasp': [], 'ms': []})
+            step = d['ionic_steps'][i] if 'ionic_steps' in d else i
+            mp_data.setdefault(mp_id, {'vasp': [], 'ms': [], 'steps': []})
             mp_data[mp_id]['vasp'].append(float(d['vasp_epa'][i]))
             mp_data[mp_id]['ms'].append(float(d['ms_epa'][i]))
+            mp_data[mp_id]['steps'].append(int(step))
             if 'is_outlier' in d:
                 is_outlier_map[mp_id] = d['is_outlier'][i]
 
         for mp_id, md in sorted(mp_data.items()):
-            diff = np.array(md['ms']) - np.array(md['vasp'])
+            vasp_arr = np.array(md['vasp'])
+            ms_arr = np.array(md['ms'])
+            diff = ms_arr - vasp_arr
             entry = {
                 'split': split,
                 'is_outlier': is_outlier_map.get(mp_id, False),
+                'is_bad_pred': mp_id in bad_set,
                 'n_frames': len(diff),
                 'mae_eV_per_atom': float(np.mean(np.abs(diff))),
                 'rmse_eV_per_atom': float(np.sqrt(np.mean(diff ** 2))),
-                'mean_vasp_epa': float(np.mean(md['vasp'])),
-                'mean_ms_epa': float(np.mean(md['ms'])),
+                'mean_vasp_epa': float(np.mean(vasp_arr)),
+                'mean_ms_epa': float(np.mean(ms_arr)),
             }
+            if mp_id in bad_set:
+                entry['frames'] = [
+                    {'ionic_step': md['steps'][j],
+                     'vasp_epa': md['vasp'][j],
+                     'ms_epa': md['ms'][j],
+                     'error': float(diff[j])}
+                    for j in range(len(diff))
+                ]
             if mp_id in out['per_mp_id']:
                 out['per_mp_id'][mp_id].update(entry)
             else:
@@ -691,9 +767,18 @@ def main():
         print("=" * 70)
         print("Evaluation Only Mode")
         print("=" * 70)
+
+        print("\n--- Original (pretrained) model ---")
+        baseline_results = evaluate_model(args.model, xyz_paths, args.device)
+        save_eval_results(baseline_results,
+                          output_dir / 'baseline_eval_results.json')
+
+        print("\n--- Fine-tuned model ---")
         results = evaluate_model(model_path, xyz_paths, args.device)
-        plot_evaluation(results, output_dir / 'ft_eval_scatter.png')
         save_eval_results(results, output_dir / 'ft_eval_results.json')
+
+        plot_evaluation(results, output_dir / 'ft_eval_scatter.png',
+                        baseline_results=baseline_results)
         return 0
 
     print("=" * 70)
@@ -849,9 +934,18 @@ def main():
                     'val': val_path,
                     'test': test_path,
                 }
+                print("\n--- Original (pretrained) model ---")
+                baseline_results = evaluate_model(
+                    args.model, xyz_paths, args.device)
+                save_eval_results(baseline_results,
+                                  output_dir / 'baseline_eval_results.json')
+
+                print("\n--- Fine-tuned model ---")
                 eval_results = evaluate_model(model_ckpt, xyz_paths, args.device)
-                plot_evaluation(eval_results, output_dir / 'ft_eval_scatter.png')
                 save_eval_results(eval_results, output_dir / 'ft_eval_results.json')
+
+                plot_evaluation(eval_results, output_dir / 'ft_eval_scatter.png',
+                                baseline_results=baseline_results)
             except Exception as e:
                 print(f"\nWARNING: Post-finetuning evaluation failed: {e}")
     else:
