@@ -231,7 +231,7 @@ def load_dft_cache(chemsys, dft_cache_file, require_compounds=True):
     Load DFT entries for a chemical system from single global cache file.
     
     Args:
-        chemsys: Chemical system (e.g., 'Li-B-N')
+        chemsys: Chemical system (e.g., 'B-Li-N')
         dft_cache_file: Path to global DFT cache file (mp_vaspdft.json)
         require_compounds: If True, check for both elementals and compounds.
                           If False, only check for elementals (for single-element systems).
@@ -297,7 +297,7 @@ def get_mp_stable_phases_dft(chemsys, mp_api_key, dft_cache_file, pure_pbe=False
           which misses many stable GGA phases (e.g., mp-540703-GGA for Cs2S, mp-2654-GGA for Al2S3).
     
     Args:
-        chemsys: Chemical system (e.g., 'Li-B-N')
+        chemsys: Chemical system (e.g., 'B-Li-N')
         mp_api_key: Materials Project API key
         dft_cache_file: Path to global DFT cache file (mp_vaspdft.json)
         pure_pbe: If True, filter to GGA-PBE only (exclude PBE+U)
@@ -443,6 +443,41 @@ def get_mp_stable_phases_dft(chemsys, mp_api_key, dft_cache_file, pure_pbe=False
         import traceback
         traceback.print_exc()
         return []
+
+
+def get_mattersim_entries_for_chemsys(chemsys, mattersim_cache):
+    """Build PDEntry list for a chemsys from MatterSim-relaxed DFT energies.
+
+    Args:
+        chemsys: Chemical system (e.g., 'B-Li-N')
+        mattersim_cache: List of dicts loaded from mp_mattersim.json,
+                         each with 'composition', 'energy' (total eV), 'mp_id', 'chemsys'.
+
+    Returns:
+        List of PDEntry with MatterSim total energies for this chemsys and subsystems.
+    """
+    target_elements = set(chemsys.split('-'))
+    entries = []
+    seen = set()
+
+    for item in mattersim_cache:
+        item_elements = set(item.get('chemsys', '').split('-'))
+        if not item_elements.issubset(target_elements):
+            continue
+        eid = item.get('entry_id', item.get('mp_id', ''))
+        if eid in seen:
+            continue
+        seen.add(eid)
+
+        comp = Composition(item['composition'])
+        entry = PDEntry(
+            composition=comp,
+            energy=float(item['energy']),
+            name=eid,
+        )
+        entries.append(entry)
+
+    return entries
 
 
 def compute_dft_hull(target_entry, mp_entries):
@@ -899,6 +934,15 @@ def main():
         help="MatterSim MP cache file (default: mp_mattersim.json in VASP_JOBS). "
              "Used to extract chemical systems for consistent reference phases."
     )
+    parser.add_argument(
+        '--mp-energy-ref',
+        type=str,
+        default='mp',
+        choices=['mp', 'mattersim'],
+        help="Energy reference for MP competing phases. "
+             "'mp': query MP DFT energies via API (default). "
+             "'mattersim': use MatterSim-relaxed DFT energies from mp_mattersim.json."
+    )
     
     args = parser.parse_args()
     
@@ -910,13 +954,13 @@ def main():
     
     output_path = vasp_jobs / args.output
     
-    # Get MP API key
+    # Get MP API key (always required -- mp_vaspdft.json is generated for bookkeeping)
+    use_mattersim_ref = (args.mp_energy_ref == 'mattersim')
     mp_api_key = args.mp_api_key or os.environ.get('MP_API_KEY')
     if not mp_api_key:
         print("ERROR: MP_API_KEY not found in environment or arguments")
         print("Set it with: export MP_API_KEY=your_key")
         return 1
-    
     if len(mp_api_key) != 32:
         print("ERROR: MP API key should be 32 characters (new API)")
         print("Get a new key from: https://next-gen.materialsproject.org/api")
@@ -938,21 +982,22 @@ def main():
     print(f"MP DFT cache: {mp_dft_cache}")
     print(f"Output file: {output_path}")
     
-    print(f"Energy source: MP GGA phases (using legacy pymatgen MPRester for complete coverage)")
-    print(f"Energy corrections: NONE (using raw DFT energies)")
-    print("  VASP: raw DFT energies from vasprun.xml")
-    print("  MP: ComputedEntry.uncorrected_energy (no anion/composition corrections)")
-    print("  Filtering: Only entries with '-GGA' or '-GGA+U' suffix (strict)")
-    print("  Phase diagram stability determined by pymatgen using GGA energies")
-    
-    if args.pure_pbe:
-        print(f"Functional filtering: Pure GGA-PBE only (PBE+U/R2SCAN/SCAN excluded)")
+    if use_mattersim_ref:
+        print(f"MP phase energy reference: MatterSim-relaxed DFT (from mp_mattersim.json)")
+        print(f"  MP API still queried to generate mp_vaspdft.json for bookkeeping")
     else:
-        print(f"Functional filtering: Mixed PBE/PBE+U (MP recommended methodology)")
+        print(f"MP phase energy reference: MP GGA DFT (using legacy pymatgen MPRester)")
+        print(f"  VASP: raw DFT energies from vasprun.xml")
+        print(f"  MP: ComputedEntry.uncorrected_energy (no anion/composition corrections)")
+        print(f"  Filtering: Only entries with '-GGA' or '-GGA+U' suffix (strict)")
+        if args.pure_pbe:
+            print(f"  Functional filtering: Pure GGA-PBE only (PBE+U excluded)")
+        else:
+            print(f"  Functional filtering: Mixed PBE/PBE+U (MP recommended)")
     
     print("="*70 + "\n")
     
-    # Load MatterSim cache to extract chemical systems for consistent reference phases
+    # Load MatterSim cache
     print("="*70)
     print("Loading MatterSim Cache for Reference Phase Consistency")
     print("="*70)
@@ -967,7 +1012,6 @@ def main():
         with open(mp_mattersim_cache_path, 'r') as f:
             mattersim_cache = json.load(f)
         
-        # Extract unique chemical systems from MatterSim cache
         mattersim_chemsys = set()
         for item in mattersim_cache:
             chemsys = item.get('chemsys', '')
@@ -979,16 +1023,16 @@ def main():
         print(f"  {sorted(mattersim_chemsys)}")
         print()
         
-        # Pre-populate DFT cache with GGA energies for ALL MatterSim chemical systems
-        print("Pre-populating DFT cache with GGA energies for MatterSim chemical systems...")
-        print("(This ensures DFT and MatterSim hulls use same reference phase set)")
-        print()
+        if use_mattersim_ref:
+            print("Hull computation will use MatterSim energies as competing phase reference")
         
+        print("Pre-populating DFT cache (mp_vaspdft.json) with GGA energies for all chemical systems...")
+        print()
         for chemsys in sorted(mattersim_chemsys):
             print(f"  Fetching GGA phases for {chemsys}...")
             sys.stdout.flush()
             try:
-                _ = get_mp_stable_phases_dft(chemsys, mp_api_key, mp_dft_cache, 
+                _ = get_mp_stable_phases_dft(chemsys, mp_api_key, mp_dft_cache,
                                             pure_pbe=args.pure_pbe, use_cache=False)
                 print()
             except Exception as e:
@@ -996,7 +1040,7 @@ def main():
                 sys.stdout.flush()
         
         print("="*70)
-        print("DFT cache pre-population complete")
+        print("Reference phase loading complete")
         print("="*70 + "\n")
         
     except Exception as e:
@@ -1091,17 +1135,20 @@ def main():
     for chemsys, struct_ids in sorted(structures_by_chemsys.items()):
         print(f"\nProcessing {chemsys} ({len(struct_ids)} structures)...")
         
-        # Get MP stable DFT entries once per chemical system (uses pre-populated cache)
-        print(f"  Querying MP for stable phases...")
+        # Get competing phase entries for this chemsys
         try:
-            mp_entries = get_mp_stable_phases_dft(chemsys, mp_api_key, mp_dft_cache, pure_pbe=args.pure_pbe, use_cache=True)
-            
-            if args.pure_pbe:
-                print(f"  Retrieved {len(mp_entries)} GGA phases from MP (pure -GGA suffix only)")
+            if use_mattersim_ref:
+                mp_entries = get_mattersim_entries_for_chemsys(chemsys, mattersim_cache)
+                print(f"  Loaded {len(mp_entries)} MatterSim reference phases")
             else:
-                print(f"  Retrieved {len(mp_entries)} GGA phases from MP (-GGA and -GGA+U suffixes)")
+                print(f"  Querying MP for stable phases...")
+                mp_entries = get_mp_stable_phases_dft(chemsys, mp_api_key, mp_dft_cache, pure_pbe=args.pure_pbe, use_cache=True)
+                if args.pure_pbe:
+                    print(f"  Retrieved {len(mp_entries)} GGA phases from MP (pure -GGA suffix only)")
+                else:
+                    print(f"  Retrieved {len(mp_entries)} GGA phases from MP (-GGA and -GGA+U suffixes)")
         except Exception as e:
-            print(f"  ERROR: Could not get MP entries: {e}")
+            print(f"  ERROR: Could not get reference phase entries: {e}")
             failed += len(struct_ids)
             continue
         
@@ -1192,16 +1239,24 @@ def main():
     print("\n" + "="*70)
     print("Saving DFT hull results...")
     
+    if use_mattersim_ref:
+        energy_ref_label = 'MatterSim-DFT'
+        ref_source = 'MatterSim'
+    else:
+        if args.pure_pbe:
+            energy_ref_label = 'GGA'
+        else:
+            energy_ref_label = 'GGA+U'
+        ref_source = 'Materials Project'
+
     output_data = {
         'summary': {
             'total_structures': len(completed_structures),
             'passed_prescreening': processed,
             'failed_prescreening': failed,
             'hull_threshold': args.hull_threshold,
-            'energy_reference': 'VASP-DFT-PBE',
-            'mp_phase_selection': 'all_gga_entries (no is_stable filter, stability determined by PhaseDiagram)',
-            'mp_functional_filter': 'pure_pbe' if args.pure_pbe else 'mixed_pbe_pbeU',
-            'reference_phase_source': f'mp_mattersim.json (chemsys-based, ensures MatterSim and DFT use same reference phases)'
+            'energy_reference': energy_ref_label,
+            'reference_phase_source': ref_source,
         },
         'results': results
     }

@@ -10,6 +10,7 @@ PRESCREEN_RESULTS="./VASP_JOBS/prescreening_stability.json"
 PURE_PBE=""
 HULL_THRESHOLD=""
 OUTLIER_THRESHOLD=""
+MP_ENERGY_REF=""
 SUBMIT_SCRIPT="submit_dft_e_hull.sh"
 
 # Parse command-line arguments
@@ -39,6 +40,10 @@ while [[ $# -gt 0 ]]; do
             OUTLIER_THRESHOLD="$2"
             shift 2
             ;;
+        --mp-energy-ref)
+            MP_ENERGY_REF="$2"
+            shift 2
+            ;;
         -h|--help)
             cat << EOF
 Usage: $0 [OPTIONS]
@@ -52,6 +57,7 @@ Options:
     --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)
     --hull-threshold VALUE     E_hull threshold for stability analysis in eV/atom (default: 0.1)
     --outlier-threshold VALUE  E_hull outlier threshold for plot filtering in eV/atom (default: 0.5)
+    --mp-energy-ref REF        Energy reference for MP phases: 'mp' (default) or 'mattersim'
     -h, --help                 Show this help message
 
 Example:
@@ -72,11 +78,11 @@ Example:
 
 Notes:
     - Requires mattersim conda environment
-    - Requires MP_API_KEY environment variable (32 characters)
+    - Requires MP_API_KEY environment variable (mp_vaspdft.json always generated)
     - Only processes structures that completed relaxation (RELAX_DONE or later)
     - If --prescreen-results provided, only processes structures that passed pre-screening
-    - Uses VASP energies from vasprun.xml + MP DFT energies for competing phases
-    - Default: Mixed PBE/PBE+U (MP recommended methodology for accuracy)
+    - Default (--mp-energy-ref mp): query MP GGA DFT energies for competing phases
+    - --mp-energy-ref mattersim: use MatterSim-relaxed DFT energies from mp_mattersim.json
     - Use --pure-pbe only if your VASP uses pure PBE without +U corrections
 
 EOF
@@ -103,6 +109,7 @@ export PRESCREEN_RESULTS
 export PURE_PBE
 export HULL_THRESHOLD
 export OUTLIER_THRESHOLD
+export MP_ENERGY_REF
 
 echo "======================================================================"
 echo "Submitting DFT Energy Above Hull Calculation"
@@ -124,6 +131,11 @@ if [ -n "$OUTLIER_THRESHOLD" ]; then
     echo "Outlier threshold: $OUTLIER_THRESHOLD eV/atom"
 else
     echo "Outlier threshold: 0.5 eV/atom (default)"
+fi
+if [ -n "$MP_ENERGY_REF" ]; then
+    echo "MP energy reference: $MP_ENERGY_REF"
+else
+    echo "MP energy reference: mp (default)"
 fi
 echo "======================================================================"
 

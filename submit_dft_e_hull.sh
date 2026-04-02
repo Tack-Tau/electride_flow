@@ -41,13 +41,12 @@ echo "  OMP_NUM_THREADS: $OMP_NUM_THREADS"
 echo "  MKL_NUM_THREADS: $MKL_NUM_THREADS"
 echo ""
 
-# Check MP API key
+# Check MP API key (always required -- mp_vaspdft.json is generated for bookkeeping)
 if [ -z "$MP_API_KEY" ]; then
     echo "ERROR: MP_API_KEY environment variable not set"
     echo "Set it in ~/.bashrc: export MP_API_KEY=your_32_character_key"
     exit 1
 fi
-
 echo "MP_API_KEY: ${MP_API_KEY:0:8}..." # Show first 8 chars only
 echo "======================================================================"
 echo ""
@@ -77,6 +76,11 @@ if [ -n "$OUTLIER_THRESHOLD" ]; then
 else
     echo "  Outlier threshold: 0.5 eV/atom (default)"
 fi
+if [ -n "$MP_ENERGY_REF" ]; then
+    echo "  MP energy reference: $MP_ENERGY_REF"
+else
+    echo "  MP energy reference: mp (default)"
+fi
 echo ""
 
 # Build command with optional arguments
@@ -92,6 +96,10 @@ fi
 
 if [ -n "$OUTLIER_THRESHOLD" ]; then
     CMD="$CMD --outlier-threshold $OUTLIER_THRESHOLD"
+fi
+
+if [ -n "$MP_ENERGY_REF" ]; then
+    CMD="$CMD --mp-energy-ref $MP_ENERGY_REF"
 fi
 
 eval $CMD
