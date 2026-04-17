@@ -28,6 +28,7 @@ BATCH_SIZE=${BATCH_SIZE:-32}
 MAX_ATOMS_GPU=${MAX_ATOMS_GPU:-2048}
 MODEL_PATH=${MODEL_PATH:-""}
 PURE_PBE=${PURE_PBE:-""}
+PRESSURE=${PRESSURE:-""}
 
 echo "========================================================================"
 echo "VASPflow Pre-screening (MatterSim)"
@@ -157,6 +158,10 @@ if [ -n "$PURE_PBE" ]; then
     CMD="$CMD $PURE_PBE"
 fi
 
+if [ -n "$PRESSURE" ]; then
+    CMD="$CMD --pressure $PRESSURE"
+fi
+
 # Print configuration
 echo "Configuration:"
 echo "  Results dir: $RESULTS_DIR"
@@ -173,6 +178,7 @@ if [ -n "$PURE_PBE" ]; then
 else
     echo "  Functional filtering: Mixed PBE/PBE+U"
 fi
+echo "  Pressure: ${PRESSURE:-0.0} GPa"
 
 # Check MP API key
 if [ -z "$MP_API_KEY" ]; then

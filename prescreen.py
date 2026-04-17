@@ -53,6 +53,8 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from pyxtal import pyxtal
 from pyxtal.db import database_topology
 
+from ase.filters import ExpCellFilter
+
 try:
     from mattersim.forcefield.potential import Potential
     from mattersim.applications.batch_relax import BatchRelaxer
@@ -61,6 +63,23 @@ except ImportError:
     MATTERSIM_AVAILABLE = False
     print("ERROR: MatterSim not available!")
     sys.exit(1)
+
+GPa_TO_eV_A3 = 1.0 / 160.2176634
+
+
+def make_pressure_filter(pressure_gpa):
+    """Return an ExpCellFilter subclass with scalar_pressure pre-bound.
+
+    BatchRelaxer checks `issubclass(filter, Filter)`, so we need a real
+    subclass rather than functools.partial.
+    """
+    p = pressure_gpa * GPa_TO_eV_A3
+
+    class PressureExpCellFilter(ExpCellFilter):
+        def __init__(self, atoms, **kwargs):
+            super().__init__(atoms, scalar_pressure=p, **kwargs)
+
+    return PressureExpCellFilter
 
 warnings.filterwarnings('ignore', category=UserWarning, message='.*POTCAR data with symbol.*')
 warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0')
@@ -105,7 +124,7 @@ def validate_structure(pmg_struct):
         return False, f"Validation error: {str(e)[:100]}"
 
 
-def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=500, max_natoms_per_batch=2048):
+def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=500, max_natoms_per_batch=2048, pressure_gpa=0.0):
     """
     Batch relax multiple structures using MatterSim BatchRelaxer for efficient GPU utilization.
     
@@ -115,6 +134,7 @@ def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=5
         fmax: Force convergence criterion (eV/Angstrom)
         max_steps: Maximum optimization steps per structure
         max_natoms_per_batch: Maximum total atoms in GPU batch (controls memory usage)
+        pressure_gpa: Target pressure in GPa (default 0.0 = ambient)
     
     Returns:
         list of dicts: Results for each structure with keys:
@@ -208,6 +228,10 @@ def relax_structure_mattersim(structures_dict, potential, fmax=0.01, max_steps=5
             max_natoms_per_batch=max_natoms_per_batch,
             max_n_steps=max_steps
         )
+        if pressure_gpa != 0.0:
+            relaxer.filter = make_pressure_filter(pressure_gpa)
+            print(f"    Relaxing at {pressure_gpa} GPa "
+                  f"({pressure_gpa * GPa_TO_eV_A3:.6f} eV/A^3)")
         
         trajectories = relaxer.relax(atoms_list)
         
@@ -425,7 +449,7 @@ def save_mp_cache_locked(cache_file, new_entries_data):
             fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
 
 
-def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, pure_pbe=False, max_atoms_gpu=2048):
+def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, pure_pbe=False, max_atoms_gpu=2048, pressure_gpa=0.0):
     """
     Get MP GGA phase structures and relax with MatterSim for consistent energy reference.
     
@@ -666,7 +690,8 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, p
                     potential,
                     fmax=0.01,
                     max_steps=500,
-                    max_natoms_per_batch=max_atoms_gpu
+                    max_natoms_per_batch=max_atoms_gpu,
+                    pressure_gpa=pressure_gpa
                 )
                 
                 # Process batch results
@@ -886,6 +911,13 @@ def main():
         help="Path to MatterSim checkpoint (default: MatterSim-v1.0.0-5M.pth). "
              "Use a finetuned model path for domain-specific prescreening."
     )
+    parser.add_argument(
+        '--pressure',
+        type=float,
+        default=0.0,
+        help="Target pressure in GPa for relaxation (default: 0.0, ambient). "
+             "Passed as scalar_pressure to ASE ExpCellFilter."
+    )
     
     args = parser.parse_args()
     
@@ -923,6 +955,11 @@ def main():
         print(f"Functional filtering: Pure GGA-PBE only (PBE+U/R2SCAN/SCAN excluded)")
     else:
         print(f"Functional filtering: Mixed PBE/PBE+U (MP recommended methodology)")
+    
+    if args.pressure != 0.0:
+        print(f"Target pressure: {args.pressure} GPa ({args.pressure * GPa_TO_eV_A3:.6f} eV/A^3)")
+    else:
+        print(f"Target pressure: 0.0 GPa (ambient)")
     
     print("="*70 + "\n")
     
@@ -1051,7 +1088,8 @@ def main():
         try:
             mp_entries = get_mp_stable_phases_mattersim(
                 chemsys, mp_api_key, mp_cache_file, potential_mp, 
-                pure_pbe=args.pure_pbe, max_atoms_gpu=args.max_atoms_gpu
+                pure_pbe=args.pure_pbe, max_atoms_gpu=args.max_atoms_gpu,
+                pressure_gpa=args.pressure
             )
             mp_entries_cache[chemsys] = mp_entries
             print(f"  → {len(mp_entries)} stable phases ready\n")
@@ -1271,7 +1309,8 @@ def main():
                     potential,
                     fmax=0.01,
                     max_steps=500,
-                    max_natoms_per_batch=args.max_atoms_gpu
+                    max_natoms_per_batch=args.max_atoms_gpu,
+                    pressure_gpa=args.pressure
                 )
                 
                 print(f"Batch relaxation complete. Processing results...\n")
@@ -1494,6 +1533,7 @@ def main():
             'failed_prescreening': failed,
             'hull_threshold': args.hull_threshold,
             'energy_reference': Path(args.model_path).name,
+            'pressure_gpa': args.pressure,
             'mp_api': 'legacy_pymatgen_mprester_complete_gga',
             'mp_filtering': 'pure_pbe_only' if args.pure_pbe else 'mixed_pbe_pbeU',
             'mp_suffix_filter': 'strict_-GGA_suffix' if args.pure_pbe else 'strict_-GGA_or_-GGA+U_suffix'

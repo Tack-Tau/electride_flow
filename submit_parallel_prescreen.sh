@@ -13,6 +13,7 @@ MAX_STRUCTURES=0
 MAX_ATOMS_GPU=2048
 MODEL_PATH=""
 PURE_PBE=""
+PRESSURE=""
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
@@ -57,6 +58,10 @@ while [[ $# -gt 0 ]]; do
             PURE_PBE="--pure-pbe"
             shift
             ;;
+        --pressure)
+            PRESSURE="$2"
+            shift 2
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -75,6 +80,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --model-path PATH          Path to MatterSim checkpoint (default: MatterSim-v1.0.0-5M.pth)"
     echo "                             Use finetuned model: --model-path /path/to/best_model.pth"
     echo "  --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)"
+    echo "  --pressure GPa             Target pressure in GPa for relaxation (default: 0.0, ambient)"
     echo "  -h, --help                 Show this help message"
             echo ""
             echo "Example:"
@@ -124,6 +130,7 @@ echo "Max structures per composition: $MAX_STRUCTURES"
 echo "Device: $DEVICE"
 echo "Model: ${MODEL_PATH:-MatterSim-v1.0.0-5M.pth (default)}"
 echo "Functional filter: ${PURE_PBE:+Pure PBE only}${PURE_PBE:-Mixed PBE/PBE+U}"
+echo "Pressure: ${PRESSURE:-0.0} GPa"
 echo "========================================"
 echo ""
 
@@ -185,6 +192,7 @@ MAX_STRUCTURES=$MAX_STRUCTURES
 DEVICE="$DEVICE"
 MODEL_PATH="$MODEL_PATH"
 PURE_PBE="$PURE_PBE"
+PRESSURE="$PRESSURE"
 
 EOF_PARAMS
     
@@ -225,6 +233,10 @@ fi
 
 if [ -n "$PURE_PBE" ]; then
     CMD="$CMD $PURE_PBE"
+fi
+
+if [ -n "$PRESSURE" ]; then
+    CMD="$CMD --pressure $PRESSURE"
 fi
 
 $CMD

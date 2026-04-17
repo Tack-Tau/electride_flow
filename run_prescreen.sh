@@ -17,6 +17,7 @@ BATCH_SIZE=32
 MAX_ATOMS_GPU=2048
 MODEL_PATH=""
 PURE_PBE=""
+PRESSURE=""
 
 # Colors
 GREEN='\033[0;32m'
@@ -80,6 +81,10 @@ while [[ $# -gt 0 ]]; do
             PURE_PBE="--pure-pbe"
             shift
             ;;
+        --pressure)
+            PRESSURE="$2"
+            shift 2
+            ;;
         --help)
             echo "Usage: bash run_prescreen.sh [options]"
             echo ""
@@ -104,6 +109,7 @@ while [[ $# -gt 0 ]]; do
     echo "                             Use finetuned model: --model-path /path/to/ft_mattersim/model/best_model.pth"
     echo "  --pure-pbe                 Filter MP entries to pure GGA-PBE only (exclude PBE+U)"
             echo "                             Default: accept both PBE and PBE+U (recommended)"
+    echo "  --pressure GPa             Target pressure in GPa for relaxation (default: 0.0, ambient)"
             echo ""
             echo "Example:"
             echo "  bash run_prescreen.sh --max-structures 10 --hull-threshold 0.05"
@@ -158,6 +164,7 @@ echo "  Conda environment:    $CONDA_ENV"
 echo "  MP API key:           ${MP_API_KEY:+[SET]}${MP_API_KEY:-[NOT SET]}"
 echo "  Model path:           ${MODEL_PATH:-MatterSim-v1.0.0-5M.pth (default)}"
 echo "  Functional filter:    ${PURE_PBE:+Pure PBE only}${PURE_PBE:-Mixed PBE/PBE+U (default)}"
+echo "  Pressure:             ${PRESSURE:-0.0} GPa"
 echo ""
 
 # Check if database already exists
@@ -189,6 +196,7 @@ export BATCH_SIZE
 export MAX_ATOMS_GPU
 export MODEL_PATH
 export PURE_PBE
+export PRESSURE
 
 JOB_ID=$(sbatch submit_prescreen.sh | awk '{print $NF}')
 
