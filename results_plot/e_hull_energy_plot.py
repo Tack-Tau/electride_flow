@@ -7,10 +7,12 @@ and regenerates all comparison plots without needing to re-parse VASP outputs.
 
 Usage:
     python3 e_hull_energy_plot.py --results-dir <path_to_json_files>
+    python3 e_hull_energy_plot.py --results-dir <path> --systems Co-Gd Fe-Y
 
 Example:
     python3 e_hull_energy_plot.py --results-dir Bin-Ele-HT/prescreen_results
     python3 e_hull_energy_plot.py --results-dir Ter-Ele-HT/prescreen_results
+    python3 e_hull_energy_plot.py --results-dir bin_mag_results --systems Co-Gd Fe-Y
 """
 
 import os
@@ -62,6 +64,31 @@ def extract_mp_id(entry_id):
     return mp_id
 
 
+def normalize_chemsys(chemsys):
+    """Normalize a chemsys string so element order doesn't matter."""
+    return '-'.join(sorted(chemsys.split('-')))
+
+
+def get_entry_chemsys(entry):
+    """Get chemsys from a JSON entry, using the 'chemsys' field if present,
+    otherwise deriving from 'composition'."""
+    if 'chemsys' in entry and entry['chemsys']:
+        return normalize_chemsys(entry['chemsys'])
+    comp = entry.get('composition', '')
+    if isinstance(comp, dict):
+        return '-'.join(sorted(comp.keys()))
+    return '-'.join(sorted(str(e) for e in Composition(comp).elements))
+
+
+def filter_by_systems(data_list, systems):
+    """Filter entries whose chemsys is a sub-system of any requested system
+    (so elemental references are kept for binary system queries)."""
+    norm_sets = [set(normalize_chemsys(s).split('-')) for s in systems]
+    return [d for d in data_list
+            if any(set(get_entry_chemsys(d).split('-')).issubset(ns)
+                   for ns in norm_sets)]
+
+
 def save_figure(fig, output_dir, filename_base):
     """Save figure in both PNG and PDF formats."""
     png_file = output_dir / f"{filename_base}.png"
@@ -74,7 +101,7 @@ def save_figure(fig, output_dir, filename_base):
     print(f"    {pdf_file.name}")
 
 
-def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_results_data, output_dir, outlier_threshold=0.5):
+def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_results_data, output_dir, outlier_threshold=0.5, systems=None):
     """
     Generate combined hull energy comparison plots.
     
@@ -90,6 +117,8 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     
     # Try to get composition from hull_comparison data
     matched_hull = hull_comparison_data.get('matched_structures', [])
+    if systems:
+        matched_hull = filter_by_systems(matched_hull, systems)
     if matched_hull:
         first_comp = Composition(matched_hull[0].get('composition', ''))
         n_elements = len(first_comp.elements)
@@ -115,8 +144,14 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     dft_vals_hull = np.array([d['dft_e_hull'] for d in matched_hull])
     
     # ===== PREPARE DATA FOR GENERATED STRUCTURES =====
+    prescreen_results = prescreen_data.get('results', [])
+    dft_results = dft_results_data.get('results', [])
+    if systems:
+        prescreen_results = filter_by_systems(prescreen_results, systems)
+        dft_results = filter_by_systems(dft_results, systems)
+
     ms_energies = {}
-    for result in prescreen_data.get('results', []):
+    for result in prescreen_results:
         if result.get('passed_prescreening', False) and result.get('mattersim_energy_per_atom') is not None:
             struct_id = result['structure_id']
             ms_energies[struct_id] = result['mattersim_energy_per_atom']
@@ -124,7 +159,7 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     vasp_energies = {}
     dft_e_hull_lookup = {}
     
-    for result in dft_results_data.get('results', []):
+    for result in dft_results:
         struct_id = result['structure_id']
         vasp_e = result.get('vasp_energy_per_atom')
         dft_e_hull = result.get('energy_above_hull')
@@ -379,7 +414,7 @@ def plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_result
     plt.close()
 
 
-def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir):
+def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir, systems=None):
     """
     Generate combined MP phases comparison plot.
     
@@ -388,6 +423,10 @@ def plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir):
     """
     print("\nGenerating combined MP phases comparison plot...")
     
+    if systems:
+        mp_mattersim_cache = filter_by_systems(mp_mattersim_cache, systems)
+        mp_dft_cache = filter_by_systems(mp_dft_cache, systems)
+
     # Parse MatterSim cache
     ms_by_mpid = {}
     for item in mp_mattersim_cache:
@@ -547,6 +586,13 @@ Examples:
         default=0.2,
         help="DFT E_hull outlier threshold for plot filtering (eV/atom, default: 0.2)"
     )
+    parser.add_argument(
+        '--systems',
+        nargs='+',
+        default=None,
+        help="Filter to specific chemical systems (e.g., Co-Gd Fe-Y). "
+             "Default: use all entries."
+    )
     
     args = parser.parse_args()
     
@@ -560,6 +606,8 @@ Examples:
     print(f"Results directory: {results_dir}")
     print(f"Output directory: {output_dir}")
     print(f"Outlier threshold: {args.outlier_threshold} eV/atom")
+    if args.systems:
+        print(f"Systems filter: {args.systems}")
     print("="*70)
     
     # Check for required JSON files
@@ -618,10 +666,12 @@ Examples:
     try:
         # 1. Combined hull energy comparison plots (scatter + residuals)
         plot_hull_energy_comparison(hull_comparison_data, prescreen_data, dft_results_data, 
-                                    output_dir, outlier_threshold=outlier_threshold_to_use)
+                                    output_dir, outlier_threshold=outlier_threshold_to_use,
+                                    systems=args.systems)
         
         # 2. Combined MP phases comparison plot (scatter + residuals)
-        plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir)
+        plot_mp_phases_combined(mp_mattersim_cache, mp_dft_cache, output_dir,
+                                systems=args.systems)
         
     except Exception as e:
         print(f"\nERROR during plot generation: {e}")
