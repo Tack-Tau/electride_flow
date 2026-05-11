@@ -7,12 +7,12 @@ and regenerates all comparison plots without needing to re-parse VASP outputs.
 
 Usage:
     python3 e_hull_energy_plot.py --results-dir <path_to_json_files>
-    python3 e_hull_energy_plot.py --results-dir <path> --systems Co-Gd Fe-Y
+    python3 e_hull_energy_plot.py --results-dir <path> --systems Ca-P Ba-S
 
 Example:
     python3 e_hull_energy_plot.py --results-dir Bin-Ele-HT/prescreen_results
     python3 e_hull_energy_plot.py --results-dir Ter-Ele-HT/prescreen_results
-    python3 e_hull_energy_plot.py --results-dir bin_mag_results --systems Co-Gd Fe-Y
+    python3 e_hull_energy_plot.py --results-dir bin_mag_results --systems Ca-P Ba-S
 """
 
 import os
@@ -590,7 +590,7 @@ Examples:
         '--systems',
         nargs='+',
         default=None,
-        help="Filter to specific chemical systems (e.g., Co-Gd Fe-Y). "
+        help="Filter to specific chemical systems (e.g., Ca-P Ba-S). "
              "Default: use all entries."
     )
     
