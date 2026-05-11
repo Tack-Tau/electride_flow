@@ -18,6 +18,8 @@ After running this script, use reset_failed_jobs.py to retry from RELAX:
 Usage:
     python reset_failed_to_relax.py --dry-run    # Preview changes
     python reset_failed_to_relax.py              # Execute changes
+    python reset_failed_to_relax.py --chemsys Al-Ca-S    # Filter by chemical system
+    python reset_failed_to_relax.py --chemsys "Ca-S-*"   # Wildcard (any system with Ca and S)
 """
 
 import json
@@ -27,6 +29,35 @@ import shutil
 import argparse
 from datetime import datetime
 from pathlib import Path
+
+
+def parse_chemsys_pattern(chemsys_input):
+    """
+    Parse a chemsys input into (fixed_elements, is_wildcard).
+    
+    Order-independent: "Ca-S-*", "*-S-Ca", "S-*-Ca" are all equivalent.
+    Exact: "Al-Ca-S", "Ca-S-Al" are equivalent (sorted to "Al-Ca-S").
+    """
+    parts = [p.strip() for p in chemsys_input.split('-')]
+    fixed = sorted([p for p in parts if p != '*'])
+    is_wildcard = '*' in parts
+    return fixed, is_wildcard
+
+
+def chemsys_matches(stored_chemsys, fixed_elements, is_wildcard):
+    """
+    Check if a stored chemsys matches the filter.
+    
+    stored_chemsys: alphabetically sorted, e.g. "Al-Ca-S"
+    fixed_elements: sorted list of required elements
+    is_wildcard: if True, stored_chemsys must contain all fixed_elements (and may have more)
+                 if False, stored_chemsys must be exactly the sorted fixed_elements
+    """
+    stored_els = stored_chemsys.split('-')
+    if is_wildcard:
+        return all(el in stored_els for el in fixed_elements)
+    else:
+        return stored_els == fixed_elements
 
 
 def load_workflow(workflow_path):
@@ -69,13 +100,20 @@ def create_backup(workflow_path, dry_run=False):
         sys.exit(1)
 
 
-def find_failed_structures(data):
-    """Find all structures in failed states."""
+def find_failed_structures(data, chemsys_filter=None):
+    """Find all structures in failed states, optionally filtered by chemsys."""
+    if chemsys_filter:
+        fixed_els, is_wc = parse_chemsys_pattern(chemsys_filter)
+    
     sc_failed = []
     elf_failed = []
     parchg_failed = []
     
     for struct_id, sdata in data['structures'].items():
+        if chemsys_filter:
+            stored = sdata.get('chemsys', '')
+            if not chemsys_matches(stored, fixed_els, is_wc):
+                continue
         state = sdata.get('state')
         if state == 'SC_FAILED':
             sc_failed.append(struct_id)
@@ -152,7 +190,7 @@ def remove_directory(dir_path, dir_type, dry_run=False):
     return True, f"Removed {dir_type} directory"
 
 
-def process_structure(struct_id, sdata, dry_run=False):
+def process_structure(struct_id, sdata, clean=False, dry_run=False):
     """Process a single failed structure."""
     results = {
         'relax_updated': False,
@@ -161,6 +199,13 @@ def process_structure(struct_id, sdata, dry_run=False):
     }
     
     print(f"  Processing: {struct_id}")
+    
+    if not clean:
+        results['messages'].append(f"    (skipping directory cleanup, use --clean to remove)")
+        for msg in results['messages']:
+            print(msg)
+        print()
+        return results
     
     # Update RELAX marker
     relax_dir = sdata.get('relax_dir', '')
@@ -246,6 +291,19 @@ def main():
         help='Path to workflow.json (default: VASP_JOBS/workflow.json)'
     )
     parser.add_argument(
+        '--chemsys',
+        type=str,
+        default=None,
+        help="Filter by chemical system (order-independent). "
+             "Exact: 'Al-Ca-S'. Wildcard: 'Ca-S-*' (any system with Ca and S)"
+    )
+    parser.add_argument(
+        '--clean',
+        action='store_true',
+        help="Remove SPE directories and update RELAX markers. "
+             "Without this flag, only workflow.json states are reset."
+    )
+    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Preview changes without executing'
@@ -265,6 +323,12 @@ def main():
     print("=" * 67)
     print(f"Workflow database: {args.workflow}")
     print(f"Timestamp: {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    if args.chemsys:
+        fixed_els, is_wc = parse_chemsys_pattern(args.chemsys)
+        if is_wc:
+            print(f"Chemical system filter: {args.chemsys} (wildcard, containing {fixed_els})")
+        else:
+            print(f"Chemical system filter: {args.chemsys} (exact: {'-'.join(fixed_els)})")
     print()
     print("Will reset: SC_FAILED, ELF_FAILED, PARCHG_FAILED → RELAX_FAILED")
     print()
@@ -290,7 +354,7 @@ def main():
     
     # Step 2: Find failed structures
     print("Step 2: Finding failed structures...")
-    failed = find_failed_structures(data)
+    failed = find_failed_structures(data, chemsys_filter=args.chemsys)
     total_count = len(failed['all_failed'])
     
     if total_count == 0:
@@ -305,12 +369,17 @@ def main():
     
     # Step 3: Process each structure
     print("Step 3: Processing structures...")
+    if not args.clean:
+        print("  NOTE: Running without --clean flag")
+        print("        Job states will be reset but directories won't be cleaned")
+        print("        Use --clean to remove SPE directories and update RELAX markers")
+        print()
     total_relax_updated = 0
     total_spe_removed = 0
     
     for struct_id in failed['all_failed']:
         sdata = data['structures'].get(struct_id, {})
-        results = process_structure(struct_id, sdata, args.dry_run)
+        results = process_structure(struct_id, sdata, clean=args.clean, dry_run=args.dry_run)
         
         if results['relax_updated']:
             total_relax_updated += 1

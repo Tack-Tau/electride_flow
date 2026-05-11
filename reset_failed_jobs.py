@@ -5,15 +5,18 @@ Reset failed VASP jobs to allow retry.
 This script resets structures that failed at various stages:
 - RELAX_FAILED -> PENDING (retry from scratch)
 - SC_FAILED -> RELAX_DONE (retry SC stage in SPE)
-- PARCHG_FAILED -> SC_DONE (retry PARCHG stage in SPE)
-- ELF_FAILED -> PARCHG_DONE (retry ELF stage in SPE)
+- PARCHG_FAILED -> RELAX_DONE (retry PARCHG stage in SPE)
+- ELF_FAILED -> RELAX_DONE (retry ELF stage in SPE)
 
 Usage:
-    python3 reset_failed_jobs.py [--db workflow.json] [--stage STAGE] [--clean] [--dry-run]
+    python3 reset_failed_jobs.py [--db workflow.json] [--stage STAGE] [--chemsys CHEMSYS] [--clean] [--dry-run]
 
 Options:
     --db PATH           Path to workflow.json (default: ./VASP_JOBS/workflow.json)
     --stage STAGE       Only reset specific stage: RELAX, SC, PARCHG, or ELF (default: all)
+    --chemsys CHEMSYS   Filter by chemical system (order-independent).
+                        Exact: "Al-Ca-S" (matches regardless of input order)
+                        Wildcard: "Ca-S-*" (matches any system containing Ca and S)
     --clean             Clean calculation directories to proper restart state:
                         - RELAX_FAILED: Remove entire Relax directory
                         - SC_FAILED: Remove all SPE directory contents (keeps Relax/CONTCAR)
@@ -37,6 +40,12 @@ Examples:
 
     # Reset ELF failures with cleanup (removes old ELFCAR, keeps PARCHG-* files)
     python3 reset_failed_jobs.py --stage ELF --clean
+
+    # Reset all failed jobs for a specific chemical system
+    python3 reset_failed_jobs.py --chemsys Al-Ca-S --clean
+
+    # Reset using wildcard (all systems containing Ca and S)
+    python3 reset_failed_jobs.py --chemsys "Ca-S-*" --clean
 """
 
 import json
@@ -46,26 +55,67 @@ from pathlib import Path
 from collections import defaultdict
 
 
-def list_failed_structures(data):
+def parse_chemsys_pattern(chemsys_input):
+    """
+    Parse a chemsys input into (fixed_elements, is_wildcard).
+    
+    Order-independent: "Ca-S-*", "*-S-Ca", "S-*-Ca" are all equivalent.
+    Exact: "Al-Ca-S", "Ca-S-Al" are equivalent (sorted to "Al-Ca-S").
+    """
+    parts = [p.strip() for p in chemsys_input.split('-')]
+    fixed = sorted([p for p in parts if p != '*'])
+    is_wildcard = '*' in parts
+    return fixed, is_wildcard
+
+
+def chemsys_matches(stored_chemsys, fixed_elements, is_wildcard):
+    """
+    Check if a stored chemsys matches the filter.
+    
+    stored_chemsys: alphabetically sorted, e.g. "Al-Ca-S"
+    fixed_elements: sorted list of required elements
+    is_wildcard: if True, stored_chemsys must contain all fixed_elements (and may have more)
+                 if False, stored_chemsys must be exactly the sorted fixed_elements
+    """
+    stored_els = stored_chemsys.split('-')
+    if is_wildcard:
+        return all(el in stored_els for el in fixed_elements)
+    else:
+        return stored_els == fixed_elements
+
+
+def list_failed_structures(data, chemsys_filter=None):
     """List all failed structures grouped by failure stage."""
     failed_states = ['RELAX_FAILED', 'SC_FAILED', 'PARCHG_FAILED', 'ELF_FAILED']
+    
+    if chemsys_filter:
+        fixed_els, is_wc = parse_chemsys_pattern(chemsys_filter)
     
     failed_by_stage = defaultdict(list)
     for struct_id, sdata in data['structures'].items():
         if sdata['state'] in failed_states:
+            if chemsys_filter:
+                stored = sdata.get('chemsys', '')
+                if not chemsys_matches(stored, fixed_els, is_wc):
+                    continue
             failed_by_stage[sdata['state']].append({
                 'id': struct_id,
                 'composition': sdata.get('composition', 'N/A'),
+                'chemsys': sdata.get('chemsys', 'N/A'),
                 'error': sdata.get('error', 'No error message'),
                 'dir': sdata.get(f"{sdata['state'].split('_')[0].lower()}_dir", 'N/A')
             })
     
     if not any(failed_by_stage.values()):
-        print("No failed structures found!")
+        filter_msg = f" (chemsys filter: {chemsys_filter})" if chemsys_filter else ""
+        print(f"No failed structures found{filter_msg}!")
         return
     
     print("\n" + "="*80)
-    print("Failed Structures Summary")
+    header = "Failed Structures Summary"
+    if chemsys_filter:
+        header += f" [chemsys: {chemsys_filter}]"
+    print(header)
     print("="*80)
     
     for state in failed_states:
@@ -73,8 +123,8 @@ def list_failed_structures(data):
             structures = failed_by_stage[state]
             print(f"\n{state}: {len(structures)} structures")
             print("-" * 80)
-            for s in structures[:5]:  # Show first 5
-                print(f"  {s['id']:<25} {s['composition']:<20}")
+            for s in structures[:5]:
+                print(f"  {s['id']:<25} {s['chemsys']:<15} {s['composition']:<20}")
                 if s['error'] and s['error'] != 'No error message':
                     error_short = s['error'][:60] + '...' if len(s['error']) > 60 else s['error']
                     print(f"    Error: {error_short}")
@@ -86,13 +136,14 @@ def list_failed_structures(data):
     print("="*80 + "\n")
 
 
-def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
+def reset_failed_jobs(db_path, stage_filter=None, chemsys_filter=None, clean=False, dry_run=False):
     """
     Reset failed jobs to allow retry.
     
     Args:
         db_path: Path to workflow.json
         stage_filter: Only reset specific stage ('RELAX', 'SC', 'PARCHG', or None for all)
+        chemsys_filter: Filter by chemical system (order-independent, supports wildcard '*')
         clean: Remove failed directories and error markers
         dry_run: Don't make actual changes
     """
@@ -125,6 +176,15 @@ def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
             print(f"Error: Invalid stage '{stage_filter}'. Must be RELAX, SC, PARCHG, or ELF")
             return
     
+    # Parse chemsys filter
+    if chemsys_filter:
+        fixed_els, is_wc = parse_chemsys_pattern(chemsys_filter)
+        print(f"Chemical system filter: {chemsys_filter}")
+        if is_wc:
+            print(f"  Wildcard mode: matching systems containing {fixed_els}")
+        else:
+            print(f"  Exact mode: matching system {'-'.join(fixed_els)}")
+    
     reset_counts = defaultdict(int)
     cleaned_dirs = []
     
@@ -142,6 +202,11 @@ def reset_failed_jobs(db_path, stage_filter=None, clean=False, dry_run=False):
         
         if state not in reset_map:
             continue
+        
+        if chemsys_filter:
+            stored = sdata.get('chemsys', '')
+            if not chemsys_matches(stored, fixed_els, is_wc):
+                continue
         
         new_state, job_field, dir_field = reset_map[state]
         job_dir = Path(sdata[dir_field])
@@ -292,6 +357,13 @@ def main():
         help="Only reset specific stage (RELAX, SC, PARCHG, or ELF)"
     )
     parser.add_argument(
+        '--chemsys',
+        type=str,
+        default=None,
+        help="Filter by chemical system (order-independent). "
+             "Exact: 'Al-Ca-S'. Wildcard: 'Ca-S-*' (any system with Ca and S)"
+    )
+    parser.add_argument(
         '--clean',
         action='store_true',
         help="Remove VASP_FAILED markers from directories"
@@ -319,13 +391,14 @@ def main():
     if args.list:
         with open(db_path, 'r') as f:
             data = json.load(f)
-        list_failed_structures(data)
+        list_failed_structures(data, chemsys_filter=args.chemsys)
         return 0
     
     # Reset mode
     reset_failed_jobs(
         db_path=db_path,
         stage_filter=args.stage,
+        chemsys_filter=args.chemsys,
         clean=args.clean,
         dry_run=args.dry_run
     )
