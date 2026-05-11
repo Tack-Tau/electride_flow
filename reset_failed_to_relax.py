@@ -46,7 +46,7 @@ def parse_chemsys_pattern(chemsys_input):
 
 def chemsys_matches(stored_chemsys, fixed_elements, is_wildcard):
     """
-    Check if a stored chemsys matches the filter.
+    Check if a stored chemsys matches a single pattern.
     
     stored_chemsys: alphabetically sorted, e.g. "Al-Ca-S"
     fixed_elements: sorted list of required elements
@@ -58,6 +58,14 @@ def chemsys_matches(stored_chemsys, fixed_elements, is_wildcard):
         return all(el in stored_els for el in fixed_elements)
     else:
         return stored_els == fixed_elements
+
+
+def chemsys_matches_any(stored_chemsys, patterns):
+    """Check if stored chemsys matches any of the parsed patterns."""
+    for fixed_els, is_wc in patterns:
+        if chemsys_matches(stored_chemsys, fixed_els, is_wc):
+            return True
+    return False
 
 
 def load_workflow(workflow_path):
@@ -103,7 +111,7 @@ def create_backup(workflow_path, dry_run=False):
 def find_failed_structures(data, chemsys_filter=None):
     """Find all structures in failed states, optionally filtered by chemsys."""
     if chemsys_filter:
-        fixed_els, is_wc = parse_chemsys_pattern(chemsys_filter)
+        patterns = [parse_chemsys_pattern(c) for c in chemsys_filter]
     
     sc_failed = []
     elf_failed = []
@@ -112,7 +120,7 @@ def find_failed_structures(data, chemsys_filter=None):
     for struct_id, sdata in data['structures'].items():
         if chemsys_filter:
             stored = sdata.get('chemsys', '')
-            if not chemsys_matches(stored, fixed_els, is_wc):
+            if not chemsys_matches_any(stored, patterns):
                 continue
         state = sdata.get('state')
         if state == 'SC_FAILED':
@@ -292,10 +300,11 @@ def main():
     )
     parser.add_argument(
         '--chemsys',
-        type=str,
+        nargs='+',
         default=None,
-        help="Filter by chemical system (order-independent). "
-             "Exact: 'Al-Ca-S'. Wildcard: 'Ca-S-*' (any system with Ca and S)"
+        help="Filter by chemical system (order-independent, multiple patterns allowed). "
+             "Exact: 'Al-Ca-S'. Wildcard: 'Ca-S-*' (any system with Ca and S). "
+             "Example: --chemsys 'Ca-S-*' 'Al-Ca-*'"
     )
     parser.add_argument(
         '--clean',
@@ -324,11 +333,13 @@ def main():
     print(f"Workflow database: {args.workflow}")
     print(f"Timestamp: {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     if args.chemsys:
-        fixed_els, is_wc = parse_chemsys_pattern(args.chemsys)
-        if is_wc:
-            print(f"Chemical system filter: {args.chemsys} (wildcard, containing {fixed_els})")
-        else:
-            print(f"Chemical system filter: {args.chemsys} (exact: {'-'.join(fixed_els)})")
+        print(f"Chemical system filter: {' '.join(args.chemsys)}")
+        for c in args.chemsys:
+            fixed_els, is_wc = parse_chemsys_pattern(c)
+            if is_wc:
+                print(f"  {c} -> wildcard, matching systems containing {fixed_els}")
+            else:
+                print(f"  {c} -> exact, matching system {'-'.join(fixed_els)}")
     print()
     print("Will reset: SC_FAILED, ELF_FAILED, PARCHG_FAILED → RELAX_FAILED")
     print()

@@ -70,7 +70,7 @@ def parse_chemsys_pattern(chemsys_input):
 
 def chemsys_matches(stored_chemsys, fixed_elements, is_wildcard):
     """
-    Check if a stored chemsys matches the filter.
+    Check if a stored chemsys matches a single pattern.
     
     stored_chemsys: alphabetically sorted, e.g. "Al-Ca-S"
     fixed_elements: sorted list of required elements
@@ -84,19 +84,27 @@ def chemsys_matches(stored_chemsys, fixed_elements, is_wildcard):
         return stored_els == fixed_elements
 
 
+def chemsys_matches_any(stored_chemsys, patterns):
+    """Check if stored chemsys matches any of the parsed patterns."""
+    for fixed_els, is_wc in patterns:
+        if chemsys_matches(stored_chemsys, fixed_els, is_wc):
+            return True
+    return False
+
+
 def list_failed_structures(data, chemsys_filter=None):
     """List all failed structures grouped by failure stage."""
     failed_states = ['RELAX_FAILED', 'SC_FAILED', 'PARCHG_FAILED', 'ELF_FAILED']
     
     if chemsys_filter:
-        fixed_els, is_wc = parse_chemsys_pattern(chemsys_filter)
+        patterns = [parse_chemsys_pattern(c) for c in chemsys_filter]
     
     failed_by_stage = defaultdict(list)
     for struct_id, sdata in data['structures'].items():
         if sdata['state'] in failed_states:
             if chemsys_filter:
                 stored = sdata.get('chemsys', '')
-                if not chemsys_matches(stored, fixed_els, is_wc):
+                if not chemsys_matches_any(stored, patterns):
                     continue
             failed_by_stage[sdata['state']].append({
                 'id': struct_id,
@@ -107,14 +115,14 @@ def list_failed_structures(data, chemsys_filter=None):
             })
     
     if not any(failed_by_stage.values()):
-        filter_msg = f" (chemsys filter: {chemsys_filter})" if chemsys_filter else ""
+        filter_msg = f" (chemsys filter: {' '.join(chemsys_filter)})" if chemsys_filter else ""
         print(f"No failed structures found{filter_msg}!")
         return
     
     print("\n" + "="*80)
     header = "Failed Structures Summary"
     if chemsys_filter:
-        header += f" [chemsys: {chemsys_filter}]"
+        header += f" [chemsys: {' '.join(chemsys_filter)}]"
     print(header)
     print("="*80)
     
@@ -178,12 +186,13 @@ def reset_failed_jobs(db_path, stage_filter=None, chemsys_filter=None, clean=Fal
     
     # Parse chemsys filter
     if chemsys_filter:
-        fixed_els, is_wc = parse_chemsys_pattern(chemsys_filter)
-        print(f"Chemical system filter: {chemsys_filter}")
-        if is_wc:
-            print(f"  Wildcard mode: matching systems containing {fixed_els}")
-        else:
-            print(f"  Exact mode: matching system {'-'.join(fixed_els)}")
+        patterns = [parse_chemsys_pattern(c) for c in chemsys_filter]
+        print(f"Chemical system filter: {' '.join(chemsys_filter)}")
+        for c, (fixed_els, is_wc) in zip(chemsys_filter, patterns):
+            if is_wc:
+                print(f"  {c} -> wildcard, matching systems containing {fixed_els}")
+            else:
+                print(f"  {c} -> exact, matching system {'-'.join(fixed_els)}")
     
     reset_counts = defaultdict(int)
     cleaned_dirs = []
@@ -205,7 +214,7 @@ def reset_failed_jobs(db_path, stage_filter=None, chemsys_filter=None, clean=Fal
         
         if chemsys_filter:
             stored = sdata.get('chemsys', '')
-            if not chemsys_matches(stored, fixed_els, is_wc):
+            if not chemsys_matches_any(stored, patterns):
                 continue
         
         new_state, job_field, dir_field = reset_map[state]
@@ -358,10 +367,11 @@ def main():
     )
     parser.add_argument(
         '--chemsys',
-        type=str,
+        nargs='+',
         default=None,
-        help="Filter by chemical system (order-independent). "
-             "Exact: 'Al-Ca-S'. Wildcard: 'Ca-S-*' (any system with Ca and S)"
+        help="Filter by chemical system (order-independent, multiple patterns allowed). "
+             "Exact: 'Al-Ca-S'. Wildcard: 'Ca-S-*' (any system with Ca and S). "
+             "Example: --chemsys 'Ca-S-*' 'Al-Ca-*'"
     )
     parser.add_argument(
         '--clean',
