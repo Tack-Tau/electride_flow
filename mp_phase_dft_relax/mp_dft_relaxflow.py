@@ -27,21 +27,22 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 # Suppress POTCAR warnings (they are informational only)
 warnings.filterwarnings('ignore', category=BadInputSetWarning)
 
-# MAGMOM overrides for elements with wrong pymatgen neutral-element defaults.
-# pymatgen gives Co=0.6 (should be ~5 for magnetic intermetallics) and
-# most rare earths get 0.6 (only Ce=5 and Eu=10 have neutral entries).
-# RE values: Hund's rule spin-only moments (unpaired 4f electron count).
+# MAGMOM overrides: antiparallel RE-TM ferrimagnetic convention.
+# RE = negative (4f moments), late 3d TM = positive, early 3d TM = small negative.
 MAGMOM_OVERRIDE = {
-    'Pr': 2.0, 'Nd': 3.0, 'Pm': 4.0, 'Sm': 5.0,
-    'Gd': 7.0, 'Tb': 6.0, 'Dy': 5.0, 'Ho': 4.0,
-    'Er': 3.0, 'Tm': 2.0, 'Yb': 1.0,
-    'Co': 2.0,
+    'Ce': -1.0,
+    'Pr': -2.0, 'Nd': -3.0, 'Pm': -4.0, 'Sm': -5.0, 'Eu': -7.0,
+    'Gd': -7.0, 'Tb': -6.0, 'Dy': -5.0, 'Ho': -4.0,
+    'Er': -3.0, 'Tm': -2.0, 'Yb': -1.0,
+    'Ti': -0.5, 'V': -1.0, 'Cr': -2.0,
+    'Mn': 0.5,
+    'Fe': 2.2, 'Co': 2.0, 'Ni': 2.0,
 }
 
 
 def build_magmom(structure):
-    """Build MAGMOM dict overriding wrong pymatgen defaults for intermetallics.
-    
+    """Build MAGMOM dict for RE-TM ferrimagnetic initial guess.
+
     When overriding via user_incar_settings, pymatgen does NOT merge with its
     config defaults, so all elements must be included in the returned dict.
     Returns dict (element -> value) if any override is needed,
@@ -50,16 +51,10 @@ def build_magmom(structure):
     elements = [str(el) for el in structure.composition.elements]
     if not any(el in MAGMOM_OVERRIDE for el in elements):
         return None
-    pmg_defaults = {
-        'Ce': 5, 'Eu': 10, 'Fe': 5, 'Ni': 5,
-        'Mn': 5, 'Cr': 5, 'V': 5, 'Mo': 5, 'W': 5,
-    }
     result = {}
     for el in elements:
         if el in MAGMOM_OVERRIDE:
             result[el] = MAGMOM_OVERRIDE[el]
-        elif el in pmg_defaults:
-            result[el] = pmg_defaults[el]
         else:
             result[el] = 0.6
     return result
@@ -308,8 +303,8 @@ def create_vasp_relax_inputs(structure, job_dir):
         'LAECHG': False,
         'LASPH': True,
         'LORBIT': 11,
-        'SYMPREC': 1e-4,
         'NCORE': 4,
+        'SYMPREC': 1e-5,
     }
     
     # Override MAGMOM for RE and Co (pymatgen defaults are wrong for intermetallics)
