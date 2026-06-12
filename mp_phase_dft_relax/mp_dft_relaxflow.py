@@ -244,7 +244,7 @@ def save_database(db_path, db):
 
 
 def symmetrize_structure(structure, symprec_list=(0.01, 0.1)):
-    """Symmetrize structure to clean up numerical noise from CIF conversion.
+    """Symmetrize structure to clean up numerical noise from VASP conversion.
 
     Tries progressively looser tolerances until symmetry is detected.
     Prefers primitive cell, falls back to conventional if it matches original size.

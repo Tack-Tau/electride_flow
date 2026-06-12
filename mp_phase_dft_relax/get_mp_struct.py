@@ -27,6 +27,10 @@ import time
 import random
 from pathlib import Path
 
+import pymatgen.entries.computed_entries
+import pymatgen.core.structure
+sys.modules.setdefault('pymatgen.core.entries', pymatgen.entries.computed_entries)
+
 from pymatgen.core import Structure
 
 # Use legacy pymatgen MPRester for complete GGA entry retrieval
@@ -37,6 +41,13 @@ except ImportError:
     print("Install with: pip install pymatgen")
     sys.exit(1)
 
+def alpha_to_mpid(alpha_id):
+    """Convert AlphaID (e.g. 'mp-aaaaaaft') to numeric MPID (e.g. 'mp-149')."""
+    prefix, code = alpha_id.rsplit('-', 1)
+    num = 0
+    for ch in code:
+        num = num * 26 + (ord(ch) - ord('a'))
+    return f"{prefix}-{num}"
 
 def extract_chemsys_from_cache(cache_data, chemsys_filter=None):
     """
@@ -68,14 +79,14 @@ def extract_chemsys_from_cache(cache_data, chemsys_filter=None):
 
 def query_and_download_structures(chemsys, output_dir, mp_api_key, skip_existing=True, pure_pbe=False):
     """
-    Query MP for GGA/GGA+U structures and save as CIF files with MP energies.
+    Query MP for GGA/GGA+U structures and save as VASP files with MP energies.
     Uses legacy MPRester with get_entries_in_chemsys() for complete GGA coverage.
     
     Args:
         chemsys: Chemical system (e.g., 'B-Li-N')
-        output_dir: Output directory for CIF files
+        output_dir: Output directory for VASP files
         mp_api_key: Materials Project API key
-        skip_existing: If True, skip structures that already have CIF files
+        skip_existing: If True, skip structures that already have VASP files
         pure_pbe: If True, filter to GGA-PBE only (exclude PBE+U)
     
     Returns:
@@ -110,48 +121,44 @@ def query_and_download_structures(chemsys, output_dir, mp_api_key, skip_existing
         skipped_structure_retrieval = []
         
         for comp_entry in computed_entries:
-            entry_id = str(comp_entry.entry_id)
-            
+            # Handle entry_id as dict (new MP API) or string (legacy)
+            raw_eid = comp_entry.entry_id
+            if isinstance(raw_eid, dict):
+                mp_id = alpha_to_mpid(raw_eid.get('identifier', 'mp-a'))
+                suffix = raw_eid.get('suffix', '')
+                sep = raw_eid.get('separator', '-')
+                entry_id = f"{mp_id}{sep}{suffix}"
+            else:
+                entry_id = str(raw_eid)
+                suffix = entry_id.rsplit('-', 1)[-1] if '-' in entry_id else ''
+                parts = entry_id.split('-')
+                mp_id = parts[0] + '-' + parts[1] if len(parts) >= 2 else entry_id
+
             # Skip if already seen
             if entry_id in seen_entries:
                 continue
-            
-            # Only accept entries ending with '-GGA' or '-GGA+U' (strict filtering)
-            is_pure_gga = entry_id.endswith('-GGA')
-            is_gga_u = entry_id.endswith('-GGA+U')
-            
-            # Skip non-GGA entries (r2SCAN, SCAN, or no suffix)
+
+            # Only accept GGA or GGA+U entries
+            is_pure_gga = suffix == 'GGA'
+            is_gga_u = suffix == 'GGA+U'
+
             if not is_pure_gga and not is_gga_u:
                 continue
-            
+
             # Skip +U if pure_pbe requested
             if pure_pbe and is_gga_u:
                 continue
-            
+
             has_U = is_gga_u
-            
-            # Extract base MP ID (e.g., 'mp-540703' from 'mp-540703-GGA')
-            parts = entry_id.split('-')
-            if len(parts) >= 2:
-                mp_id = parts[0] + '-' + parts[1]
-            else:
-                mp_id = entry_id
-            
-            # Get structure
-            structure = None
-            try:
-                structure = mpr.get_structure_by_material_id(mp_id)
-            except Exception as e:
+
+            # Use structure from ComputedStructureEntry directly
+            structure = getattr(comp_entry, 'structure', None)
+            if structure is None:
                 skipped_structure_retrieval.append(f"{mp_id} ({comp_entry.composition.reduced_formula})")
                 continue
-            
-            if structure is None:
-                continue
-            
-            # Get MP GGA-PBE uncorrected energy (raw DFT, no composition corrections)
-            # This is the energy we want to compare with VASP
-            mp_energy_per_atom = comp_entry.energy_per_atom  # From ComputedEntry
-            
+
+            mp_energy_per_atom = comp_entry.energy_per_atom
+
             mp_phases.append((mp_id, structure, has_U, entry_id, float(mp_energy_per_atom)))
             seen_entries[entry_id] = True
         
@@ -255,7 +262,7 @@ def main():
     parser.add_argument(
         '--force',
         action='store_true',
-        help="Force re-download even if CIF files already exist"
+        help="Force re-download even if VASP files already exist"
     )
     parser.add_argument(
         '--pure-pbe',

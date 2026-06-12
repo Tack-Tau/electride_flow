@@ -33,6 +33,10 @@ import warnings
 from pathlib import Path
 from collections import defaultdict
 
+import pymatgen.entries.computed_entries
+import pymatgen.core.structure
+sys.modules.setdefault('pymatgen.core.entries', pymatgen.entries.computed_entries)
+
 from pymatgen.core import Structure, Composition
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
 from pymatgen.io.ase import AseAtomsAdaptor
@@ -68,6 +72,13 @@ warnings.filterwarnings('ignore', message='Using UFloat objects with std_dev==0'
 warnings.filterwarnings('ignore', category=DeprecationWarning, module='pkg_resources')
 warnings.filterwarnings('ignore', category=UserWarning, message='.*pkg_resources is deprecated.*')
 
+def alpha_to_mpid(alpha_id):
+    """Convert AlphaID (e.g. 'mp-aaaaaaft') to numeric MPID (e.g. 'mp-149')."""
+    prefix, code = alpha_id.rsplit('-', 1)
+    num = 0
+    for ch in code:
+        num = num * 26 + (ord(ch) - ord('a'))
+    return f"{prefix}-{num}"
 
 def relax_structure_mattersim(pmg_struct, calculator, structure_id=None, fmax=0.001, max_steps=800):
     """
@@ -282,15 +293,26 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cached_data, calculator,
         skipped_structure_retrieval = []
         
         for comp_entry in computed_entries:
-            entry_id = str(comp_entry.entry_id)
+            # Handle entry_id as dict (new MP API) or string (legacy)
+            raw_eid = comp_entry.entry_id
+            if isinstance(raw_eid, dict):
+                mp_id = alpha_to_mpid(raw_eid.get('identifier', 'mp-a'))
+                suffix = raw_eid.get('suffix', '')
+                sep = raw_eid.get('separator', '-')
+                entry_id = f"{mp_id}{sep}{suffix}"
+            else:
+                entry_id = str(raw_eid)
+                suffix = entry_id.rsplit('-', 1)[-1] if '-' in entry_id else ''
+                parts = entry_id.split('-')
+                mp_id = parts[0] + '-' + parts[1] if len(parts) >= 2 else entry_id
             
             # Skip if already seen
             if entry_id in seen_entries:
                 continue
             
-            # Only accept entries ending with '-GGA' or '-GGA+U'
-            is_pure_gga = entry_id.endswith('-GGA')
-            is_gga_u = entry_id.endswith('-GGA+U')
+            # Only accept GGA or GGA+U entries
+            is_pure_gga = suffix == 'GGA'
+            is_gga_u = suffix == 'GGA+U'
             
             # Skip non-GGA entries (r2SCAN, SCAN, or no suffix)
             if not is_pure_gga and not is_gga_u:
@@ -300,22 +322,10 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cached_data, calculator,
             if pure_pbe and is_gga_u:
                 continue
             
-            # Extract base MP ID (e.g., 'mp-540703' from 'mp-540703-GGA')
-            parts = entry_id.split('-')
-            if len(parts) >= 2:
-                mp_id = parts[0] + '-' + parts[1]
-            else:
-                mp_id = entry_id
-            
-            # Get structure
-            structure = None
-            try:
-                structure = mpr.get_structure_by_material_id(mp_id)
-            except Exception as e:
-                skipped_structure_retrieval.append(f"{mp_id} ({comp_entry.composition.reduced_formula})")
-                continue
-            
+            # Use structure from ComputedStructureEntry directly
+            structure = getattr(comp_entry, 'structure', None)
             if structure is None:
+                skipped_structure_retrieval.append(f"{mp_id} ({comp_entry.composition.reduced_formula})")
                 continue
             
             mp_phases.append((mp_id, structure, is_gga_u))

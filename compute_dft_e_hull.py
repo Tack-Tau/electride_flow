@@ -27,6 +27,10 @@ import random
 from pathlib import Path
 from collections import defaultdict
 
+import pymatgen.entries.computed_entries
+import pymatgen.core.structure
+sys.modules.setdefault('pymatgen.core.entries', pymatgen.entries.computed_entries)
+
 from pymatgen.core import Composition
 from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
@@ -48,6 +52,14 @@ from scipy.stats import gaussian_kde
 
 # Use non-interactive backend for cluster
 mpl.use('Agg')
+
+def alpha_to_mpid(alpha_id):
+    """Convert AlphaID (e.g. 'mp-aaaaaaft') to numeric MPID (e.g. 'mp-149')."""
+    prefix, code = alpha_id.rsplit('-', 1)
+    num = 0
+    for ch in code:
+        num = num * 26 + (ord(ch) - ord('a'))
+    return f"{prefix}-{num}"
 
 def load_workflow_database(db_path):
     """Load workflow.json database."""
@@ -359,15 +371,26 @@ def get_mp_stable_phases_dft(chemsys, mp_api_key, dft_cache_file, pure_pbe=False
         seen_entries = {}  # Track by entry_id to avoid duplicates
         
         for comp_entry in computed_entries:
-            entry_id = str(comp_entry.entry_id)
+            # Handle entry_id as dict (new MP API) or string (legacy)
+            raw_eid = comp_entry.entry_id
+            if isinstance(raw_eid, dict):
+                mp_id = alpha_to_mpid(raw_eid.get('identifier', 'mp-a'))
+                suffix = raw_eid.get('suffix', '')
+                sep = raw_eid.get('separator', '-')
+                entry_id = f"{mp_id}{sep}{suffix}"
+            else:
+                entry_id = str(raw_eid)
+                suffix = entry_id.rsplit('-', 1)[-1] if '-' in entry_id else ''
+                parts = entry_id.split('-')
+                mp_id = parts[0] + '-' + parts[1] if len(parts) >= 2 else entry_id
             
             # Skip if already seen
             if entry_id in seen_entries:
                 continue
             
-            # Only accept entries ending with '-GGA' or '-GGA+U'
-            is_pure_gga = entry_id.endswith('-GGA')
-            is_gga_u = entry_id.endswith('-GGA+U')
+            # Only accept GGA or GGA+U entries
+            is_pure_gga = suffix == 'GGA'
+            is_gga_u = suffix == 'GGA+U'
             
             # Skip non-GGA entries (r2SCAN, SCAN, or no suffix)
             if not is_pure_gga and not is_gga_u:
@@ -381,7 +404,6 @@ def get_mp_stable_phases_dft(chemsys, mp_api_key, dft_cache_file, pure_pbe=False
             try:
                 uncorrected_energy = comp_entry.uncorrected_energy
             except AttributeError:
-                # Fallback: use corrected energy if uncorrected not available
                 uncorrected_energy = comp_entry.energy
             
             composition = comp_entry.composition
@@ -389,13 +411,6 @@ def get_mp_stable_phases_dft(chemsys, mp_api_key, dft_cache_file, pure_pbe=False
             # Determine chemsys for this phase
             doc_elements = sorted([str(el) for el in composition.elements])
             doc_chemsys = '-'.join(doc_elements)
-            
-            # Extract base MP ID (e.g., 'mp-540703' from 'mp-540703-GGA')
-            parts = entry_id.split('-')
-            if len(parts) >= 2:
-                mp_id = parts[0] + '-' + parts[1]
-            else:
-                mp_id = entry_id
             
             # Create PDEntry with uncorrected energy
             entry = PDEntry(

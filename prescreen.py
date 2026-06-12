@@ -38,6 +38,10 @@ from pathlib import Path
 from io import StringIO
 from datetime import datetime
 
+import pymatgen.entries.computed_entries
+import pymatgen.core.structure
+sys.modules.setdefault('pymatgen.core.entries', pymatgen.entries.computed_entries)
+
 from pymatgen.core import Composition
 from pymatgen.io.cif import CifParser
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
@@ -48,6 +52,7 @@ except ImportError:
     print("ERROR: pymatgen package with MPRester is required")
     print("Install with: pip install pymatgen")
     sys.exit(1)
+
 from pymatgen.io.ase import AseAtomsAdaptor
 
 from pyxtal import pyxtal
@@ -66,6 +71,13 @@ except ImportError:
 
 GPa_TO_eV_A3 = 1.0 / 160.2176634
 
+def alpha_to_mpid(alpha_id):
+    """Convert AlphaID (e.g. 'mp-aaaaaaft') to numeric MPID (e.g. 'mp-149')."""
+    prefix, code = alpha_id.rsplit('-', 1)
+    num = 0
+    for ch in code:
+        num = num * 26 + (ord(ch) - ord('a'))
+    return f"{prefix}-{num}"
 
 def make_pressure_filter(pressure_gpa):
     """Return an ExpCellFilter subclass with scalar_pressure pre-bound.
@@ -547,15 +559,26 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, p
                 skipped_structure_retrieval = []
                 
                 for comp_entry in computed_entries:
-                    entry_id = str(comp_entry.entry_id)
+                    # Handle entry_id as dict (new MP API) or string (legacy)
+                    raw_eid = comp_entry.entry_id
+                    if isinstance(raw_eid, dict):
+                        mp_id = alpha_to_mpid(raw_eid.get('identifier', 'mp-a'))
+                        suffix = raw_eid.get('suffix', '')
+                        sep = raw_eid.get('separator', '-')
+                        entry_id = f"{mp_id}{sep}{suffix}"
+                    else:
+                        entry_id = str(raw_eid)
+                        suffix = entry_id.rsplit('-', 1)[-1] if '-' in entry_id else ''
+                        parts = entry_id.split('-')
+                        mp_id = parts[0] + '-' + parts[1] if len(parts) >= 2 else entry_id
                     
                     # Skip if already seen
                     if entry_id in seen_entries:
                         continue
                     
-                    # Only accept entries ending with '-GGA' or '-GGA+U' (strict filtering)
-                    is_pure_gga = entry_id.endswith('-GGA')
-                    is_gga_u = entry_id.endswith('-GGA+U')
+                    # Only accept GGA or GGA+U entries
+                    is_pure_gga = suffix == 'GGA'
+                    is_gga_u = suffix == 'GGA+U'
                     
                     # Skip non-GGA entries (r2SCAN, SCAN, or no suffix)
                     if not is_pure_gga and not is_gga_u:
@@ -567,26 +590,11 @@ def get_mp_stable_phases_mattersim(chemsys, mp_api_key, cache_file, potential, p
                     
                     has_U = is_gga_u
                     
-                    # Extract base MP ID (e.g., 'mp-540703' from 'mp-540703-GGA')
-                    parts = entry_id.split('-')
-                    if len(parts) >= 2:
-                        mp_id = parts[0] + '-' + parts[1]
-                    else:
-                        mp_id = entry_id
-                    
-                    # Get structure
-                    structure = None
-                    try:
-                        structure = mpr.get_structure_by_material_id(mp_id)
-                    except Exception as e:
-                        skipped_structure_retrieval.append(
-                            f"{mp_id} ({comp_entry.composition.reduced_formula}): {str(e).split(chr(10))[0][:120]}"
-                        )
-                        continue
-                    
+                    # Use structure from ComputedStructureEntry directly
+                    structure = getattr(comp_entry, 'structure', None)
                     if structure is None:
                         skipped_structure_retrieval.append(
-                            f"{mp_id} ({comp_entry.composition.reduced_formula}): returned None"
+                            f"{mp_id} ({comp_entry.composition.reduced_formula}): no structure"
                         )
                         continue
                     
