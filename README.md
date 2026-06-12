@@ -89,11 +89,32 @@ cd vaspflow
 # - Electride.py                     # Bader analysis
 # - bader (executable, optional)
 
-# Create conda environment (with MatterSim for pre-screening)
+# Load CUDA runtime (check your HPC's available versions, need >= 11.8)
+module load cuda/11.8
+
+# Create conda environment
 conda create -n mattersim python=3.10
 conda activate mattersim
-conda install -c conda-forge pymatgen mp-api
-pip install mattersim ase
+
+# Install PyTorch with matching CUDA version FIRST
+# (adjust cu118 to match your loaded CUDA module)
+pip install torch==2.5.1+cu118 torchvision==0.20.1+cu118 torchaudio==2.5.1+cu118 \
+    --index-url https://download.pytorch.org/whl/cu118
+pip install torch_scatter==2.1.2+pt25cu118 torch_sparse==0.6.18+pt25cu118 \
+    torch_cluster==1.6.3+pt25cu118 torch_spline_conv==1.2.2+pt25cu118 \
+    -f https://data.pyg.org/whl/torch-2.5.1+cu118.html
+pip install torch-geometric==2.7.0 pytorch-lightning==2.0.6
+
+# Install pymatgen/mp-api (pinned versions for MP API compatibility)
+pip install pymatgen==2024.10.29 mp-api==0.43.0 monty==2024.7.30 emmet-core==0.84.10
+
+# Install other dependencies
+pip install numpy>=2.0 ase==3.23.0 pyxtal==1.1.1
+
+# Install MatterSim last (--no-deps to avoid overriding torch versions)
+pip install mattersim --no-deps
+# Then install any missing mattersim deps that don't conflict:
+pip install torch-ema torch-runstats torchmetrics
 
 # Set environment variables in ~/.bashrc
 echo 'export PMG_VASP_PSP_DIR=$HOME/apps/PBE64' >> ~/.bashrc
