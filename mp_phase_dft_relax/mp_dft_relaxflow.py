@@ -312,11 +312,20 @@ def create_vasp_relax_inputs(structure, job_dir):
     if magmom is not None:
         incar_settings['MAGMOM'] = magmom
     
+    # Compute NBANDS from POTCAR ZVAL to avoid VASP crash for high-ZVAL systems
+    potcar = MPRelaxSet(structure).potcar
+    zval = {p.element: p.ZVAL for p in potcar}
+    nelect = sum(zval[str(el)] * amt for el, amt in structure.composition.items())
+    nions = len(structure)
+    ncore = incar_settings.get('NCORE', 4)
+    nbands = max(int(nelect / 2) + max(nions // 2, 10), int(0.6 * nelect))
+    nbands = ((nbands + ncore - 1) // ncore) * ncore
+    incar_settings['NBANDS'] = nbands
+
     vis = MPRelaxSet(structure,
         user_incar_settings=incar_settings,
         user_kpoints_settings={'reciprocal_density': 64}
     )
-    
     vis.write_input(str(job_dir))
 
 
