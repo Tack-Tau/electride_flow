@@ -34,8 +34,9 @@ from pathlib import Path
 from collections import defaultdict
 
 import pymatgen.entries.computed_entries
-import pymatgen.core.structure
+import pymatgen.entries.compatibility
 sys.modules.setdefault('pymatgen.core.entries', pymatgen.entries.computed_entries)
+sys.modules.setdefault('pymatgen.analysis.compatibility', pymatgen.entries.compatibility)
 
 from pymatgen.core import Structure, Composition
 from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
